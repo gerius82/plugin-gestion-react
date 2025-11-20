@@ -190,60 +190,100 @@ export default function FichaGrillaTurnos() {
       </div>
 
 
-
-
       {cargando ? (
         <div className="text-center py-10 text-gray-500">Cargando…</div>
       ) : (
-        <div className="overflow-x-auto">
-          <div className="grid grid-cols-6 text-center font-semibold text-gray-700 mb-2 min-w-full">
-            {dias.map((d) => (
-              <div key={d} className="py-2">{d}</div>
+        <>
+          {/* --- DESKTOP Y TABLET: GRILLA 6 COLUMNAS --- */}
+          <div className="hidden md:block overflow-x-auto">
+            <div className="grid grid-cols-6 text-center font-semibold text-gray-700 mb-2">
+              {dias.map((d) => (
+                <div key={d} className="py-2">{d}</div>
+              ))}
+            </div>
+
+            {filas.map((filaKey) => (
+              <div key={filaKey} className="grid grid-cols-6 gap-4 mb-4">
+                {dias.map((dia) => {
+                  const celda = mapa[dia][filaKey];
+                  const lista = celda?.inscriptos || [];
+                  const turno = celda?.turnoLabel;
+                  const max = getMaxCupo(turno);
+                  const completo = lista.length >= max;
+
+                  return (
+                    <div
+                      key={`${dia}-${filaKey}`}
+                      className={`rounded-lg border p-3 h-[420px] align-top text-xs shadow-sm ${
+                        completo ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+                      }`}
+                    >
+                      <h5 className="text-center text-[11px] text-gray-700 mb-1">
+                        {turno ? `${soloHorario(turno)} (${lista.length}/${max})` : ""}
+                      </h5>
+
+                      <div className="overflow-y-auto max-h-[360px] pr-1">
+                        {lista.map((a, i) => (
+                          <div key={`${a.nombre}-${a.apellido}-${i}`} className="text-[11px] mb-1">
+                            <span className="text-gray-800">{i + 1}. {a.nombre} {a.apellido}</span>
+                            <span className="text-gray-500"> · {a.edad ?? ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ))}
           </div>
 
-          {filas.map((filaKey) => (
-            <div key={filaKey} className="grid grid-cols-6 gap-4 mb-4 min-w-full">
-              {dias.map((dia) => {
-                const celda = mapa[dia][filaKey];
-                const lista = celda?.inscriptos || [];
-                const turno = celda?.turnoLabel;
-                const max = getMaxCupo(turno);
-                const completo = lista.length >= max;
+          {/* --- MOBILE: CARD POR DÍA --- */}
+          <div className="block md:hidden space-y-4">
+            {dias.map((dia) => (
+              <div key={dia} className="bg-white rounded-xl shadow border border-gray-200 p-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-3">{dia}</h3>
 
-                return (
-                  <div
-                    key={`${dia}-${filaKey}`}
-                    className={`rounded-lg border p-3 h-[420px] align-top text-sm shadow-sm ${
-                      completo ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
-                    }`}
-                  >
-                    <h5 className="text-center text-xs text-gray-700 mb-2">
-                      {turno ? `${soloHorario(turno)} (${lista.length}/${max})` : ""}
-                    </h5>
+                {filas.map((filaKey) => {
+                  const celda = mapa[dia][filaKey];
+                  if (!celda || !celda.turnoLabel) return null;
 
-                    <table className="w-full border-collapse">
-                      <tbody>
-                        {lista.map((a, i) => (
-                          <tr key={`${a.nombre}-${a.apellido}-${i}`}>
-                            <td className="py-0.5 pr-1 w-4 text-[10px] align-top text-gray-400">{i + 1}</td>
-                            <td className="py-0.5">
-                              <div className="leading-tight flex flex-col sm:flex-row sm:justify-between sm:items-center whitespace-normal">
-                                <div className="text-gray-800 mr-2 break-words">{a.nombre} {a.apellido}</div>
-                                <div className="text-[11px] text-gray-500 text-right">{a.edad ?? ""}</div>
-                              </div>
-                            </td>
-                          </tr>
+                  const lista = celda.inscriptos;
+                  const turno = celda.turnoLabel;
+                  const max = getMaxCupo(turno);
+                  const completo = lista.length >= max;
+
+                  return (
+                    <div
+                      key={filaKey}
+                      className={`mb-3 p-2 rounded-lg border ${
+                        completo ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+                      }`}
+                    >
+                      <div className="flex justify-between mb-1">
+                        <span className="text-xs font-semibold">{soloHorario(turno)}</span>
+                        <span className="text-[11px]">
+                          {lista.length}/{max}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-x-2 gap-y-1">
+                        {lista.map((al, i) => (
+                          <span key={`${al.nombre}-${i}`} className="text-[11px] text-gray-800">
+                            {i + 1}. {al.nombre} {al.apellido}
+                          </span>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </>
       )}
+
+
+      
 
       <div className="mt-6 w-fit mx-auto">
         <Link
