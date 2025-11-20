@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
 import FormularioInscripcion from "./components/FormularioInscripcion";
 import logo from "./assets/Logo_Plugin_2025.png";
 import MenuGestion from "./components/menus/MenuGestion";
@@ -45,6 +45,7 @@ function App() {
             }
           />
           <Route path="/formulario" element={<FormularioInscripcion />} />
+          <Route path="/" element={<Navigate to="/menu-gestion" replace />} />
           <Route path="/alumnos-menu" element={<AlumnosMenu />} />
           <Route path="/ficha" element={<FichaAlumno />} />
           <Route path="/ficha-alumno/:id" element={<FichaAlumno />} />
