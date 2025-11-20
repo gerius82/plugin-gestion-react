@@ -152,37 +152,43 @@ export default function FichaGrillaTurnos() {
         <FaThLarge className="text-purple-500 text-3xl" />
         <h2 className="text-2xl font-bold text-center">Grilla por Turno</h2>
       </div>
-      {/* Filtros compactos en 2 columnas */}
-      <div className="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        
-        {/* Sede */}
-        <div className="flex flex-col">
-          <label className="font-medium mb-1">Filtrar por sede:</label>
-          <select
-            className="w-full border rounded px-3 py-2 bg-gray-50 hover:bg-white"
-            value={sede}
-            onChange={(e) => setSede(e.target.value)}
-          >
-            <option value="Calle Mendoza">Calle Mendoza</option>
-            <option value="Fisherton">Fisherton</option>
-          </select>
-        </div>
+      {/* Filtros en tarjeta, 2 columnas */}
+      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Sede */}
+          <div className="flex flex-col">
+            <label className="text-sm font-medium text-gray-700 mb-1">
+              Filtrar por sede:
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 hover:bg-white text-sm"
+              value={sede}
+              onChange={(e) => setSede(e.target.value)}
+            >
+              <option value="Calle Mendoza">Calle Mendoza</option>
+              <option value="Fisherton">Fisherton</option>
+            </select>
+          </div>
 
-        {/* Tipo de inscripción */}
-        <div className="flex flex-col">
-          <label className="font-medium mb-1">Tipo de inscripción:</label>
-          <select
-            className="w-full border rounded px-3 py-2 bg-gray-50 hover:bg-white"
-            value={tipoInscripcion}
-            onChange={(e) => setTipoInscripcion(e.target.value)}
-          >
-            <option value="CICLO_2025">Ciclo 2025</option>
-            <option value="TDV">Taller de Verano</option>
-            <option value="CICLO_2026">Ciclo 2026</option>
-          </select>
+          {/* Tipo de inscripción */}
+          <div className="flex flex-col">
+            <label className="text-sm font-medium text-gray-700 mb-1">
+              Tipo de inscripción:
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 hover:bg-white text-sm"
+              value={tipoInscripcion}
+              onChange={(e) => setTipoInscripcion(e.target.value)}
+            >
+              <option value="CICLO_2025">Ciclo 2025</option>
+              <option value="TDV">Taller de Verano</option>
+              <option value="CICLO_2026">Ciclo 2026</option>
+              <option value="">Todos</option>
+            </select>
+          </div>
         </div>
-
       </div>
+
 
 
 
@@ -190,14 +196,14 @@ export default function FichaGrillaTurnos() {
         <div className="text-center py-10 text-gray-500">Cargando…</div>
       ) : (
         <div className="overflow-x-auto">
-          <div className="grid grid-cols-6 text-center font-semibold text-gray-700 mb-2 min-w-[1200px]">
+          <div className="grid grid-cols-6 text-center font-semibold text-gray-700 mb-2 min-w-full">
             {dias.map((d) => (
               <div key={d} className="py-2">{d}</div>
             ))}
           </div>
 
           {filas.map((filaKey) => (
-            <div key={filaKey} className="grid grid-cols-6 gap-4 mb-4 min-w-[1200px]">
+            <div key={filaKey} className="grid grid-cols-6 gap-4 mb-4 min-w-full">
               {dias.map((dia) => {
                 const celda = mapa[dia][filaKey];
                 const lista = celda?.inscriptos || [];
