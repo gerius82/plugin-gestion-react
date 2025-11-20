@@ -30,22 +30,9 @@ function App() {
       <div className="min-h-screen flex flex-col items-center p-6 bg-gray-100">
         <img src={logo} alt="Logo Plugin" className="w-72 mb-8 drop-shadow-lg" />
         <Routes>
-          <Route
-            path="/"
-            element={
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-4xl">
-                <Link
-                  to="/formulario?origen=gestion"
-                  className="bg-white border-l-8 border-green-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
-                >
-                  <span className="text-2xl">📝</span>
-                  <span className="font-semibold">Formulario de Inscripción</span>
-                </Link>
-              </div>
-            }
-          />
-          <Route path="/formulario" element={<FormularioInscripcion />} />
           <Route path="/" element={<Navigate to="/menu-gestion" replace />} />
+          <Route path="/formulario" element={<FormularioInscripcion />} />
+
           <Route path="/alumnos-menu" element={<AlumnosMenu />} />
           <Route path="/ficha" element={<FichaAlumno />} />
           <Route path="/ficha-alumno/:id" element={<FichaAlumno />} />
