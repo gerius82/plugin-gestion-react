@@ -10,6 +10,7 @@ export default function FichaResumenAlumnos() {
   const [turnosDisponibles, setTurnosDisponibles] = useState([]);
   const [ordenColumna, setOrdenColumna] = useState("creado_en");
   const [ordenAscendente, setOrdenAscendente] = useState(true);
+  const [filtroTipoInscripcion, setFiltroTipoInscripcion] = useState("");
   
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function FichaResumenAlumnos() {
   useEffect(() => {
     if (!config) return;
     cargarDatos();
-  }, [config, filtroSede, filtroTurno, ordenColumna, ordenAscendente]);
+  }, [config, filtroSede, filtroTurno, filtroTipoInscripcion, ordenColumna, ordenAscendente]);
 
   async function cargarDatos() {
     const headers = {
@@ -37,7 +38,8 @@ export default function FichaResumenAlumnos() {
     let filtro = "&activo=eq.true";
     if (filtroSede) filtro += `&sede=eq.${encodeURIComponent(filtroSede)}`;
     if (filtroTurno) filtro += `&turno_1=eq.${encodeURIComponent(filtroTurno)}`;
-
+    if (filtroTipoInscripcion)
+      filtro += `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`;
     const alumnosRes = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=*&order=creado_en.asc${filtro}`, { headers });
     let data = await alumnosRes.json();
 
@@ -91,7 +93,8 @@ export default function FichaResumenAlumnos() {
 
       
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* Sede */}
         <div>
           <label className="block font-medium mb-1">Sede:</label>
           <select
@@ -108,6 +111,7 @@ export default function FichaResumenAlumnos() {
           </select>
         </div>
 
+        {/* Turno */}
         <div>
           <label className="block font-medium mb-1">Turno:</label>
           <select
@@ -121,7 +125,23 @@ export default function FichaResumenAlumnos() {
             ))}
           </select>
         </div>
+
+        {/* 👇 Nuevo: Tipo de inscripción */}
+        <div>
+          <label className="block font-medium mb-1">Tipo de inscripción:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={filtroTipoInscripcion}
+            onChange={(e) => setFiltroTipoInscripcion(e.target.value)}
+          >
+            <option value="">Todos</option>
+            <option value="CICLO_2025">Ciclo 2025</option>
+            <option value="TDV">Taller de Verano</option>
+            <option value="CICLO_2026">Ciclo 2026</option>
+          </select>
+        </div>
       </div>
+
 
       <div className="mb-4 flex gap-6 text-sm text-gray-700 font-medium">
         <span>Total: <strong>{alumnos.length}</strong></span>
