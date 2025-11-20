@@ -152,28 +152,38 @@ export default function FichaGrillaTurnos() {
         <FaThLarge className="text-purple-500 text-3xl" />
         <h2 className="text-2xl font-bold text-center">Grilla por Turno</h2>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
-        <label className="font-medium">Filtrar por sede:</label>
-        <select
-          className="border rounded px-3 py-2 bg-gray-50 hover:bg-white"
-          value={sede}
-          onChange={(e) => setSede(e.target.value)}
-        >
-          <option value="Calle Mendoza">Calle Mendoza</option>
-          <option value="Fisherton">Fisherton</option>
-        </select>
+      {/* Filtros compactos en 2 columnas */}
+      <div className="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        
+        {/* Sede */}
+        <div className="flex flex-col">
+          <label className="font-medium mb-1">Filtrar por sede:</label>
+          <select
+            className="w-full border rounded px-3 py-2 bg-gray-50 hover:bg-white"
+            value={sede}
+            onChange={(e) => setSede(e.target.value)}
+          >
+            <option value="Calle Mendoza">Calle Mendoza</option>
+            <option value="Fisherton">Fisherton</option>
+          </select>
+        </div>
 
-        <label className="font-medium ml-4">Tipo de inscripción:</label>
-        <select
-          className="border rounded px-3 py-2 bg-gray-50 hover:bg-white"
-          value={tipoInscripcion}
-          onChange={(e) => setTipoInscripcion(e.target.value)}
-        >
-          <option value="CICLO_2025">Ciclo 2025</option>
-          <option value="TDV">Taller de Verano</option>
-          <option value="CICLO_2026">Ciclo 2026</option>
-        </select>
+        {/* Tipo de inscripción */}
+        <div className="flex flex-col">
+          <label className="font-medium mb-1">Tipo de inscripción:</label>
+          <select
+            className="w-full border rounded px-3 py-2 bg-gray-50 hover:bg-white"
+            value={tipoInscripcion}
+            onChange={(e) => setTipoInscripcion(e.target.value)}
+          >
+            <option value="CICLO_2025">Ciclo 2025</option>
+            <option value="TDV">Taller de Verano</option>
+            <option value="CICLO_2026">Ciclo 2026</option>
+          </select>
+        </div>
+
       </div>
+
 
 
       {cargando ? (
