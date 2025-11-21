@@ -18,29 +18,54 @@ const FichaAsistencia = () => {
   const [listaMostrada, setListaMostrada] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
-
+  const [tipoInscripcion, setTipoInscripcion] = useState("CICLO_2025"); // 👈 default
 
   useEffect(() => {
-    const loadData = async () => {
+    const loadConfig = async () => {
       const cfg = await (await fetch("/config.json")).json();
-      const turnos = await (await fetch("/turnos.json")).json();
       setConfig(cfg);
+    };
+    loadConfig();
+  }, []);
+
+  useEffect(() => {
+    if (!config) return;
+
+    const loadData = async () => {
+      setCargando(true);
+
+      // Elegir archivo de turnos según tipoInscripcion
+      const archivoTurnos =
+        tipoInscripcion === "TDV" ? "/turnos_verano.json" : "/turnos.json";
+
+      const turnos = await (await fetch(archivoTurnos)).json();
       setTurnosPorSede(turnos);
+
+      // Filtro por tipo de inscripción
+      const filtroTipo = tipoInscripcion
+        ? `&tipo_inscripcion=eq.${encodeURIComponent(tipoInscripcion)}`
+        : "";
+
       const res = await fetch(
-        `${cfg.supabaseUrl}/rest/v1/inscripciones?activo=eq.true&select=id,nombre,apellido,sede,turno_1,curso,creado_en`,
+        `${config.supabaseUrl}/rest/v1/inscripciones?activo=eq.true${filtroTipo}&select=id,nombre,apellido,sede,turno_1,curso,creado_en,tipo_inscripcion`,
         {
           headers: {
-            apikey: cfg.supabaseKey,
-            Authorization: `Bearer ${cfg.supabaseKey}`,
+            apikey: config.supabaseKey,
+            Authorization: `Bearer ${config.supabaseKey}`,
           },
         }
       );
       const data = await res.json();
       setAlumnos(data);
+      setListaMostrada([]);
+      setRecuperadores([]);
       setCargando(false);
     };
+
     loadData();
-  }, []);
+  }, [config, tipoInscripcion]);
+
+
 
   const turnoCompleto = `${dia} ${horario}`;
 
@@ -109,6 +134,20 @@ const FichaAsistencia = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Selector de ciclo / tipo de inscripción */}
+            <div className="mb-4">
+              <label className="font-medium block mb-1">Ciclo:</label>
+              <select
+                className="w-full border p-2 rounded"
+                value={tipoInscripcion}
+                onChange={(e) => setTipoInscripcion(e.target.value)}
+              >
+                <option value="CICLO_2025">Ciclo 2025</option>
+                <option value="TDV">Taller de Verano</option>
+                <option value="CICLO_2026">Ciclo 2026</option>
+              </select>
+            </div>
+
             <div>
               <label className="font-medium">Sede:</label>
               <select className="w-full border p-2 rounded" value={sede} onChange={(e) => setSede(e.target.value)}>
