@@ -7,6 +7,8 @@ export default function FichaAsistenciasEstadisticas() {
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroTurno, setFiltroTurno] = useState("");
   const [turnosDisponibles, setTurnosDisponibles] = useState([]);
+  const [filtroTipoInscripcion, setFiltroTipoInscripcion] = useState("CICLO_2025");
+
 
   useEffect(() => {
     fetch("/config.json")
@@ -19,12 +21,13 @@ export default function FichaAsistenciasEstadisticas() {
   useEffect(() => {
     if (!config) return;
     cargarResumen();
-  }, [config, filtroSede, filtroTurno]);
+  }, [config, filtroSede, filtroTurno, filtroTipoInscripcion]);
 
   async function cargarResumen() {
     let filtro = "&activo=eq.true";
     if (filtroSede) filtro += `&sede=eq.${encodeURIComponent(filtroSede)}`;
     if (filtroTurno) filtro += `&turno_1=eq.${encodeURIComponent(filtroTurno)}`;
+    if (filtroTipoInscripcion) filtro += `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`;
 
     const alumnosRes = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido,turno_1,sede${filtro}`, {
       headers: {
@@ -50,7 +53,12 @@ export default function FichaAsistenciasEstadisticas() {
 
     // cargar turnos disponibles SOLO según sede
     if (config && filtroSede) {
-        const res = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=turno_1&sede=eq.${encodeURIComponent(filtroSede)}`, {
+        const filtroTipo = filtroTipoInscripcion
+        ? `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`
+        : "";
+
+
+        const res = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=turno_1&sede=eq.${encodeURIComponent(filtroSede)}${filtroTipo}`, {
           headers: {
             apikey: config.supabaseKey,
             Authorization: `Bearer ${config.supabaseKey}`,
@@ -93,7 +101,8 @@ export default function FichaAsistenciasEstadisticas() {
     <div className="max-w-5xl mx-auto mt-10 p-6 bg-white rounded-xl shadow">
       <h2 className="text-2xl font-bold text-center mb-6">Estadísticas de Asistencia</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* Sede */}
         <div>
           <label className="block font-medium mb-1">Sede:</label>
           <select
@@ -110,6 +119,7 @@ export default function FichaAsistenciasEstadisticas() {
           </select>
         </div>
 
+        {/* Turno */}
         <div>
           <label className="block font-medium mb-1">Turno:</label>
           <select
@@ -119,11 +129,29 @@ export default function FichaAsistenciasEstadisticas() {
           >
             <option value="">Todos</option>
             {turnosDisponibles.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                {t}
+              </option>
             ))}
           </select>
         </div>
+
+        {/* 👉 Nuevo: Tipo de inscripción / ciclo */}
+        <div>
+          <label className="block font-medium mb-1">Tipo de inscripción:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={filtroTipoInscripcion}
+            onChange={(e) => setFiltroTipoInscripcion(e.target.value)}
+          >
+            <option value="CICLO_2025">Ciclo 2025</option>
+            <option value="TDV">Taller de Verano</option>
+            <option value="CICLO_2026">Ciclo 2026</option>
+            <option value="">Todos</option>
+          </select>
+        </div>
       </div>
+
 
       <table className="min-w-full table-auto border-t border-b text-left text-sm">
         <thead className="bg-gray-100">

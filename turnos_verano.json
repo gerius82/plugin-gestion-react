@@ -1,29 +1,25 @@
 {
     "Calle Mendoza": {
-      "Lunes 17:00 a 18:30hs": 10,
-      "Lunes 19:00 a 20:30hs": 10,
+      
       "Martes 17:00 a 18:30hs": 10,
       "Martes 19:00 a 20:30hs": 10,
       "Miércoles 17:00 a 18:30hs": 10,
       "Miércoles 19:00 a 20:30hs": 10,
       "Jueves 17:00 a 18:30hs": 10,
       "Jueves 19:00 a 20:30hs": 10,
-      "Viernes 17:00 a 18:30hs": 10,
-      "Viernes 19:00 a 20:30hs": 10,
+      
       "Sábado 09:00 a 10:30hs": 10,
       "Sábado 11:00 a 12:30hs": 10
     },
     "Fisherton": {
-      "Lunes 17:00 a 18:30hs": 10,
-      "Lunes 19:00 a 20:30hs": 10,
+      
       "Martes 17:00 a 18:30hs": 10,
       "Martes 19:00 a 20:30hs": 10,
       "Miércoles 17:00 a 18:30hs": 10,
       "Miércoles 19:00 a 20:30hs": 10,
       "Jueves 17:00 a 18:30hs": 10,
       "Jueves 19:00 a 20:30hs": 10,
-      "Viernes 17:00 a 18:30hs": 10,
-      "Viernes 19:00 a 20:30hs": 10,
+      
       "Sábado 09:00 a 10:30hs": 10,
       "Sábado 11:00 a 12:30hs": 10
     }

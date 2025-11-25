@@ -7,7 +7,7 @@ export default function MenuInscripcionPadres() {
   return (
     <div className="max-w-2xl mx-auto mt-8 space-y-4">
       <h1 className="text-2xl font-bold mb-2 text-center">
-        Elegí el tipo de inscripción
+        Elegí el ciclo de inscripción
       </h1>
 
       <p className="text-center text-sm text-gray-600 mb-4">
@@ -23,7 +23,7 @@ export default function MenuInscripcionPadres() {
         <div>
           <div className="font-semibold">Taller de Verano</div>
           <p className="text-sm text-gray-600">
-            Inscripción para el Taller de Verano.
+            Info e inscripción para el Taller de Verano.
           </p>
         </div>
       </Link>

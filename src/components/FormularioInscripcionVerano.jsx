@@ -252,7 +252,71 @@ const FormularioInscripcionVerano = () => {
         </div>
       ) : !mostrarResumen ? (
         <form onSubmit={handleSubmit} className="space-y-6">
-          <h2 className="text-2xl font-bold text-center mb-6">Inscripción Taller de Verano</h2>
+          <h2 className="text-2xl font-bold text-center mb-6">Info e Inscripción Taller de Verano</h2>
+          {/* Información introductoria del taller */}
+          <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg shadow-sm animate-fadeIn">
+            <h3 className="text-xl font-semibold text-yellow-700 mb-2">
+              ☀️🤖¡Verano 2026 a pura creatividad con LEGO & Robótica!⚙️
+            </h3>
+
+            <p className="text-sm text-gray-700 leading-relaxed">
+              Este verano te invitamos a un espacio donde los chicos juegan, crean y programan mientras disfrutan aprendiendo con LEGO y explorando la robótica.
+            </p>
+
+            {/* Sedes */}
+            <p className="text-sm text-gray-700 mt-4 font-semibold">📍 Sedes disponibles:</p>
+            <ul className="text-sm text-gray-800 space-y-1 mt-1">
+              <li>🏫 <strong>Mendoza 3024 – Rosario (Macrocentro)</strong></li>
+              <li>🏫 <strong>Eva Perón 8128 – Rosario (Fisherton)</strong></li>
+            </ul>
+
+            {/* Duración, fechas, modalidad */}
+            <ul className="mt-4 space-y-1 text-sm text-gray-800">
+              <li>📅 <strong>Duración:</strong> 2 meses (8 clases)</li>
+              <li>🗓️ <strong>Inicio:</strong> Lunes 5 de enero</li>
+              <li>🧩 <strong>Modalidad:</strong> 1 clase por semana de 90 minutos cada una</li>
+            </ul>
+
+            {/* Días y horarios */}
+            <p className="text-sm text-gray-700 mt-4 font-semibold">🕒 Días y horarios disponibles:</p>
+            <ul className="text-sm text-gray-800 space-y-1">
+              <li>👉 <strong>Martes:</strong> 17:00 hs · 19:00 hs</li>
+              <li>👉 <strong>Miércoles:</strong> 17:00 hs · 19:00 hs</li>
+              <li>👉 <strong>Jueves:</strong> 17:00 hs · 19:00 hs</li>
+              <li>👉 <strong>Sábados:</strong> 09:00 hs · 11:00 hs</li>
+            </ul>
+
+            {/* Precios y formas de pago */}
+            <p className="text-sm text-gray-700 mt-4 font-semibold">💳 Formas de pago</p>
+
+            <ul className="mt-1 text-sm text-gray-800 space-y-1">
+              <li>
+                 🔒 <strong>Reserva de cupo:</strong> Inscripción mínima de <strong>$10.000</strong> para asegurar el lugar.
+              </li>
+
+              <li>
+                 🎉 <strong>Primera clase de prueba:</strong> El taller se abona recién después de la primera clase, cuando el alumno ya vivió la experiencia y decide continuar.
+              </li>
+
+              <li>
+                 💰 <strong>Opción 1 – Pago completo con descuento: </strong>  
+                Si abonás el taller completo al inicio (después de la clase de prueba), obtenés un <strong>5% de descuento</strong>, quedando en <strong>$95.000</strong>.
+              </li>
+
+              <li>
+                 💸 <strong>Opción 2 – Pago en cuotas: </strong>  
+                $50.000 en enero y $50.000 en febrero.
+              </li>
+            </ul>
+
+            <p className="text-sm text-gray-700 mt-3">
+              Queremos que cada familia elija la modalidad que mejor se adapte a su momento, siempre priorizando la experiencia y el bienestar de los chicos.
+            </p>
+          </div>
+
+
+
+
             {/* Sección: Datos del alumno */}
             <div className="mb-3 w-full p-4 rounded-lg bg-gray-50 shadow-sm">
                 <h3 className="text-lg sm:text-xl font-semibold text-gray-800 leading-snug">Datos del alumno</h3>
@@ -398,29 +462,24 @@ const FormularioInscripcionVerano = () => {
             </div>
           </div>
 
-        {/* Sección: Seleccioná el taller */}
-        <div className="mb-3 w-full p-4 rounded-lg bg-gray-50 shadow-sm">
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 leading-snug">Seleccioná el taller</h3>
-            <p className="text-xs sm:text-sm text-gray-600 leading-tight">Hacé clic en el taller que quieras inscribir.</p>
-            <hr className="border-gray-200 mt-1" />
-        </div>
+        
 
         {/* Curso */}
         <div className="mb-4 w-full p-4 rounded-lg bg-gray-50 shadow-sm">
             <h3 className="text-lg sm:text-xl font-semibold text-gray-800 leading-snug">
-                Curso
+                Elección de taller
             </h3>
             <p className="text-xs sm:text-sm text-gray-600 mb-2">
-                Para el Taller de Verano hay un único curso disponible.
+                Único curso disponible.
             </p>
 
             <div className="p-4 rounded-lg border border-green-300 bg-green-50 shadow-sm">
                 <h4 className="text-lg font-semibold">Robótca con Lego</h4>
                 <p className="text-sm text-gray-700">
-                Actividades intensivas de robótica y programación durante las vacaciones.
+                Propuestas creativas de robótica y programación para pasar unas vacaciones diferentes.
                 </p>
                 <span className="text-xs text-green-700">
-                La inscripción se registra como "Taller de Verano".
+                Taller de Verano
                 </span>
             </div>
         </div>
