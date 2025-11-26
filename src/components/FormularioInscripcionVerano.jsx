@@ -432,11 +432,11 @@ const FormularioInscripcionVerano = () => {
           </div>
 
             {/* Sección: Seleccioná la sede */}
-        <div className="mb-3 w-full p-4 rounded-lg bg-gray-50 shadow-sm">
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-800 leading-snug">Seleccioná la sede</h3>
-            <p className="text-xs sm:text-sm text-gray-600 leading-tight">Elegí la sede donde se cursará el taller.</p>
-            <hr className="border-gray-200 mt-1" />
-        </div>
+          <div className="mb-3 w-full p-4 rounded-lg bg-gray-50 shadow-sm">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-800 leading-snug">Seleccioná la sede</h3>
+              <p className="text-xs sm:text-sm text-gray-600 leading-tight">Elegí la sede donde se cursará el taller.</p>
+              <hr className="border-gray-200 mt-1" />
+          </div>
 
           {/* Sedes */}
           <div>
