@@ -260,7 +260,8 @@ const FormularioInscripcionVerano = () => {
             </h3>
 
             <p className="text-sm text-gray-700 leading-relaxed">
-              Este verano te invitamos a un espacio donde los chicos juegan, crean y programan mientras disfrutan aprendiendo con LEGO y explorando la robótica.
+              Una propuesta pensada para chicos y chicas de <strong>5 a 12 años</strong> que quieran explorar, construir y divertirse mientras aprenden.
+              Durante las vacaciones nos encontramos para vivir experiencias llenas de creatividad, tecnología y juego. No hace falta experiencia previa: solo ganas de experimentar y pasarlo bien. 😄
             </p>
 
             {/* Sedes */}
