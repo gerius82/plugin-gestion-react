@@ -17,8 +17,8 @@ const FichaAlumno = () => {
   const [yaPagoInscripcion, setYaPagoInscripcion] = useState(false);
   const [confirmarInactivacion, setConfirmarInactivacion] = useState(false);
   const [formulario, setFormulario] = useState(null);
-  const [turnosPorSede, setTurnosPorSede] = useState({});
-  const [renderTurnos, setRenderTurnos] = useState(0);
+  const [turnosRegulares, setTurnosRegulares] = useState({});
+  const [turnosVerano, setTurnosVerano] = useState({});
 
   const { id } = useParams();
 
@@ -49,14 +49,26 @@ const FichaAlumno = () => {
       const cfg = await res.json();
       setConfig(cfg);
     };
+
     const loadTurnos = async () => {
-      const res = await fetch("/turnos.json");
-      const data = await res.json();
-      setTurnosPorSede(data);
+      const [resCiclo, resVerano] = await Promise.all([
+        fetch("/turnos.json"),
+        fetch("/turnos_verano.json"),
+      ]);
+
+      const [dataCiclo, dataVerano] = await Promise.all([
+        resCiclo.json(),
+        resVerano.json(),
+      ]);
+
+      setTurnosRegulares(dataCiclo || {});
+      setTurnosVerano(dataVerano || {});
     };
+
     loadConfig();
     loadTurnos();
   }, []);
+
 
   useEffect(() => {
     if (!config) return;
@@ -280,7 +292,8 @@ const FichaAlumno = () => {
 
   const FormularioAlumno = ({
     formulario,
-    turnosPorSede,
+    turnosRegulares,
+    turnosVerano,
     refResponsable,
     refTelefono,
     refEmail,
@@ -293,8 +306,16 @@ const FichaAlumno = () => {
     const [turnoKey, setTurnoKey] = useState(0); // para forzar re-render de select de turnos
   
     const sedeSeleccionada = refSede.current?.value ?? formulario?.sede ?? "";
-    const turnos = turnosPorSede?.[sedeSeleccionada]
-      ? Object.keys(turnosPorSede[sedeSeleccionada])
+    const cursoSeleccionado = refCurso.current?.value ?? formulario?.curso ?? "";
+
+    const esTallerVerano =
+      (cursoSeleccionado || "").toLowerCase() === "taller de verano";
+
+    // según el curso, elegimos la fuente de turnos
+    const mapaTurnos = esTallerVerano ? turnosVerano : turnosRegulares;
+
+    const turnos = mapaTurnos?.[sedeSeleccionada]
+      ? Object.keys(mapaTurnos[sedeSeleccionada])
       : [];
   
     return (
@@ -362,11 +383,18 @@ const FichaAlumno = () => {
             className="w-full border rounded p-2"
             defaultValue={formulario?.curso ?? ""}
             ref={refCurso}
+            onChange={(e) => {
+              refCurso.current.value = e.target.value;
+              // cuando cambia de curso, limpio el turno y fuerzo re-render
+              refTurno.current.value = "";
+              setTurnoKey((k) => k + 1);
+            }}
           >
             <option value="">-- Seleccionar curso --</option>
             <option>Robótica Básica</option>
             <option>Robótica Avanzada</option>
             <option>Programación con Scratch</option>
+            <option>Taller de Verano</option>
           </select>
         </div>
         <div>
@@ -560,7 +588,8 @@ const FichaAlumno = () => {
             {modoEdicion && formulario ? (
               <FormularioAlumno
               formulario={formulario}
-              turnosPorSede={turnosPorSede}
+              turnosRegulares={turnosRegulares}
+              turnosVerano={turnosVerano}
               refResponsable={refResponsable}
               refTelefono={refTelefono}
               refEmail={refEmail}
@@ -677,7 +706,7 @@ const FichaAlumno = () => {
               {yaPagoInscripcion ? (
                 <p className="text-green-700 font-medium text-center">✅ Inscripción paga</p>
               ) : (
-                <a href={`https://wa.me/54${alumnoSeleccionado.telefono?.replace(/\\D/g,'')}?text=${encodeURIComponent(`¡Hola ${alumnoSeleccionado.nombre} ${alumnoSeleccionado.apellido}! 👋\n\nTe comparto los datos para completar la inscripción:\n\n💲 Monto: $18.000\n🏦 Alias: plugin.robotica\n👤 Titular: Germán Iusto\n\n¡Muchas gracias por confiar en nosotros! 🙌\nCualquier duda, estoy a disposición.\n\n¡Saludos! 😊`)}`} target="_blank" className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition hover:scale-105">
+                <a href={`https://wa.me/54${alumnoSeleccionado.telefono?.replace(/\\D/g,'')}?text=${encodeURIComponent(`¡Hola ${alumnoSeleccionado.nombre} ${alumnoSeleccionado.apellido}! 👋\n\nTe comparto los datos para completar la inscripción:\n\n💲 Monto: $10.000\n🏦 Alias: plugin.robotica\n👤 Titular: Germán Iusto\n\n¡Muchas gracias por confiar en nosotros! 🙌\nCualquier duda, estoy a disposición.\n\n¡Saludos! 😊`)}`} target="_blank" className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition hover:scale-105">
                   Enviar datos de inscripción 📲
                 </a>
               )}
