@@ -706,7 +706,7 @@ const FichaAlumno = () => {
               {yaPagoInscripcion ? (
                 <p className="text-green-700 font-medium text-center">✅ Inscripción paga</p>
               ) : (
-                <a href={`https://wa.me/54${alumnoSeleccionado.telefono?.replace(/\\D/g,'')}?text=${encodeURIComponent(`¡Hola ${alumnoSeleccionado.nombre} ${alumnoSeleccionado.apellido}! 👋\n\nTe comparto los datos para completar la inscripción:\n\n💲 Monto: $10.000\n🏦 Alias: plugin.robotica\n👤 Titular: Germán Iusto\n\n¡Muchas gracias por confiar en nosotros! 🙌\nCualquier duda, estoy a disposición.\n\n¡Saludos! 😊`)}`} target="_blank" className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition hover:scale-105">
+                <a href={`https://wa.me/54${alumnoSeleccionado.telefono?.replace(/\\D/g,'')}?text=${encodeURIComponent(`¡Hola ${alumnoSeleccionado.nombre} ${alumnoSeleccionado.apellido}! 👋\n\nTe comparto los datos para completar la reserva de cupo:\n\n💲 Monto: $10.000\n🏦 Alias: plugin.robotica\n👤 Titular: Germán Iusto\n\n¡Muchas gracias por confiar en nosotros! 🙌\nCualquier duda, estoy a disposición.\n\n¡Saludos! 😊`)}`} target="_blank" className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition hover:scale-105">
                   Enviar datos de inscripción 📲
                 </a>
               )}
