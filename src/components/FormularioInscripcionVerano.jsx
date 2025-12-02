@@ -475,7 +475,7 @@ const FormularioInscripcionVerano = () => {
             </p>
 
             <div className="p-4 rounded-lg border border-green-300 bg-green-50 shadow-sm">
-                <h4 className="text-lg font-semibold">Robótca con Lego</h4>
+                <h4 className="text-lg font-semibold">Robótica con Lego</h4>
                 <p className="text-sm text-gray-700">
                 Propuestas creativas de robótica y programación para pasar unas vacaciones diferentes.
                 </p>
