@@ -21,6 +21,11 @@ import CambioTurno from "./components/CambioTurno";
 import DarDeBaja from "./components/DarDeBaja"; // ajustá la ruta si lo ponés en otra carpeta
 import FichaGrillaTurnos from "./components/FichaGrillaTurnos";
 import FormularioInscripcionVerano from "./components/FormularioInscripcionVerano";
+import GestorCursos from "./components/GestorCursos";
+import GestorCiclos from "./components/GestorCiclos";
+import FichaAvisosAlumnos from "./components/FichaAvisosAlumnos";
+
+
 
 
 
@@ -54,6 +59,10 @@ function App() {
           <Route path="/menu-resumen" element={<MenuResumen />} />
           <Route path="/menu-padres" element={<MenuPadres />} />
           <Route path="/menu-inscripcion-padres" element={<MenuInscripcionPadres />} />
+          <Route path="/gestion-cursos" element={<GestorCursos />} />
+          <Route path="/gestor-ciclos" element={<GestorCiclos />} />
+          <Route path="/avisos" element={<FichaAvisosAlumnos />} />
+          
 
           
 

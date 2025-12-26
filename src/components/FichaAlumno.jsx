@@ -143,7 +143,7 @@ const FichaAlumno = () => {
   };
 
   const fetchAsistenciasAlumno = async (id) => {
-    const res = await fetch(`${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${id}&order=fecha.desc&limit=4&select=fecha,tipo,turno`, {
+    const res = await fetch(`${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${id}&order=fecha.desc&limit=8&select=fecha,tipo,turno`, {
       headers: headers()
     });
     if (!res.ok) return [];

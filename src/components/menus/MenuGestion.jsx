@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FaUserEdit, FaClipboardList, FaUserCheck, FaMoneyBillWave, FaThLarge, FaChartPie } from "react-icons/fa";
+import { FaUserEdit, FaClipboardList, FaUserCheck, FaMoneyBillWave, FaThLarge, FaChartPie, FaCog } from "react-icons/fa";
 
 export default function MenuGestion() {
   return (
@@ -58,6 +58,23 @@ export default function MenuGestion() {
         >
           <FaChartPie className="text-indigo-500 text-3xl" />
           <span className="font-semibold text-lg">Resúmenes & Gastos</span>
+        </Link>
+
+        <Link
+          to="/gestor-ciclos"
+          className="bg-white rounded-xl border-l-8 border-purple-500 shadow-sm hover:shadow-md p-4 hover:-translate-y-0.5 hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaClipboardList className="text-purple-500 text-3xl" />
+          <span className="font-semibold text-lg">Gestor de Ciclos</span>
+        </Link>
+
+        
+        <Link
+          to="/gestion-cursos"
+          className="bg-white rounded-xl border-l-8 border-purple-400 p-4 shadow hover:shadow-lg hover:-translate-y-1 hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaCog className="text-purple-500 text-3xl" />
+          <span className="font-semibold text-lg">Gestión de cursos</span>
         </Link>
 
       </div>

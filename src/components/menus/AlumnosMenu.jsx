@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FaClipboardList, FaTable, FaUserSlash, FaHistory, FaExchangeAlt, FaUserTimes } from "react-icons/fa";
+import { FaClipboardList, FaTable, FaUserSlash, FaHistory, FaExchangeAlt, FaUserTimes, FaBullhorn } from "react-icons/fa";
 
 export default function AlumnosMenu() {
   return (
@@ -53,6 +53,14 @@ export default function AlumnosMenu() {
             >
             <FaUserTimes className="text-red-500 text-3xl" />
             <span className="font-semibold text-lg">Dar de baja</span>
+        </Link>
+
+        <Link
+            to="/avisos"
+            className="bg-white rounded-xl border-l-8 border-green-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+            >
+            <FaBullhorn className="text-green-500 text-3xl" />
+            <span className="font-semibold text-lg">Avisos</span>
         </Link>
 
 

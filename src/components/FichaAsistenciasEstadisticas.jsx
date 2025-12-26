@@ -8,6 +8,8 @@ export default function FichaAsistenciasEstadisticas() {
   const [filtroTurno, setFiltroTurno] = useState("");
   const [turnosDisponibles, setTurnosDisponibles] = useState([]);
   const [filtroTipoInscripcion, setFiltroTipoInscripcion] = useState("CICLO_2025");
+  const [filtroMes, setFiltroMes] = useState("");
+  const [solo4Semanas, setSolo4Semanas] = useState(false);
 
 
   useEffect(() => {
@@ -21,68 +23,119 @@ export default function FichaAsistenciasEstadisticas() {
   useEffect(() => {
     if (!config) return;
     cargarResumen();
-  }, [config, filtroSede, filtroTurno, filtroTipoInscripcion]);
+  }, [config, filtroSede, filtroTurno, filtroTipoInscripcion, filtroMes, solo4Semanas]);
+
+  useEffect(() => {
+    if (filtroMes !== "") {
+      setSolo4Semanas(false);
+    }
+  }, [filtroMes]);
+
 
   async function cargarResumen() {
-    let filtro = "&activo=eq.true";
-    if (filtroSede) filtro += `&sede=eq.${encodeURIComponent(filtroSede)}`;
-    if (filtroTurno) filtro += `&turno_1=eq.${encodeURIComponent(filtroTurno)}`;
-    if (filtroTipoInscripcion) filtro += `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`;
+  // 1) Armar filtro de inscripciones
+  let filtro = "&activo=eq.true";
+  if (filtroSede) filtro += `&sede=eq.${encodeURIComponent(filtroSede)}`;
+  if (filtroTurno) filtro += `&turno_1=eq.${encodeURIComponent(filtroTurno)}`;
+  if (filtroTipoInscripcion) filtro += `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`;
 
-    const alumnosRes = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido,turno_1,sede${filtro}`, {
+  // 2) Traer alumnos
+  const alumnosRes = await fetch(
+    `${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido,turno_1,sede${filtro}`,
+    {
       headers: {
         apikey: config.supabaseKey,
         Authorization: `Bearer ${config.supabaseKey}`,
       },
-    });
+    }
+  );
 
-    const alumnosData = await alumnosRes.json();
-    alumnosData.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  let alumnosData = await alumnosRes.json();
+  alumnosData.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-    const asistenciasPromises = alumnosData.map(a =>
-      fetch(`${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.id}&select=tipo,fecha&order=fecha.desc&limit=10`, {
+  // 3) Traer asistencias (podés subir el limit si querés más historial)
+  // si hay filtro de tiempo, traigo más historial
+  const limit = filtroMes || solo4Semanas ? 200 : 10;
+
+  const asistenciasPromises = alumnosData.map((a) =>
+    fetch(
+      `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.id}&select=tipo,fecha&order=fecha.desc&limit=${limit}`,
+      {
         headers: {
           apikey: config.supabaseKey,
           Authorization: `Bearer ${config.supabaseKey}`,
         },
-      }).then(res => res.json())
-    );
-
-    const asistenciasData = await Promise.all(asistenciasPromises);
-    setAlumnos(alumnosData.map((a, idx) => ({ ...a, asistencias: asistenciasData[idx] })));
-
-    // cargar turnos disponibles SOLO según sede
-    if (config && filtroSede) {
-        const filtroTipo = filtroTipoInscripcion
-        ? `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`
-        : "";
-
-
-        const res = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=turno_1&sede=eq.${encodeURIComponent(filtroSede)}${filtroTipo}`, {
-          headers: {
-            apikey: config.supabaseKey,
-            Authorization: `Bearer ${config.supabaseKey}`,
-          },
-        });
-        const datos = await res.json();
-        const turnosUnicos = [...new Set(datos.map(d => d.turno_1))];
-      
-        const diasOrden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-        turnosUnicos.sort((a, b) => {
-          const [diaA] = a.split(" ");
-          const [diaB] = b.split(" ");
-          const idxA = diasOrden.indexOf(diaA);
-          const idxB = diasOrden.indexOf(diaB);
-          return idxA - idxB || a.localeCompare(b);
-        });
-      
-        setTurnosDisponibles(turnosUnicos);
-      } else {
-        setTurnosDisponibles([]);
       }
-      
+    ).then((res) => res.json())
+  );
+
+  const asistenciasData = await Promise.all(asistenciasPromises);
+
+  // 4) Aplicar filtros de mes y últimas 4 semanas SOBRE las asistencias ya cargadas
+  const hoy = new Date();
+  const cuatroSemanas = 28;
+
+  const alumnosConAsistencias = alumnosData.map((a, idx) => {
+    let lista = asistenciasData[idx] || [];
+
+    if (filtroMes) {
+      lista = lista.filter((x) => {
+        const m = new Date(x.fecha).toLocaleString("es-AR", { month: "long" });
+        return m.toLowerCase() === filtroMes.toLowerCase();
+      });
+    }
+
+    if (solo4Semanas && !filtroMes) {
+      lista = lista.filter((x) => {
+        const f = new Date(x.fecha);
+        const dif = (hoy - f) / (1000 * 3600 * 24);
+        return dif <= cuatroSemanas;
+      });
+    }
+
+    return { ...a, asistencias: lista };
+  });
+
+  setAlumnos(alumnosConAsistencias);
+
+
   
+
+  // 5) Turnos disponibles según sede + tipo de inscripción (esto lo dejo casi igual)
+  if (config && filtroSede) {
+    const filtroTipo = filtroTipoInscripcion
+      ? `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`
+      : "";
+
+    const res = await fetch(
+      `${config.supabaseUrl}/rest/v1/inscripciones?select=turno_1&sede=eq.${encodeURIComponent(
+        filtroSede
+      )}${filtroTipo}`,
+      {
+        headers: {
+          apikey: config.supabaseKey,
+          Authorization: `Bearer ${config.supabaseKey}`,
+        },
+      }
+    );
+    const datos = await res.json();
+    const turnosUnicos = [...new Set(datos.map(d => d.turno_1))];
+
+    const diasOrden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+    turnosUnicos.sort((a, b) => {
+      const [diaA] = a.split(" ");
+      const [diaB] = b.split(" ");
+      const idxA = diasOrden.indexOf(diaA);
+      const idxB = diasOrden.indexOf(diaB);
+      return idxA - idxB || a.localeCompare(b);
+    });
+
+    setTurnosDisponibles(turnosUnicos);
+  } else {
+    setTurnosDisponibles([]);
   }
+}
+
 
   const colorClase = tipo => {
     if (tipo === "regular") return "bg-green-400";
@@ -150,7 +203,43 @@ export default function FichaAsistenciasEstadisticas() {
             <option value="">Todos</option>
           </select>
         </div>
+
+          {/* Mes + últimas 4 semanas */}
+        <div>
+          <label className="block font-medium mb-1">Mes:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={filtroMes}
+            onChange={(e) => setFiltroMes(e.target.value)}
+          >
+            <option value="">Todos</option>
+            {[
+              "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+              "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+            ].map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </select>
+
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="w-4 h-4"
+              checked={solo4Semanas}
+              disabled={!!filtroMes}         
+              onChange={(e) => setSolo4Semanas(e.target.checked)}
+            />
+            <span className={filtroMes ? "text-gray-400" : "text-gray-800"}>
+              Últimas 4 semanas
+            </span>
+          </div>
+        </div>
       </div>
+
+      
+
+
+
 
 
       <table className="min-w-full table-auto border-t border-b text-left text-sm">
@@ -158,7 +247,13 @@ export default function FichaAsistenciasEstadisticas() {
           <tr>
             <th className="py-2 px-3">Alumno</th>
             <th className="py-2 px-3">Turno</th>
-            <th className="py-2 px-3">Últimos 10 registros</th>
+            <th className="py-2 px-3">
+              {filtroMes
+                ? `Asistencias de ${filtroMes}`
+                : solo4Semanas
+                ? "Últimas 4 semanas"
+                : "Últimos 10 registros"}
+            </th>
           </tr>
         </thead>
         <tbody>
