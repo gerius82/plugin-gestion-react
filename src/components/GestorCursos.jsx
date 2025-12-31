@@ -77,6 +77,8 @@ export default function GestorCursos() {
     const [ciclos, setCiclos] = useState([]);          // 🔹 ciclos desde Supabase
     const [loading, setLoading] = useState(false);
     const [mensaje, setMensaje] = useState("");
+    const [creando, setCreando] = useState(false);
+    const [guardando, setGuardando] = useState(false);
     const [filtroCiclo, setFiltroCiclo] = useState("TODOS");
     const [soloActivos, setSoloActivos] = useState(false);
     const [subiendoImagen, setSubiendoImagen] = useState(false);
@@ -126,10 +128,22 @@ export default function GestorCursos() {
     });
 
     // 🔹 Helper para mostrar nombre del ciclo usando la lista de ciclos
+    const getCiclo = (codigo) => ciclos.find((c) => c.codigo === codigo);
     const getNombreCiclo = (codigo) => {
-        const ciclo = ciclos.find((c) => c.codigo === codigo);
+        const ciclo = getCiclo(codigo);
         return ciclo?.nombre_publico || codigo || "Sin ciclo";
     };
+    const cicloEstaActivo = (codigo) => {
+        const ciclo = getCiclo(codigo);
+        return ciclo?.activo ?? true;
+    };
+
+    const ciclosOrdenados = [...ciclos].sort((a, b) => {
+        const ordenA = a.orden ?? Number.MAX_SAFE_INTEGER;
+        const ordenB = b.orden ?? Number.MAX_SAFE_INTEGER;
+        if (ordenA !== ordenB) return ordenA - ordenB;
+        return (a.nombre_publico || "").localeCompare(b.nombre_publico || "");
+    });
 
   const cargarCursos = async () => {
     if (!config) return;
@@ -183,12 +197,19 @@ export default function GestorCursos() {
     }
   }, [config]);
 
-  // Cuando llegan los ciclos, si el curso nuevo no tiene ciclo elegido, usar el primero
-  useEffect(() => {
+    // Cuando llegan los ciclos, si el curso nuevo no tiene ciclo elegido, usar el primero ordenado
+    useEffect(() => {
     if (ciclos.length === 0) return;
+    const sorted = [...ciclos].sort((a, b) => {
+      const ordenA = a.orden ?? Number.MAX_SAFE_INTEGER;
+      const ordenB = b.orden ?? Number.MAX_SAFE_INTEGER;
+      if (ordenA !== ordenB) return ordenA - ordenB;
+      return (a.nombre_publico || "").localeCompare(b.nombre_publico || "");
+    });
+
     setNuevoCurso((prev) => ({
       ...prev,
-      ciclo: prev.ciclo || ciclos[0].codigo,
+      ciclo: prev.ciclo || sorted[0].codigo,
     }));
   }, [ciclos]);
 
@@ -291,10 +312,42 @@ export default function GestorCursos() {
 
 
 
+  const tieneHorarios = (turnos) => {
+    if (!turnos || typeof turnos !== "object") return false;
+    return Object.values(turnos).some((dias) => {
+      if (!dias || typeof dias !== "object") return false;
+      return Object.values(dias).some(
+        (horarios) => Array.isArray(horarios) && horarios.some((h) => h?.trim())
+      );
+    });
+  };
+
   const crearCurso = async (e) => {
     e.preventDefault();
     if (!config) return;
 
+    const precioCursoValido =
+      nuevoCurso.precio_curso && parseFloat(nuevoCurso.precio_curso) > 0;
+    const precioInscripcionValido =
+      nuevoCurso.precio_inscripcion &&
+      parseFloat(nuevoCurso.precio_inscripcion) > 0;
+
+    if (!precioCursoValido || !precioInscripcionValido) {
+      setMensaje("Completá precios de cuota e inscripción con valores mayores a 0.");
+      return;
+    }
+
+    if (!tieneHorarios(turnosConfig)) {
+      setMensaje("Agregá al menos un horario en alguna sede antes de crear el curso.");
+      return;
+    }
+
+    if (!cicloEstaActivo(nuevoCurso.ciclo)) {
+      setMensaje("El ciclo seleccionado está inactivo. Elegí un ciclo activo para crear cursos.");
+      return;
+    }
+
+    setCreando(true);
     setMensaje("Guardando curso...");
     try {
       const body = {
@@ -304,13 +357,9 @@ export default function GestorCursos() {
         edad_min: nuevoCurso.edad_min ? parseInt(nuevoCurso.edad_min) : null,
         edad_max: nuevoCurso.edad_max ? parseInt(nuevoCurso.edad_max) : null,
         imagen_url: nuevoCurso.imagen_url || null,
-        precio_curso: nuevoCurso.precio_curso
-          ? parseFloat(nuevoCurso.precio_curso)
-          : null,
-        precio_inscripcion: nuevoCurso.precio_inscripcion
-          ? parseFloat(nuevoCurso.precio_inscripcion)
-          : null,
-        turnos_config: Object.keys(turnosConfig).length ? turnosConfig : null,
+        precio_curso: parseFloat(nuevoCurso.precio_curso),
+        precio_inscripcion: parseFloat(nuevoCurso.precio_inscripcion),
+        turnos_config: turnosConfig,
         activo: true,
       };
 
@@ -323,7 +372,7 @@ export default function GestorCursos() {
       setMensaje("Curso creado ✅");
       setNuevoCurso({
         nombre: "",
-        ciclo: ciclos[0]?.codigo || "",   // reset al primero disponible
+        ciclo: ciclosOrdenados[0]?.codigo || "",   // reset al primero disponible
         descripcion: "",
         edad_min: "",
         edad_max: "",
@@ -338,6 +387,8 @@ export default function GestorCursos() {
     } catch (e) {
       console.error(e);
       setMensaje("No se pudo crear el curso");
+    } finally {
+      setCreando(false);
     }
   };
 
@@ -396,9 +447,19 @@ export default function GestorCursos() {
     }
   };
 
-    const duplicarCurso = async (curso) => {
+  const duplicarCurso = async (curso) => {
     if (!config) {
       setMensaje("No pude cargar config.json");
+      return;
+    }
+
+    if (!cicloEstaActivo(curso.ciclo)) {
+      setMensaje("No se puede duplicar un curso en un ciclo inactivo. Elegí un ciclo activo.");
+      return;
+    }
+
+    if (!tieneHorarios(curso.turnos_config)) {
+      setMensaje("Agregá turnos antes de duplicar este curso.");
       return;
     }
 
@@ -482,6 +543,27 @@ export default function GestorCursos() {
     e.preventDefault();
     if (!cursoEditando) return;
 
+    const precioCursoValido =
+      cursoEditando.precio_curso && parseFloat(cursoEditando.precio_curso) > 0;
+    const precioInscripcionValido =
+      cursoEditando.precio_inscripcion &&
+      parseFloat(cursoEditando.precio_inscripcion) > 0;
+
+    if (!precioCursoValido || !precioInscripcionValido) {
+      setMensaje("Completá precios de cuota e inscripción con valores mayores a 0.");
+      return;
+    }
+
+    if (!tieneHorarios(editTurnosConfig)) {
+      setMensaje("Agregá al menos un horario en alguna sede antes de guardar.");
+      return;
+    }
+
+    if (!cicloEstaActivo(cursoEditando.ciclo)) {
+      setMensaje("No podés mover/guardar el curso en un ciclo inactivo.");
+      return;
+    }
+
     const cambios = {
       nombre: cursoEditando.nombre,
       ciclo: cursoEditando.ciclo || null,
@@ -489,19 +571,18 @@ export default function GestorCursos() {
       edad_min: cursoEditando.edad_min ? parseInt(cursoEditando.edad_min) : null,
       edad_max: cursoEditando.edad_max ? parseInt(cursoEditando.edad_max) : null,
       imagen_url: cursoEditando.imagen_url || null,
-      precio_curso: cursoEditando.precio_curso
-        ? parseFloat(cursoEditando.precio_curso)
-        : null,
-      precio_inscripcion: cursoEditando.precio_inscripcion
-        ? parseFloat(cursoEditando.precio_inscripcion)
-        : null,
-      turnos_config: Object.keys(editTurnosConfig).length
-        ? editTurnosConfig
-        : null,
+      precio_curso: parseFloat(cursoEditando.precio_curso),
+      precio_inscripcion: parseFloat(cursoEditando.precio_inscripcion),
+      turnos_config: editTurnosConfig,
     };
 
-    await actualizarCurso(cursoEditando.id, cambios);
-    cerrarModalEdicion();
+    setGuardando(true);
+    try {
+      await actualizarCurso(cursoEditando.id, cambios);
+      cerrarModalEdicion();
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const cursosFiltrados = cursos.filter((c) => {
@@ -704,6 +785,12 @@ export default function GestorCursos() {
         </Link>
         </div>
 
+        {mensaje && (
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+            {mensaje}
+          </div>
+        )}
+
 
       {/* Formulario para nuevo curso */}
       <form
@@ -737,12 +824,12 @@ export default function GestorCursos() {
               className="w-full border rounded px-3 py-2 text-sm"
               required
             >
-              {ciclos.length === 0 ? (
+              {ciclosOrdenados.length === 0 ? (
                 <option value="">No hay ciclos disponibles</option>
               ) : (
-                ciclos.map((c) => (
+                ciclosOrdenados.map((c) => (
                   <option key={c.id} value={c.codigo}>
-                    {c.nombre_publico}
+                    {c.nombre_publico} {c.activo ? "" : "(inactivo)"}
                   </option>
                 ))
               )}
@@ -962,18 +1049,19 @@ export default function GestorCursos() {
           <button
             type="submit"
             form="formCrearCurso"
-            className="
-              inline-flex items-center justify-center
-              bg-green-500 text-white font-semibold 
-              px-4 py-2 rounded-md shadow-sm
-              hover:bg-green-600 hover:shadow-md
-              transition-all duration-200
-              active:scale-[0.97]
-              text-sm
-              w-auto
-            "
-          >
-            Crear curso
+              className="
+                inline-flex items-center justify-center
+                bg-green-500 text-white font-semibold 
+                px-4 py-2 rounded-md shadow-sm
+                hover:bg-green-600 hover:shadow-md
+                transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
+                active:scale-[0.97]
+                text-sm
+                w-auto
+              "
+            disabled={creando}
+            >
+            {creando ? "Guardando..." : "Crear curso"}
           </button>
 
         </div>
@@ -993,7 +1081,7 @@ export default function GestorCursos() {
                 className="border rounded px-2 py-1 text-xs md:text-sm"
               >
                 <option value="TODOS">Todos</option>
-                {ciclos.map((c) => (
+                {ciclosOrdenados.map((c) => (
                   <option key={c.id} value={c.codigo}>
                     {c.nombre_publico}
                   </option>
@@ -1051,6 +1139,11 @@ export default function GestorCursos() {
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100">
                           {getNombreCiclo(c.ciclo)}
                         </span>
+                        {!cicloEstaActivo(c.ciclo) && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                            Ciclo inactivo
+                          </span>
+                        )}
 
                         {c.edad_min || c.edad_max ? (
                           <span>
@@ -1076,6 +1169,12 @@ export default function GestorCursos() {
                           ${Number(c.precio_inscripcion).toLocaleString("es-AR")}
                         </p>
                       )}
+                      {!c.precio_curso && (
+                        <p className="text-red-600">Cuota sin definir</p>
+                      )}
+                      {!c.precio_inscripcion && (
+                        <p className="text-red-600">Inscripción sin definir</p>
+                      )}
                     </div>
                   </div>
 
@@ -1090,6 +1189,11 @@ export default function GestorCursos() {
                       Turnos:
                     </p>
                     <TurnosResumen turnos={c.turnos_config} />
+                    {!tieneHorarios(c.turnos_config) && (
+                      <p className="text-xs text-red-600 mt-1">
+                        Este curso no tiene horarios cargados.
+                      </p>
+                    )}
                   </div>
 
                   {/* Estado + Acciones */}
@@ -1166,12 +1270,12 @@ export default function GestorCursos() {
                   className="w-full border rounded px-3 py-2 text-sm"
                   required
                 >
-                  {ciclos.length === 0 ? (
+                  {ciclosOrdenados.length === 0 ? (
                     <option value="">No hay ciclos disponibles</option>
                   ) : (
-                    ciclos.map((c) => (
+                    ciclosOrdenados.map((c) => (
                       <option key={c.id} value={c.codigo}>
-                        {c.nombre_publico}
+                        {c.nombre_publico} {c.activo ? "" : "(inactivo)"}
                       </option>
                     ))
                   )}
@@ -1407,9 +1511,10 @@ export default function GestorCursos() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow"
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={guardando}
                 >
-                  Guardar cambios
+                  {guardando ? "Guardando..." : "Guardar cambios"}
                 </button>
               </div>
             </form>
