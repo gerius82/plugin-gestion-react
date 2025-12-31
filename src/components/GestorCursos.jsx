@@ -1115,7 +1115,7 @@ export default function GestorCursos() {
                             onClick={() => duplicarCurso(c)}
                             className="text-gray-600 hover:text-gray-800 hover:bg-white"
                             >
-                            Duplicar
+                            Duplicarlo
                             </button>
 
                             <button
