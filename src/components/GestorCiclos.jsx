@@ -61,7 +61,7 @@ export default function GestorCiclos() {
     setMensaje("");
     try {
         const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/ciclos?select=*`,
+        `${config.supabaseUrl}/rest/v1/ciclos?select=*&order=orden.asc.nullslast&order=nombre_publico.asc`,
         { headers: headers() }
         );
         const data = await res.json();
