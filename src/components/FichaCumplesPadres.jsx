@@ -248,22 +248,22 @@ export default function FichaCumplesPadres() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto mt-8 px-3 sm:px-4">
-      <div className="bg-white rounded-2xl shadow border border-gray-200 p-6 mb-6">
+    <div className="w-full mt-6">
+      <div className="px-3 sm:px-4">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
           nos encargamos del resto.
         </p>
-        <div className="mt-4 rounded-xl overflow-hidden border border-gray-200">
-          <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
-        </div>
-        {mensaje && (
-          <div className="text-center text-sm text-emerald-700 mt-4">{mensaje}</div>
-        )}
       </div>
+      <div className="mt-4 overflow-hidden">
+        <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
+      </div>
+      {mensaje && (
+        <div className="text-center text-sm text-emerald-700 mt-4 px-3 sm:px-4">{mensaje}</div>
+      )}
 
-      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 sm:p-5">
+      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 sm:p-5 mt-6 mx-3 sm:mx-4">
         <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
         <div className="text-xs sm:text-sm text-gray-600 mb-4">
           <div className="font-medium text-gray-700 mb-1">Como reservar</div>
