@@ -248,7 +248,7 @@ export default function FichaCumplesPadres() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto mt-8 px-4">
+    <div className="max-w-screen-2xl mx-auto mt-8 px-3 sm:px-4">
       <div className="bg-white rounded-2xl shadow border border-gray-200 p-6 mb-6">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
@@ -263,9 +263,9 @@ export default function FichaCumplesPadres() {
         )}
       </div>
 
-      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5">
+      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 sm:p-5">
         <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
-        <div className="text-sm text-gray-600 mb-4">
+        <div className="text-xs sm:text-sm text-gray-600 mb-4">
           <div className="font-medium text-gray-700 mb-1">Como reservar</div>
           <div>1) Elegi el mes y tocá el dia con cupo.</div>
           <div>2) Selecciona el horario disponible.</div>
@@ -282,42 +282,46 @@ export default function FichaCumplesPadres() {
           />
         </div>
 
-        <div className="grid grid-cols-7 gap-2 text-center text-xs mb-2 text-gray-500">
-          {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
-            <div key={d}>{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-2 mb-4">
-          {Array.from({ length: daysInMonth[0]?.weekDay || 0 }).map((_, i) => (
-            <div key={`empty-${i}`} />
-          ))}
-          {daysInMonth.map((d) => {
-            const slots = slotsPorDia[d.fecha] || [];
-            const disponibles = slots.filter((s) => {
-              if (!s.activo || !s.hora) return false;
-              const key = `${s.fecha}-${s.hora}`;
-              return !reservasPorSlot.has(key);
-            });
-            const disponiblesCount = disponibles.length;
-            const color =
-              disponiblesCount === 0
-                ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100";
-            return (
-              <button
-                key={d.fecha}
-                className={`rounded-lg border py-2 text-xs font-medium transition ${color}`}
-                onClick={() => {
-                  setDiaSeleccionado(d.fecha);
-                  setSlotSeleccionado(null);
-                }}
-              >
-                <div className="text-[10px] text-gray-500">{DIA_NOMBRE[d.weekDay]}</div>
-                <div className="text-sm font-semibold">{d.day}</div>
-                <div className="text-[10px]">{disponiblesCount}/2</div>
-              </button>
-            );
-          })}
+        <div className="overflow-x-auto">
+          <div className="min-w-[360px]">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500">
+              {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
+                <div key={d}>{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
+              {Array.from({ length: daysInMonth[0]?.weekDay || 0 }).map((_, i) => (
+                <div key={`empty-${i}`} />
+              ))}
+              {daysInMonth.map((d) => {
+                const slots = slotsPorDia[d.fecha] || [];
+                const disponibles = slots.filter((s) => {
+                  if (!s.activo || !s.hora) return false;
+                  const key = `${s.fecha}-${s.hora}`;
+                  return !reservasPorSlot.has(key);
+                });
+                const disponiblesCount = disponibles.length;
+                const color =
+                  disponiblesCount === 0
+                    ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100";
+                return (
+                  <button
+                    key={d.fecha}
+                    className={`rounded-lg border py-1 sm:py-2 text-[10px] sm:text-xs font-medium transition ${color} flex flex-col items-center justify-center min-h-[54px] sm:min-h-[64px]`}
+                    onClick={() => {
+                      setDiaSeleccionado(d.fecha);
+                      setSlotSeleccionado(null);
+                    }}
+                  >
+                    <div className="text-[10px] text-gray-500">{DIA_NOMBRE[d.weekDay]}</div>
+                    <div className="text-sm font-semibold">{d.day}</div>
+                    <div className="text-[10px] whitespace-nowrap">{disponiblesCount}/2</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {diaSeleccionado && (
@@ -417,8 +421,8 @@ export default function FichaCumplesPadres() {
                   ))}
                 </div>
               </div>
-                <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-xs font-medium whitespace-nowrap">
+              <div className="md:col-span-2 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-[11px] sm:text-xs font-medium whitespace-nowrap leading-none">
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
@@ -436,7 +440,7 @@ export default function FichaCumplesPadres() {
                 <input
                   type="number"
                   min="0"
-                  className="border rounded px-2 py-1 text-sm w-24"
+                  className="border rounded px-2 py-1 text-sm w-20 sm:w-24"
                   placeholder="Cantidad"
                   value={reservaForm.menu_especial_cantidad}
                   onChange={(e) =>
