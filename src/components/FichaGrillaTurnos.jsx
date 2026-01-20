@@ -113,7 +113,7 @@ export default function FichaGrillaTurnos() {
 
         const urlMatriculas =
           `${config.supabaseUrl}/rest/v1/matriculas` +
-          `?select=alumno_id,sede,dia,hora,ciclo_codigo,estado` +
+          `?select=alumno_id,sede,dia,hora,ciclo_codigo,estado,creado_en` +
           `&ciclo_codigo=eq.${encodeURIComponent(tipoInscripcion)}` +
           `&estado=eq.activa`;
 
@@ -133,13 +133,13 @@ export default function FichaGrillaTurnos() {
           const filtros = ids.map((id) => `id.eq.${id}`).join(",");
           const urlInsc =
             `${config.supabaseUrl}/rest/v1/inscripciones` +
-            `?select=id,nombre,apellido` +
+            `?select=id,nombre,apellido,edad` +
             `&or=(${filtros})`;
           const resInsc = await fetch(urlInsc, { headers });
           const inscData = await resInsc.json();
           const map = {};
           (inscData || []).forEach((i) => {
-            map[i.id] = { nombre: i.nombre, apellido: i.apellido };
+            map[i.id] = { nombre: i.nombre, apellido: i.apellido, edad: i.edad };
           });
           setInscripcionesMap(map);
         } else {
@@ -191,7 +191,15 @@ export default function FichaGrillaTurnos() {
         id: m.alumno_id,
         nombre: info.nombre || "Sin nombre",
         apellido: info.apellido || "",
+        edad: info.edad ?? null,
+        creado_en: m.creado_en || null,
       });
+    });
+
+    map.forEach((entry) => {
+      entry.alumnos.sort(
+        (a, b) => new Date(a.creado_en || 0).getTime() - new Date(b.creado_en || 0).getTime()
+      );
     });
 
     return map;
@@ -287,6 +295,7 @@ export default function FichaGrillaTurnos() {
                             lista.map((al, i) => (
                               <div key={`${al.id}-${i}`} className="text-[11px] text-gray-800">
                                 {i + 1}. {al.nombre} {al.apellido}
+                                {al.edad != null && al.edad !== "" ? ` (${al.edad})` : ""}
                               </div>
                             ))
                           ) : (

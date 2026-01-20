@@ -25,6 +25,9 @@ import GestorCursos from "./components/GestorCursos";
 import GestorCiclos from "./components/GestorCiclos";
 import FichaAvisosAlumnos from "./components/FichaAvisosAlumnos";
 import GestorTurnos from "./components/GestorTurnos";
+import FichaCumples from "./components/FichaCumples";
+import FichaCumplesPadres from "./components/FichaCumplesPadres";
+import CumplesMenu from "./components/menus/CumplesMenu";
 
 
 
@@ -65,6 +68,10 @@ function App() {
           <Route path="/gestor-ciclos" element={<GestorCiclos />} />
           <Route path="/avisos" element={<FichaAvisosAlumnos />} />
           <Route path="/gestor-turnos" element={<GestorTurnos />} />
+          <Route path="/cumples" element={<FichaCumples />} />
+          <Route path="/cumples-menu" element={<CumplesMenu />} />
+          <Route path="/cumples-gestion" element={<FichaCumples />} />
+          <Route path="/cumples-reservas" element={<FichaCumplesPadres />} />
 
           
 
@@ -85,4 +92,3 @@ function App() {
 }
 
 export default App;
-
