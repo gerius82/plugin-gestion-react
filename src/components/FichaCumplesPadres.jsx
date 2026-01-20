@@ -4,7 +4,20 @@ const IMG_CUMPLES =
   "https://cvogoablzgymmodegfft.supabase.co/storage/v1/object/sign/cumples/cumples%20info.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWJmYzhjNy0wZGU5LTRkMGQtODc2YS0zODEyNjZmMjRmOWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjdW1wbGVzL2N1bXBsZXMgaW5mby5wbmciLCJpYXQiOjE3Njg4NzYwODMsImV4cCI6MjA4NDIzNjA4M30.fViNIiMR5BubUrqEqem3H6VQ6bV28MhsIkhy2KsvjGQ";
 
 const HORAS_DEFAULT = ["15:00", "18:00"];
-const DIA_NOMBRE = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
+const MESES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
 
 const toDateKey = (year, monthIndex, day) => {
   const d = new Date(year, monthIndex, day, 12, 0, 0);
@@ -53,7 +66,7 @@ export default function FichaCumplesPadres() {
     mensaje: "",
     cumpleanero_nombre: "",
     cumpleanero_edad: "",
-    invitados: Array.from({ length: 12 }, () => ""),
+    invitados: Array.from({ length: 11 }, () => ""),
     menu_especial: false,
     menu_especial_cantidad: "",
   });
@@ -80,6 +93,19 @@ export default function FichaCumplesPadres() {
   }, [config]);
 
   const daysInMonth = useMemo(() => buildMonthDays(mesSeleccionado), [mesSeleccionado]);
+  const mesesDisponibles = useMemo(() => {
+    const now = new Date();
+    const lista = [];
+    for (let i = 0; i < 4; i += 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      lista.push({
+        value: `${d.getFullYear()}-${mm}`,
+        label: `${MESES[d.getMonth()]} ${d.getFullYear()}`,
+      });
+    }
+    return lista;
+  }, []);
 
   const cargarDatosMes = async () => {
     if (!config || !mesSeleccionado) return;
@@ -237,7 +263,7 @@ export default function FichaCumplesPadres() {
       mensaje: "",
       cumpleanero_nombre: "",
       cumpleanero_edad: "",
-      invitados: Array.from({ length: 12 }, () => ""),
+      invitados: Array.from({ length: 11 }, () => ""),
       menu_especial: false,
       menu_especial_cantidad: "",
     });
@@ -274,12 +300,17 @@ export default function FichaCumplesPadres() {
         </div>
         <div className="flex items-center gap-3 mb-4">
           <label className="text-sm font-medium">Mes:</label>
-          <input
-            type="month"
+          <select
             className="border rounded px-3 py-2 text-sm"
             value={mesSeleccionado}
             onChange={(e) => setMesSeleccionado(e.target.value)}
-          />
+          >
+            {mesesDisponibles.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
         </div>
 
           <div className="overflow-x-auto sm:overflow-visible">
@@ -310,17 +341,21 @@ export default function FichaCumplesPadres() {
                     : isSelected
                     ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
                     : "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100";
-                const selectedCls = isSelected ? "border-2" : "border";
+                const selectedCls =
+                  isSelected && disponiblesCount === 0
+                    ? "ring-2 ring-red-300"
+                    : isSelected
+                    ? "ring-2 ring-emerald-300"
+                    : "ring-1 ring-gray-200";
                 return (
                   <button
                     key={d.fecha}
-                    className={`rounded-lg py-1 sm:py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[54px] sm:min-h-[64px] w-full`}
+                    className={`rounded-lg border py-1 sm:py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[54px] sm:min-h-[64px] w-full`}
                     onClick={() => {
                       setDiaSeleccionado(d.fecha);
                       setSlotSeleccionado(null);
                     }}
                   >
-                    <div className="text-[10px] text-gray-500">{DIA_NOMBRE[d.weekDay]}</div>
                     <div className="text-sm font-semibold">{d.day}</div>
                     <div className="text-[10px] whitespace-nowrap">{disponiblesCount}/2</div>
                   </button>
@@ -336,15 +371,24 @@ export default function FichaCumplesPadres() {
               Horarios disponibles para {formatFecha(diaSeleccionado)}
             </div>
             <div className="flex flex-wrap gap-2">
-              {slotsDisponibles.map((s) => (
-                <button
-                  key={`${s.fecha}-${s.slot_num}`}
-                  className="px-3 py-2 text-xs rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition"
-                  onClick={() => setSlotSeleccionado(s)}
-                >
-                  {s.hora}
-                </button>
-              ))}
+              {slotsDisponibles.map((s) => {
+                const isHoraSelected =
+                  slotSeleccionado &&
+                  slotSeleccionado.fecha === s.fecha &&
+                  slotSeleccionado.hora === s.hora;
+                const horaCls = isHoraSelected
+                  ? "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-100 ring-2 ring-emerald-300"
+                  : "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 ring-1 ring-gray-200";
+                return (
+                  <button
+                    key={`${s.fecha}-${s.slot_num}`}
+                    className={`px-3 py-2 text-xs rounded-lg border transition ${horaCls}`}
+                    onClick={() => setSlotSeleccionado(s)}
+                  >
+                    {s.hora}
+                  </button>
+                );
+              })}
               {slotsDisponibles.length === 0 && (
                 <span className="text-xs text-gray-500">No hay horarios disponibles.</span>
               )}
@@ -408,8 +452,8 @@ export default function FichaCumplesPadres() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="text-xs font-medium">Nombres de invitados (12)</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
+                  <label className="text-xs font-medium">Nombres de invitados (11)</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
                   {reservaForm.invitados.map((inv, idx) => (
                     <input
                       key={`inv-${idx}`}
@@ -484,4 +528,3 @@ export default function FichaCumplesPadres() {
     </div>
   );
 }
-

@@ -5,6 +5,20 @@ const IMG_CUMPLES =
 
 const ESTADOS_RESERVA = ["pendiente", "confirmada", "cancelada"];
 const HORAS_DEFAULT = ["15:00", "18:00"];
+const MESES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
 
 const toDateKey = (year, monthIndex, day) => {
   const d = new Date(year, monthIndex, day, 12, 0, 0);
@@ -83,6 +97,19 @@ export default function FichaCumples() {
   }, [config]);
 
   const daysInMonth = useMemo(() => buildMonthDays(mesSeleccionado), [mesSeleccionado]);
+  const mesesDisponibles = useMemo(() => {
+    const now = new Date();
+    const lista = [];
+    for (let i = 0; i < 4; i += 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      lista.push({
+        value: `${d.getFullYear()}-${mm}`,
+        label: `${MESES[d.getMonth()]} ${d.getFullYear()}`,
+      });
+    }
+    return lista;
+  }, []);
 
   const cargarDatosMes = async () => {
     if (!config || !mesSeleccionado) return;
@@ -313,25 +340,47 @@ export default function FichaCumples() {
       "Content-Type": "application/json",
       Prefer: "return=representation",
     };
+    const payload = {
+      nombre: detalleForm?.nombre || "",
+      apellido: detalleForm?.apellido || "",
+      telefono: detalleForm?.telefono || "",
+      mensaje: detalleForm?.mensaje || "",
+      cumpleanero_nombre: detalleForm?.cumpleanero_nombre || "",
+      cumpleanero_edad: detalleForm?.cumpleanero_edad || null,
+      invitados: detalleForm?.invitados || [],
+      menu_especial: !!detalleForm?.menu_especial,
+      menu_especial_cantidad: detalleForm?.menu_especial
+        ? detalleForm?.menu_especial_cantidad || null
+        : null,
+      estado: detalleForm?.estado || "pendiente",
+    };
+
     await fetch(`${config.supabaseUrl}/rest/v1/cumple_reservas?id=eq.${reservaDetalle.id}`, {
       method: "PATCH",
       headers: headersJson,
-      body: JSON.stringify({
-        nombre: detalleForm?.nombre || "",
-        apellido: detalleForm?.apellido || "",
-        telefono: detalleForm?.telefono || "",
-        mensaje: detalleForm?.mensaje || "",
-        cumpleanero_nombre: detalleForm?.cumpleanero_nombre || "",
-        cumpleanero_edad: detalleForm?.cumpleanero_edad || null,
-        invitados: detalleForm?.invitados || [],
-        menu_especial: !!detalleForm?.menu_especial,
-        menu_especial_cantidad: detalleForm?.menu_especial
-          ? detalleForm?.menu_especial_cantidad || null
-          : null,
-        estado: detalleForm?.estado || "pendiente",
-      }),
+      body: JSON.stringify(payload),
     });
     await cargarDatosMes();
+    setReservaDetalle((prev) => (prev ? { ...prev, ...payload } : prev));
+    setDetalleForm((prev) => (prev ? { ...prev, ...payload } : prev));
+    setModoEditarDetalle(false);
+  };
+
+  const eliminarDetalle = async () => {
+    if (!config || !reservaDetalle) return;
+    const confirmar = confirm("Eliminar esta reserva?");
+    if (!confirmar) return;
+    const headersJson = {
+      ...headers,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    };
+    await fetch(`${config.supabaseUrl}/rest/v1/cumple_reservas?id=eq.${reservaDetalle.id}`, {
+      method: "DELETE",
+      headers: headersJson,
+    });
+    await cargarDatosMes();
+    setReservaDetalle(null);
     setModoEditarDetalle(false);
   };
 
@@ -357,14 +406,14 @@ export default function FichaCumples() {
   }, [diaSeleccionado, slotsPorDia, reservasPorSlot]);
 
   return (
-    <div className="max-w-screen-2xl mx-auto mt-8 px-4">
-      <div className="bg-white rounded-2xl shadow border border-gray-200 p-6 mb-6">
+    <div className="w-full mt-6 px-2 sm:px-4">
+      <div className="p-4 sm:p-6 mb-4">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
           nos encargamos del resto.
         </p>
-        <div className="mt-4 rounded-xl overflow-hidden border border-gray-200">
+        <div className="mt-4 overflow-hidden">
           <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
         </div>
         {mensaje && (
@@ -372,25 +421,30 @@ export default function FichaCumples() {
         )}
 
         <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5">
+          <div className="p-3 sm:p-4">
             <h3 className="text-lg font-semibold mb-4">Gestion de agenda</h3>
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
               <label className="text-sm font-medium">Mes:</label>
-              <input
-                type="month"
-                className="border rounded px-3 py-2 text-sm"
+              <select
+                className="border rounded px-3 py-2 text-sm w-full sm:w-auto"
                 value={mesSeleccionado}
                 onChange={(e) => setMesSeleccionado(e.target.value)}
-              />
+              >
+                {mesesDisponibles.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
               <button
-                className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded transition"
+                className="sm:ml-auto bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded transition w-full sm:w-auto"
                 onClick={guardarSlots}
               >
                 Guardar cambios
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {daysInMonth.map((d) => {
                 const slots = slotsPorDia[d.fecha] || [];
                 const ocupados = slots.filter((s) => {
@@ -402,16 +456,16 @@ export default function FichaCumples() {
                   ocupados >= 2 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200";
 
                 return (
-                  <div key={d.fecha} className={`rounded-xl border p-3 ${color}`}>
+                  <div key={d.fecha} className={`rounded-xl border p-3 sm:p-4 ${color}`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold">Dia {d.day}</span>
                       <span className="text-[11px] text-gray-500">{formatFecha(d.fecha)}</span>
                     </div>
                     {slots.map((s) => (
-                      <div key={`${d.fecha}-${s.slot_num}`} className="flex items-center gap-2 mb-2">
+                      <div key={`${d.fecha}-${s.slot_num}`} className="flex flex-wrap items-center gap-2 mb-2">
                         <input
                           type="time"
-                          className="border rounded px-2 py-1 text-xs w-24"
+                          className="border rounded px-2 py-1 text-xs w-full sm:w-24"
                           value={s.hora || ""}
                           onChange={(e) =>
                             setSlotsDraft((prev) => ({
@@ -439,7 +493,7 @@ export default function FichaCumples() {
                           />
                           Activo
                         </label>
-                        <span className="ml-auto text-[11px] text-gray-500">
+                        <span className="w-full sm:w-auto sm:ml-auto text-[11px] text-gray-500">
                           Slot {s.slot_num}
                         </span>
                       </div>
@@ -452,8 +506,8 @@ export default function FichaCumples() {
             <div className="mt-6">
               <h4 className="text-sm font-semibold mb-2">Reservas del mes</h4>
               <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full text-xs sm:text-sm">
+                  <thead className="bg-gray-50 text-[11px] sm:text-sm">
                     <tr>
                       <th className="px-3 py-2 text-left">Fecha</th>
                       <th className="px-3 py-2 text-left">Hora</th>
@@ -513,197 +567,6 @@ export default function FichaCumples() {
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5">
-            <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
-            <div className="flex items-center gap-3 mb-4">
-              <label className="text-sm font-medium">Mes:</label>
-              <input
-                type="month"
-                className="border rounded px-3 py-2 text-sm"
-                value={mesSeleccionado}
-                onChange={(e) => setMesSeleccionado(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-7 gap-2 text-center text-xs mb-2 text-gray-500">
-              {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
-                <div key={d}>{d}</div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-2 mb-4">
-              {Array.from({ length: daysInMonth[0]?.weekDay || 0 }).map((_, i) => (
-                <div key={`empty-${i}`} />
-              ))}
-              {daysInMonth.map((d) => {
-                const slots = slotsPorDia[d.fecha] || [];
-                const disponibles = slots.filter((s) => {
-                  if (!s.activo || !s.hora) return false;
-                  const key = `${s.fecha}-${s.hora}`;
-                  return !reservasPorSlot.has(key);
-                });
-                const color =
-                  disponibles.length === 0
-                    ? "bg-red-100 text-red-700 hover:bg-red-200"
-                    : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200";
-                return (
-                  <button
-                    key={d.fecha}
-                    className={`rounded-lg py-2 text-xs font-medium transition ${color}`}
-                    onClick={() => {
-                      setDiaSeleccionado(d.fecha);
-                      setSlotSeleccionado(null);
-                    }}
-                  >
-                    {d.day}
-                  </button>
-                );
-              })}
-            </div>
-
-            {diaSeleccionado && (
-              <div className="border rounded-xl p-3 mb-4">
-                <div className="text-sm font-semibold mb-2">
-                  Horarios disponibles para {formatFecha(diaSeleccionado)}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {slotsDisponibles.map((s) => (
-                    <button
-                      key={`${s.fecha}-${s.slot_num}`}
-                      className="px-3 py-2 text-xs rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition"
-                      onClick={() => setSlotSeleccionado(s)}
-                    >
-                      {s.hora}
-                    </button>
-                  ))}
-                  {slotsDisponibles.length === 0 && (
-                    <span className="text-xs text-gray-500">No hay horarios disponibles.</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {slotSeleccionado && (
-              <div className="border rounded-xl p-4">
-                <div className="text-sm font-semibold mb-2">
-                  Reserva para {formatFecha(slotSeleccionado.fecha)} a las {slotSeleccionado.hora}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium">Nombre (madre/padre)</label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={reservaForm.nombre}
-                      onChange={(e) => setReservaForm((p) => ({ ...p, nombre: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Apellido (madre/padre)</label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={reservaForm.apellido}
-                      onChange={(e) => setReservaForm((p) => ({ ...p, apellido: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Telefono (madre/padre)</label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={reservaForm.telefono}
-                      onChange={(e) => setReservaForm((p) => ({ ...p, telefono: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Nombre del cumpleanero</label>
-                    <input
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={reservaForm.cumpleanero_nombre}
-                      onChange={(e) => setReservaForm((p) => ({ ...p, cumpleanero_nombre: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium">Edad que cumple</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      value={reservaForm.cumpleanero_edad}
-                      onChange={(e) =>
-                        setReservaForm((p) => ({ ...p, cumpleanero_edad: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-medium">Nombres de invitados (12)</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                      {reservaForm.invitados.map((inv, idx) => (
-                        <input
-                          key={`inv-${idx}`}
-                          className="w-full border rounded px-3 py-2 text-sm"
-                          placeholder={`Invitado ${idx + 1}`}
-                          value={inv}
-                          onChange={(e) =>
-                            setReservaForm((p) => {
-                              const nuevos = [...p.invitados];
-                              nuevos[idx] = e.target.value;
-                              return { ...p, invitados: nuevos };
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="md:col-span-2 flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-2 text-xs font-medium">
-                      <input
-                        type="checkbox"
-                        checked={!!reservaForm.menu_especial}
-                        onChange={(e) =>
-                          setReservaForm((p) => ({
-                            ...p,
-                            menu_especial: e.target.checked,
-                            menu_especial_cantidad: e.target.checked ? p.menu_especial_cantidad : "",
-                          }))
-                        }
-                      />
-                      Requiere comida especial para celiacos
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="border rounded px-2 py-1 text-sm w-24"
-                      placeholder="Cantidad"
-                      value={reservaForm.menu_especial_cantidad}
-                      onChange={(e) =>
-                        setReservaForm((p) => ({ ...p, menu_especial_cantidad: e.target.value }))
-                      }
-                      disabled={!reservaForm.menu_especial}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-medium">Mensaje</label>
-                    <textarea
-                      className="w-full border rounded px-3 py-2 text-sm min-h-[80px]"
-                      value={reservaForm.mensaje}
-                      onChange={(e) => setReservaForm((p) => ({ ...p, mensaje: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end mt-3">
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded transition"
-                      onClick={handleReserva}
-                    >
-                      Enviar solicitud
-                    </button>
-                    <span className="text-[11px] text-gray-500">
-                      Se enviara la solicitud por WhatsApp.
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -718,50 +581,15 @@ export default function FichaCumples() {
                   {formatFecha(reservaDetalle.fecha)} - {reservaDetalle.hora}
                 </p>
               </div>
-              <button
-                className="text-gray-500 hover:text-gray-800 text-sm transition px-2 py-1 rounded hover:bg-gray-100"
-                onClick={() => {
-                  setReservaDetalle(null);
-                  setModoEditarDetalle(false);
-                }}
-              >
-                Cerrar
-              </button>
             </div>
             </div>
 
             <div className="px-6 py-5 max-h-[75vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-              <div className="text-xs text-gray-500">
-                Estado actual: <span className="capitalize">{reservaDetalle.estado || "pendiente"}</span>
+                <div className="text-xs text-gray-500">
+                  Estado actual: <span className="capitalize">{reservaDetalle.estado || "pendiente"}</span>
+                </div>
               </div>
-              <button
-                className="text-xs text-emerald-700 hover:text-emerald-900 transition px-2 py-1 rounded hover:bg-emerald-50"
-                onClick={() => {
-                  if (modoEditarDetalle) {
-                    setModoEditarDetalle(false);
-                    setDetalleForm({
-                      nombre: reservaDetalle?.nombre || "",
-                      apellido: reservaDetalle?.apellido || "",
-                      telefono: reservaDetalle?.telefono || "",
-                      mensaje: reservaDetalle?.mensaje || "",
-                      cumpleanero_nombre: reservaDetalle?.cumpleanero_nombre || "",
-                      cumpleanero_edad: reservaDetalle?.cumpleanero_edad ?? "",
-                      invitados: Array.isArray(reservaDetalle?.invitados)
-                        ? reservaDetalle.invitados
-                        : Array.from({ length: 12 }, () => ""),
-                      menu_especial: !!reservaDetalle?.menu_especial,
-                      menu_especial_cantidad: reservaDetalle?.menu_especial_cantidad ?? "",
-                      estado: reservaDetalle?.estado || "pendiente",
-                    });
-                    return;
-                  }
-                  setModoEditarDetalle(true);
-                }}
-              >
-                {modoEditarDetalle ? "Cancelar" : "Editar"}
-              </button>
-            </div>
 
               {modoEditarDetalle ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -879,17 +707,45 @@ export default function FichaCumples() {
                     onChange={(e) => setDetalleForm((p) => ({ ...p, mensaje: e.target.value }))}
                   />
                 </div>
-                <div className="md:col-span-2 flex justify-end">
+                <div className="md:col-span-2 flex flex-wrap justify-end gap-2 pt-2">
                   <button
                     className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded transition"
                     onClick={guardarDetalle}
                   >
-                    Guardar cambios
+                    Guardar
+                  </button>
+                  <button
+                    className="bg-red-600 hover:bg-red-700 text-white text-sm px-4 py-2 rounded transition"
+                    onClick={eliminarDetalle}
+                  >
+                    Eliminar
+                  </button>
+                  <button
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded transition"
+                    onClick={() => {
+                      setModoEditarDetalle(false);
+                      setDetalleForm({
+                        nombre: reservaDetalle?.nombre || "",
+                        apellido: reservaDetalle?.apellido || "",
+                        telefono: reservaDetalle?.telefono || "",
+                        mensaje: reservaDetalle?.mensaje || "",
+                        cumpleanero_nombre: reservaDetalle?.cumpleanero_nombre || "",
+                        cumpleanero_edad: reservaDetalle?.cumpleanero_edad ?? "",
+                        invitados: Array.isArray(reservaDetalle?.invitados)
+                          ? reservaDetalle.invitados
+                          : Array.from({ length: 12 }, () => ""),
+                        menu_especial: !!reservaDetalle?.menu_especial,
+                        menu_especial_cantidad: reservaDetalle?.menu_especial_cantidad ?? "",
+                        estado: reservaDetalle?.estado || "pendiente",
+                      });
+                    }}
+                  >
+                    Cancelar
                   </button>
                 </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 <div>
                   <div className="text-gray-500 text-xs">Contacto</div>
                   <div>{reservaDetalle.nombre} {reservaDetalle.apellido}</div>
@@ -919,10 +775,27 @@ export default function FichaCumples() {
                 </div>
                 <div className="md:col-span-2">
                   <div className="text-gray-500 text-xs">Mensaje</div>
-                  <div className="text-sm">{reservaDetalle.mensaje || "—"}</div>
+                  <div className="text-sm">{reservaDetalle.mensaje || "-"}</div>
                 </div>
+                <div className="md:col-span-2 flex flex-wrap justify-end gap-2 pt-2">
+                  <button
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded transition"
+                    onClick={() => setModoEditarDetalle(true)}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded transition"
+                    onClick={() => {
+                      setReservaDetalle(null);
+                      setModoEditarDetalle(false);
+                    }}
+                  >
+                    Cerrar
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
             </div>
           </div>
         </div>
