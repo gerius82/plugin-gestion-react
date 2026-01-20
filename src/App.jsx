@@ -24,6 +24,8 @@ import FormularioInscripcionVerano from "./components/FormularioInscripcionVeran
 import GestorCursos from "./components/GestorCursos";
 import GestorCiclos from "./components/GestorCiclos";
 import FichaAvisosAlumnos from "./components/FichaAvisosAlumnos";
+import GestorTurnos from "./components/GestorTurnos";
+
 
 
 
@@ -62,6 +64,8 @@ function App() {
           <Route path="/gestion-cursos" element={<GestorCursos />} />
           <Route path="/gestor-ciclos" element={<GestorCiclos />} />
           <Route path="/avisos" element={<FichaAvisosAlumnos />} />
+          <Route path="/gestor-turnos" element={<GestorTurnos />} />
+
           
 
           

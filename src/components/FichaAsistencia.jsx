@@ -7,8 +7,6 @@ const FichaAsistencia = () => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const from = `/${params.get("from")}`;
-  
-  const [turnosPorSede, setTurnosPorSede] = useState({});
   const [alumnos, setAlumnos] = useState([]);
   const [sede, setSede] = useState("");
   const [dia, setDia] = useState("");
@@ -18,8 +16,8 @@ const FichaAsistencia = () => {
   const [listaMostrada, setListaMostrada] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
-  const [tipoInscripcion, setTipoInscripcion] = useState("CICLO_2025"); // 👈 default
-
+  const [cicloCodigo, setCicloCodigo] = useState("");
+  const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
   useEffect(() => {
     const loadConfig = async () => {
       const cfg = await (await fetch("/config.json")).json();
@@ -30,24 +28,9 @@ const FichaAsistencia = () => {
 
   useEffect(() => {
     if (!config) return;
-
-    const loadData = async () => {
-      setCargando(true);
-
-      // Elegir archivo de turnos según tipoInscripcion
-      const archivoTurnos =
-        tipoInscripcion === "TDV" ? "/turnos_verano.json" : "/turnos.json";
-
-      const turnos = await (await fetch(archivoTurnos)).json();
-      setTurnosPorSede(turnos);
-
-      // Filtro por tipo de inscripción
-      const filtroTipo = tipoInscripcion
-        ? `&tipo_inscripcion=eq.${encodeURIComponent(tipoInscripcion)}`
-        : "";
-
+    (async () => {
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/inscripciones?activo=eq.true${filtroTipo}&select=id,nombre,apellido,sede,turno_1,curso,creado_en,tipo_inscripcion`,
+        `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,nombre_publico,activo,orden&order=orden.asc`,
         {
           headers: {
             apikey: config.supabaseKey,
@@ -56,22 +39,93 @@ const FichaAsistencia = () => {
         }
       );
       const data = await res.json();
-      setAlumnos(data);
+      const lista = Array.isArray(data) ? data : [];
+      setCiclosDisponibles(lista);
+      if (!cicloCodigo && lista.length > 0) {
+        const activo = lista.find((c) => c.activo) || lista[0];
+        setCicloCodigo(activo?.codigo || "");
+      }
+    })();
+  }, [config, cicloCodigo]);
+
+  useEffect(() => {
+    if (!config) return;
+
+    const loadData = async () => {
+      setCargando(true);
+      const filtroCiclo = cicloCodigo
+        ? `&ciclo_codigo=eq.${encodeURIComponent(cicloCodigo)}`
+        : "";
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,curso_nombre,inscripciones(nombre,apellido)&estado=eq.activa${filtroCiclo}`,
+        {
+          headers: {
+            apikey: config.supabaseKey,
+            Authorization: `Bearer ${config.supabaseKey}`,
+          },
+        }
+      );
+      const data = await res.json();
+      const lista = (Array.isArray(data) ? data : []).map((m) => {
+        const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
+        return {
+          id: m.id,
+          alumno_id: m.alumno_id,
+          nombre: alumno.nombre,
+          apellido: alumno.apellido,
+          sede: m.sede,
+          dia: m.dia,
+          hora: m.hora,
+          curso: m.curso_nombre,
+          ciclo_codigo: m.ciclo_codigo,
+        };
+      });
+      setAlumnos(lista);
+      setSede("");
+      setDia("");
+      setHorario("");
       setListaMostrada([]);
       setRecuperadores([]);
       setCargando(false);
     };
 
     loadData();
-  }, [config, tipoInscripcion]);
+  }, [config, cicloCodigo]);
+  const ordenDias = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
+  const normalizarDia = (valor = "") =>
+    String(valor || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  const ordenarDias = (lista = []) =>
+    [...new Set(lista)].sort((a, b) => {
+      const ia = ordenDias.indexOf(normalizarDia(a));
+      const ib = ordenDias.indexOf(normalizarDia(b));
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  const inicioDeRango = (valor) => {
+    const m = String(valor || "").match(/(\d{1,2}:\d{2})/);
+    return m ? m[1].padStart(5, "0") : String(valor || "");
+  };
+  const ordenarHorarios = (lista = []) =>
+    [...new Set(lista)].sort((a, b) => inicioDeRango(a).localeCompare(inicioDeRango(b)));
 
+  const sedesDisponibles = [...new Set(alumnos.map((a) => a.sede).filter(Boolean))].sort();
+  const diasDisponibles = ordenarDias(
+    alumnos
+      .filter((a) => (!sede || a.sede === sede))
+      .map((a) => a.dia)
+      .filter(Boolean)
+  );
+  const horariosDisponibles = ordenarHorarios(
+    alumnos
+      .filter((a) => (!sede || a.sede === sede) && (!dia || a.dia === dia))
+      .map((a) => a.hora)
+      .filter(Boolean)
+  );
 
-
-  const turnoCompleto = `${dia} ${horario}`;
-
-  const alumnosDelTurno = alumnos
-    .filter((a) => a.sede === sede && a.turno_1 === turnoCompleto)
-    .sort((a, b) => new Date(a.creado_en) - new Date(b.creado_en));
+  const turnoCompleto = [dia, horario].filter(Boolean).join(" ");
 
   const handleGuardar = async (e) => {
     e.preventDefault();
@@ -81,9 +135,9 @@ const FichaAsistencia = () => {
     const ausentes = listaMostrada.filter((a) => !a.presente);
 
     const payload = [
-      ...presentes.map((a) => ({ alumno_id: a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "regular" })),
-      ...ausentes.map((a) => ({ alumno_id: a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "ausente" })),
-      ...recuperadores.map((a) => ({ alumno_id: a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "recuperacion" })),
+      ...presentes.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "regular" })),
+      ...ausentes.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "ausente" })),
+      ...recuperadores.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "recuperacion" })),
     ];
 
     const existentesRes = await fetch(
@@ -114,16 +168,13 @@ const FichaAsistencia = () => {
     setRecuperadores([]);
     }, 3000);
   };
-
   const handleBuscar = () => {
     if (!sede || !dia || !horario) return;
     const seleccionados = alumnos
-      .filter((a) => a.sede === sede && a.turno_1 === turnoCompleto)
+      .filter((a) => a.sede === sede && a.dia === dia && a.hora === horario)
       .map((a) => ({ ...a, presente: true }));
     setListaMostrada(seleccionados);
   };
-
-  const dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
   return (
     <div className="max-w-4xl mx-auto mt-8 p-6 bg-white rounded-xl shadow-lg">
@@ -135,51 +186,51 @@ const FichaAsistencia = () => {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {/* Selector de ciclo / tipo de inscripción */}
-            <div className="mb-4">
+            <div>
               <label className="font-medium block mb-1">Ciclo:</label>
               <select
                 className="w-full border p-2 rounded"
-                value={tipoInscripcion}
-                onChange={(e) => setTipoInscripcion(e.target.value)}
+                value={cicloCodigo}
+                onChange={(e) => setCicloCodigo(e.target.value)}
               >
-                <option value="CICLO_2025">Ciclo 2025</option>
-                <option value="TDV">Taller de Verano</option>
-                <option value="CICLO_2026">Ciclo 2026</option>
+                <option value="">Todos</option>
+                {ciclosDisponibles.map((c) => (
+                  <option key={c.codigo} value={c.codigo}>
+                    {c.nombre_publico || c.codigo}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="font-medium">Sede:</label>
+              <label className="font-medium block mb-1">Sede:</label>
               <select className="w-full border p-2 rounded" value={sede} onChange={(e) => setSede(e.target.value)}>
                 <option value="">-- Seleccionar sede --</option>
-                <option value="Calle Mendoza">Calle Mendoza</option>
-                <option value="Fisherton">Fisherton</option>
+                {sedesDisponibles.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="font-medium">Día:</label>
+              <label className="font-medium block mb-1">Día:</label>
               <select className="w-full border p-2 rounded" value={dia} onChange={(e) => setDia(e.target.value)}>
                 <option value="">-- Seleccionar día --</option>
-                {dias.map((d) => (
+                {diasDisponibles.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="font-medium">Horario:</label>
+              <label className="font-medium block mb-1">Horario:</label>
               <select className="w-full border p-2 rounded" value={horario} onChange={(e) => setHorario(e.target.value)}>
                 <option value="">-- Seleccionar horario --</option>
-                {sede && dia &&
-                  Object.keys(turnosPorSede[sede] || {})
-                    .filter((t) => t.startsWith(dia))
-                    .map((t) => t.split(" ").slice(1).join(" "))
-                    .map((h, i) => (
-                      <option key={i} value={h}>{h}</option>
-                    ))}
+                {horariosDisponibles.map((h) => (
+                  <option key={h} value={h}>{h}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="font-medium">Fecha:</label>
+              <label className="font-medium block mb-1">Fecha:</label>
               <input className="w-full border p-2 rounded" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
           </div>
@@ -281,3 +332,4 @@ const FichaAsistencia = () => {
 };
 
 export default FichaAsistencia;
+

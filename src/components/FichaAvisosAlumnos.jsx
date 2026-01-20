@@ -6,13 +6,15 @@ export default function FichaAvisosAlumnos() {
   const [alumnos, setAlumnos] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState("activos"); // activos | inactivos | todos
   const [filtroSede, setFiltroSede] = useState("");
-  const [filtroTurno, setFiltroTurno] = useState("");
-  const [filtroTipoInscripcion, setFiltroTipoInscripcion] = useState("");
-  const [turnosDisponibles, setTurnosDisponibles] = useState([]);
+  const [filtroDia, setFiltroDia] = useState("");
+  const [filtroHora, setFiltroHora] = useState("");
+  const [filtroCiclo, setFiltroCiclo] = useState("");
+  const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
+  const [diasDisponibles, setDiasDisponibles] = useState([]);
+  const [horasDisponibles, setHorasDisponibles] = useState([]);
   const [mensaje, setMensaje] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
-
   useEffect(() => {
     fetch("/config.json")
       .then((res) => res.json())
@@ -23,7 +25,23 @@ export default function FichaAvisosAlumnos() {
   useEffect(() => {
     if (!config) return;
     cargarAlumnos();
-  }, [config, filtroEstado, filtroSede, filtroTurno, filtroTipoInscripcion]);
+  }, [config, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo]);
+
+  useEffect(() => {
+    if (!config) return;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,nombre_publico,activo,orden&order=orden.asc`,
+          { headers: headers() }
+        );
+        const data = await res.json();
+        setCiclosDisponibles(Array.isArray(data) ? data : []);
+      } catch {
+        setCiclosDisponibles([]);
+      }
+    })();
+  }, [config]);
 
   const headers = () => ({
     apikey: config?.supabaseKey,
@@ -35,69 +53,78 @@ export default function FichaAvisosAlumnos() {
     setError("");
 
     try {
-      let query = `${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido,telefono,sede,turno_1,activo,tipo_inscripcion&order=nombre.asc`;
+      let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,inscripciones(nombre,apellido,telefono)`;
 
       const filtros = [];
 
-      if (filtroEstado === "activos") filtros.push("activo=eq.true");
-      if (filtroEstado === "inactivos") filtros.push("activo=eq.false");
+      if (filtroEstado === "activos") filtros.push("estado=eq.activa");
+      if (filtroEstado === "inactivos") filtros.push("estado=in.(baja,finalizada)");
       if (filtroSede) filtros.push(`sede=eq.${encodeURIComponent(filtroSede)}`);
-      if (filtroTurno) filtros.push(`turno_1=eq.${encodeURIComponent(filtroTurno)}`);
-      if (filtroTipoInscripcion)
-        filtros.push(`tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`);
+      if (filtroCiclo) filtros.push(`ciclo_codigo=eq.${encodeURIComponent(filtroCiclo)}`);
+      if (filtroDia) filtros.push(`dia=eq.${encodeURIComponent(filtroDia)}`);
+      if (filtroHora) filtros.push(`hora=eq.${encodeURIComponent(filtroHora)}`);
 
       if (filtros.length > 0) {
         query += "&" + filtros.join("&");
       }
 
       const res = await fetch(query, { headers: headers() });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || "No pude cargar los alumnos.");
+      }
       const data = await res.json();
 
+      const listaBase = (Array.isArray(data) ? data : []).map((m) => {
+        const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
+        const estadoNormalizado = String(m.estado || "").toLowerCase();
+        return {
+          id: m.id,
+          alumno_id: m.alumno_id,
+          nombre: alumno.nombre,
+          apellido: alumno.apellido,
+          telefono: alumno.telefono,
+          sede: m.sede,
+          dia: m.dia,
+          hora: m.hora,
+          estado_normalizado: estadoNormalizado,
+          ciclo_codigo: m.ciclo_codigo,
+        };
+      });
+
       // ordenar por nombre y apellido
-      data.sort((a, b) => {
+      const listaFiltrada = [...listaBase].sort((a, b) => {
         const nomA = `${a.nombre} ${a.apellido}`.toLowerCase();
         const nomB = `${b.nombre} ${b.apellido}`.toLowerCase();
         return nomA.localeCompare(nomB);
       });
 
-      setAlumnos(Array.isArray(data) ? data : []);
+      setAlumnos(listaFiltrada);
 
-      // Turnos disponibles según sede y ciclo
-      if (filtroSede) {
-        const filtroTipo = filtroTipoInscripcion
-          ? `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`
-          : "";
+      const diasOrden = [
+        "Lunes",
+        "Martes",
+        "Miércoles",
+        "Jueves",
+        "Viernes",
+        "Sábado",
+        "Domingo",
+      ];
+      const dias = [...new Set(listaBase.map((a) => a.dia).filter(Boolean))].sort(
+        (a, b) => diasOrden.indexOf(a) - diasOrden.indexOf(b)
+      );
+      setDiasDisponibles(dias);
 
-        const resTurnos = await fetch(
-          `${config.supabaseUrl}/rest/v1/inscripciones?select=turno_1&sede=eq.${encodeURIComponent(
-            filtroSede
-          )}${filtroTipo}`,
-          { headers: headers() }
-        );
-        const datosTurnos = await resTurnos.json();
-        const turnosUnicos = [...new Set(datosTurnos.map((d) => d.turno_1).filter(Boolean))];
-
-        const diasOrden = [
-          "Lunes",
-          "Martes",
-          "Miércoles",
-          "Jueves",
-          "Viernes",
-          "Sábado",
-          "Domingo",
-        ];
-        turnosUnicos.sort((a, b) => {
-          const [diaA] = (a || "").split(" ");
-          const [diaB] = (b || "").split(" ");
-          const idxA = diasOrden.indexOf(diaA);
-          const idxB = diasOrden.indexOf(diaB);
-          return idxA - idxB || a.localeCompare(b);
-        });
-
-        setTurnosDisponibles(turnosUnicos);
-      } else {
-        setTurnosDisponibles([]);
-      }
+      const horas = [
+        ...new Set(
+          listaBase
+            .filter((a) => (!filtroDia || a.dia === filtroDia))
+            .map((a) => a.hora)
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b))
+        ),
+      ];
+      setHorasDisponibles(horas);
     } catch (e) {
       console.error(e);
       setError("No pude cargar los alumnos.");
@@ -106,16 +133,41 @@ export default function FichaAvisosAlumnos() {
     }
   };
 
-  const buildWhatsappLink = (telefono, mensajePlano) => {
+  const interpolarMensaje = (plantilla, alumno) => {
+    if (!plantilla) return "";
+    const reemplazos = {
+      "{nombre}": alumno?.nombre || "",
+      "{apellido}": alumno?.apellido || "",
+      "{sede}": alumno?.sede || "",
+      "{dia}": alumno?.dia || "",
+      "{hora}": alumno?.hora || "",
+      "{ciclo}": alumno?.ciclo_codigo || "",
+    };
+    return Object.keys(reemplazos).reduce(
+      (acc, key) => acc.split(key).join(reemplazos[key]),
+      plantilla
+    );
+  };
+
+  const buildWhatsappLink = (telefono, mensajePlano, alumno) => {
     if (!telefono || !mensajePlano) return null;
     const limpio = telefono.replace(/\D/g, "");
     if (!limpio) return null;
-    return `https://wa.me/54${limpio}?text=${encodeURIComponent(mensajePlano)}`;
+    const personalizado = interpolarMensaje(mensajePlano, alumno);
+    return `https://wa.me/54${limpio}?text=${encodeURIComponent(personalizado)}`;
   };
 
   const alumnosConTelefono = alumnos.filter((a) => a.telefono);
   const total = alumnos.length;
   const totalConTel = alumnosConTelefono.length;
+  const pillForEstado = (estado) => {
+    const e = (estado || "").toLowerCase();
+    if (e === "activa") return { cls: "bg-green-100 text-green-800", label: "Activa" };
+    if (e === "baja") return { cls: "bg-red-100 text-red-800", label: "Inactiva" };
+    if (e === "pausada") return { cls: "bg-red-100 text-red-800", label: "Inactiva" };
+    if (e === "finalizada") return { cls: "bg-gray-100 text-gray-800", label: "Finalizada" };
+    return { cls: "bg-gray-100 text-gray-800", label: estado || "-" };
+  };
 
   return (
     <div className="max-w-5xl mx-auto mt-10 p-6 bg-white rounded-xl shadow">
@@ -137,18 +189,20 @@ export default function FichaAvisosAlumnos() {
           </select>
         </div>
 
-        {/* Tipo de inscripción */}
+        {/* Ciclo */}
         <div>
-          <label className="block font-medium mb-1 text-sm">Tipo de inscripción:</label>
+          <label className="block font-medium mb-1 text-sm">Ciclo:</label>
           <select
             className="w-full border p-2 rounded text-sm"
-            value={filtroTipoInscripcion}
-            onChange={(e) => setFiltroTipoInscripcion(e.target.value)}
+            value={filtroCiclo}
+            onChange={(e) => setFiltroCiclo(e.target.value)}
           >
             <option value="">Todos</option>
-            <option value="CICLO_2025">Ciclo 2025</option>
-            <option value="TDV">Taller de Verano</option>
-            <option value="CICLO_2026">Ciclo 2026</option>
+            {ciclosDisponibles.map((c) => (
+              <option key={c.codigo} value={c.codigo}>
+                {c.nombre_publico || c.codigo}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -160,7 +214,8 @@ export default function FichaAvisosAlumnos() {
             value={filtroSede}
             onChange={(e) => {
               setFiltroSede(e.target.value);
-              setFiltroTurno("");
+              setFiltroDia("");
+              setFiltroHora("");
             }}
           >
             <option value="">Todas</option>
@@ -169,27 +224,35 @@ export default function FichaAvisosAlumnos() {
           </select>
         </div>
 
-        {/* Turno */}
+        {/* Día */}
         <div>
-          <label className="block font-medium mb-1 text-sm">Turno (día y horario):</label>
+          <label className="block font-medium mb-1 text-sm">Día:</label>
           <select
             className="w-full border p-2 rounded text-sm"
-            value={filtroTurno}
-            onChange={(e) => setFiltroTurno(e.target.value)}
-            disabled={!filtroSede}
+            value={filtroDia}
+            onChange={(e) => { setFiltroDia(e.target.value); setFiltroHora(""); }}
           >
             <option value="">Todos</option>
-            {turnosDisponibles.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
+            {diasDisponibles.map((d) => (
+              <option key={d} value={d}>{d}</option>
             ))}
           </select>
-          {!filtroSede && (
-            <p className="text-xs text-gray-400 mt-1">
-              Elegí una sede para filtrar por turno.
-            </p>
-          )}
+        </div>
+
+        {/* Horario */}
+        <div>
+          <label className="block font-medium mb-1 text-sm">Horario:</label>
+          <select
+            className="w-full border p-2 rounded text-sm"
+            value={filtroHora}
+            onChange={(e) => setFiltroHora(e.target.value)}
+            disabled={!filtroDia && !filtroSede}
+          >
+            <option value="">Todos</option>
+            {horasDisponibles.map((h) => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -205,8 +268,8 @@ export default function FichaAvisosAlumnos() {
           onChange={(e) => setMensaje(e.target.value)}
         />
         <p className="mt-1 text-xs text-gray-500">
-          El mismo texto se usará para todos los alumnos. Podés personalizarlo a mano
-          cuando se abra WhatsApp, si querés.
+          Podés usar {`{nombre}`}, {`{apellido}`}, {`{sede}`}, {`{dia}`}, {`{hora}`},{" "}
+          {`{ciclo}`}. Se reemplazan por alumno al abrir WhatsApp.
         </p>
       </div>
 
@@ -244,15 +307,16 @@ export default function FichaAvisosAlumnos() {
                 <th className="px-3 py-2 text-left">Alumno</th>
                 <th className="px-3 py-2 text-left">Teléfono</th>
                 <th className="px-3 py-2 text-left">Sede</th>
-                <th className="px-3 py-2 text-left">Turno</th>
+                <th className="px-3 py-2 text-left">Día</th>
+                <th className="px-3 py-2 text-left">Horario</th>
                 <th className="px-3 py-2 text-left">Estado</th>
                 <th className="px-3 py-2 text-center">WhatsApp</th>
               </tr>
             </thead>
             <tbody>
               {alumnos.map((a) => {
-                const link = buildWhatsappLink(a.telefono || "", mensaje);
-                const esActivo = a.activo === true;
+                const link = buildWhatsappLink(a.telefono || "", mensaje, a);
+                const pill = pillForEstado(a.estado_normalizado);
                 return (
                   <tr key={a.id} className="border-t">
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -264,18 +328,11 @@ export default function FichaAvisosAlumnos() {
                     <td className="px-3 py-2 whitespace-nowrap">
                       {a.sede || "-"}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs">
-                      {a.turno_1 || "-"}
-                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs">{a.dia || "-"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs">{a.hora || "-"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
-                          esActivo
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {esActivo ? "Activo" : "Inactivo"}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${pill.cls}`}>
+                        {pill.label}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -305,3 +362,6 @@ export default function FichaAvisosAlumnos() {
     </div>
   );
 }
+
+
+

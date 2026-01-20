@@ -1,0 +1,26 @@
+);
+
+export default function FichaAlumno() {
+  const { id } = useParams();
+
+  const [config, setConfig] = useState(null);
+  const headers = useMemo(() => headersFrom(config), [config]);
+
+  const [mensaje, setMensaje] = useState("");
+
+  const [cargandoAlumnos, setCargandoAlumnos] = useState(false);
+  const [alumnos, setAlumnos] = useState([]);
+  const [incluirInactivos, setIncluirInactivos] = useState(false);
+  const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
+  const [inscripcionesPersona, setInscripcionesPersona] = useState([]);
+  const [modoEdicionAlumno, setModoEdicionAlumno] = useState(false);
+  const [modoEdicionMatriculaId, setModoEdicionMatriculaId] = useState(null); // id de la matrícula que estás editando
+
+  
+
+  const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
+
+  // Matrículas del alumno
+  const [matriculasAlumno, setMatriculasAlumno] = useState([]);
+  const [matriculaSeleccionada, setMatriculaSeleccionada] = useState(null);
+

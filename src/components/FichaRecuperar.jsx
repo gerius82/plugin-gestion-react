@@ -10,10 +10,9 @@ export default function FichaRecuperar() {
 
   const [config, setConfig] = useState(null);
   const [telefono, setTelefono] = useState("");
-  const [alumnos, setAlumnos] = useState([]); // [{id, nombre, apellido, sede, turno_1, selected}]
+  const [alumnos, setAlumnos] = useState([]); // [{matricula_id, alumno_id, nombre, apellido, sede, dia, hora, turno_1, ciclo_codigo, selected}]
   const [sede, setSede] = useState("");
 
-  const [tipoInscripcion, setTipoInscripcion] = useState("");
 
   const [ausencias, setAusencias] = useState([]); // ["12 de agosto", "19 de agosto (próxima clase)"]
   const [faltaSeleccionada, setFaltaSeleccionada] = useState("");
@@ -21,8 +20,8 @@ export default function FichaRecuperar() {
   const [turnos, setTurnos] = useState([]); // [{turno: "lunes 18:00", disponible: true}]
   const [turnoSeleccionado, setTurnoSeleccionado] = useState("");
 
-  const [conteoPorTurno, setConteoPorTurno] = useState({}); // {"lunes 18:00": 12}
-  const [cuposMaximos, setCuposMaximos] = useState({}); // {SEDE: {turno: max}}
+  const [conteoPorTurno, setConteoPorTurno] = useState({}); // {"lunes||18:00": 12}
+  const [cuposMaximos, setCuposMaximos] = useState({}); // {"lunes||18:00": max}
 
   const [diaSeleccionado, setDiaSeleccionado] = useState(null); // {date: Date, iso: "YYYY-MM-DD", etiqueta: "lun 12/08", diaNombre: "lunes"}
 
@@ -87,7 +86,9 @@ export default function FichaRecuperar() {
     setLoading(true);
     try {
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/inscripciones?telefono=ilike.*${tel}*&select=id,nombre,apellido,sede,turno_1,tipo_inscripcion`,
+        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,sede,dia,hora,ciclo_codigo,inscripciones!inner(nombre,apellido,telefono)` +
+          `&estado=eq.activa` +
+          `&inscripciones.telefono=ilike.*${tel}*`,
         { headers: headers() }
       );
       const data = await res.json();
@@ -97,18 +98,24 @@ export default function FichaRecuperar() {
         return;
       }
 
-      const conCheck = data.map((a) => ({ ...a, selected: true }));
+      const conCheck = data.map((a) => ({
+        matricula_id: a.id,
+        alumno_id: a.alumno_id,
+        nombre: a.inscripciones?.nombre || "",
+        apellido: a.inscripciones?.apellido || "",
+        sede: a.sede,
+        dia: a.dia,
+        hora: a.hora,
+        turno_1: `${a.dia} ${a.hora}`,
+        ciclo_codigo: a.ciclo_codigo,
+        selected: true,
+      }));
       setAlumnos(conCheck);
       setSede(conCheck[0].sede);
 
-      // 👇 deducir tipo_inscripcion
-      const tipo =
-        conCheck[0].tipo_inscripcion && conCheck[0].tipo_inscripcion !== ""
-          ? conCheck[0].tipo_inscripcion
-          : "CICLO_2025";
-      setTipoInscripcion(tipo);
-
-      await cargarAusenciasYCapacidad(conCheck, conCheck[0].sede, tipo);
+      // Deducir ciclo
+      const ciclo = conCheck[0].ciclo_codigo || "";
+      await cargarAusenciasYCapacidad(conCheck, conCheck[0].sede, ciclo);
     } catch (e) {
       console.error(e);
       setError("Error al buscar. Intentá nuevamente.");
@@ -118,12 +125,13 @@ export default function FichaRecuperar() {
   };
 
   // Carga ausencias, calcula próxima clase y capacidad por turno
-  const cargarAusenciasYCapacidad = async (alumnosList, sedeSel, tipo) => {
+  const cargarAusenciasYCapacidad = async (alumnosList, sedeSel, ciclo) => {
     if (!config) return;
+    let cuposLocal = {};
 
     // 1) Ausencias sin recuperar + fecha futura (próxima clase)
     try {
-      const ids = alumnosList.map((a) => a.id);
+      const ids = alumnosList.map((a) => a.alumno_id);
       const resFaltas = await fetch(
         `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=in.(${ids.join(",")})&tipo=eq.ausente&recuperada=is.false&order=fecha.desc&limit=4&select=fecha`,
         { headers: headers() }
@@ -162,11 +170,20 @@ export default function FichaRecuperar() {
 
     // 2) Cupos máximos por sede
     try {
-      const archivoTurnos =
-        tipo === "TDV" ? "/turnos_verano.json" : "/turnos.json";
-
-      const resCupos = await fetch(archivoTurnos);
-      const cupos = await resCupos.json();
+      const resTurnos = await fetch(
+        `${config.supabaseUrl}/rest/v1/turnos?select=dia,hora,cupo_maximo` +
+          `&ciclo_codigo=eq.${encodeURIComponent(ciclo)}` +
+          `&sede=eq.${encodeURIComponent(sedeSel)}` +
+          `&activo=eq.true`,
+        { headers: headers() }
+      );
+      const turnosData = await resTurnos.json();
+      const cupos = {};
+      (Array.isArray(turnosData) ? turnosData : []).forEach((t) => {
+        const key = `${t.dia}||${t.hora}`;
+        cupos[key] = Number(t.cupo_maximo);
+      });
+      cuposLocal = cupos;
       setCuposMaximos(cupos);
     } catch (e) {
       console.error(e);
@@ -175,30 +192,31 @@ export default function FichaRecuperar() {
 
     // 3) Conteo actual de inscriptos por turno en la sede
     try {
-      const tipoQuery = tipo
-        ? `&tipo_inscripcion=eq.${encodeURIComponent(tipo)}`
-        : "";
-
       const resInscriptos = await fetch(
-        `${config.supabaseUrl}/rest/v1/inscripciones?activo=eq.true&sede=eq.${encodeURIComponent(
-          sedeSel
-        )}${tipoQuery}&select=turno_1`,
+        `${config.supabaseUrl}/rest/v1/matriculas?select=dia,hora` +
+          `&estado=eq.activa` +
+          `&ciclo_codigo=eq.${encodeURIComponent(ciclo)}` +
+          `&sede=eq.${encodeURIComponent(sedeSel)}`,
         { headers: headers() }
       );
 
       const inscriptos = await resInscriptos.json();
       const conteo = {};
-      inscriptos.forEach((i) => {
-        const t = i.turno_1;
-        conteo[t] = (conteo[t] || 0) + 1;
+      (Array.isArray(inscriptos) ? inscriptos : []).forEach((i) => {
+        const key = `${i.dia}||${i.hora}`;
+        conteo[key] = (conteo[key] || 0) + 1;
       });
       setConteoPorTurno(conteo);
 
-      // Generar lista de turnos de la sede con disponibilidad provisional
-      const lista = Object.keys((cuposMaximos[sedeSel] || {})).map((t) => ({
-        turno: t,
-        disponible: true,
-      }));
+      const lista = Object.keys(cuposLocal || {}).map((key) => {
+        const [dia, hora] = key.split("||");
+        return {
+          dia,
+          hora,
+          turno: `${dia} ${hora}`,
+          disponible: true,
+        };
+      });
       setTurnos(lista);
     } catch (e) {
       console.error(e);
@@ -208,12 +226,15 @@ export default function FichaRecuperar() {
 
   // Recalcular disponibilidad cuando cambian seleccionados / cupos / conteos
   useEffect(() => {
-    if (!sede || !cuposMaximos[sede]) return;
-    const lista = Object.keys(cuposMaximos[sede]).map((t) => {
-      const max = cuposMaximos[sede][t];
-      const actuales = conteoPorTurno[t] || 0;
+    if (!sede || !Object.keys(cuposMaximos || {}).length) return;
+    const lista = Object.keys(cuposMaximos || {}).map((key) => {
+      const max = cuposMaximos[key];
+      const actuales = conteoPorTurno[key] || 0;
+      const [dia, hora] = key.split("||");
       return {
-        turno: t,
+        dia,
+        hora,
+        turno: `${dia} ${hora}`,
         disponible: actuales + selectedCount <= max,
       };
     });
@@ -230,9 +251,11 @@ export default function FichaRecuperar() {
   }, [diaSeleccionado]);
 
   // Click en checkbox alumno
-  const toggleAlumno = (id) => {
+  const toggleAlumno = (matriculaId) => {
     setAlumnos((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, selected: !a.selected } : a))
+      prev.map((a) =>
+        a.matricula_id === matriculaId ? { ...a, selected: !a.selected } : a
+      )
     );
   };
 
@@ -284,7 +307,7 @@ export default function FichaRecuperar() {
             // 1) Buscar registro de ausencia exacto y marcar recuperada=true
             const fechaFaltaISO = convertirFechaTextoAISO(falta);
             const resBuscar = await fetch(
-              `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.id}&fecha=eq.${fechaFaltaISO}&tipo=eq.ausente&select=id`,
+              `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.alumno_id}&fecha=eq.${fechaFaltaISO}&tipo=eq.ausente&select=id`,
               { headers: headers() }
             );
             const [registro] = await resBuscar.json();
@@ -309,7 +332,7 @@ export default function FichaRecuperar() {
               method: "POST",
               headers: { ...headers(), "Content-Type": "application/json" },
               body: JSON.stringify({
-                alumno_id: a.id,
+                alumno_id: a.alumno_id,
                 fecha: fechaProximaISO,
                 tipo: "ausente",
                 recuperada: true,
@@ -325,7 +348,7 @@ export default function FichaRecuperar() {
           method: "POST",
           headers: { ...headers(), "Content-Type": "application/json" },
           body: JSON.stringify({
-            alumno_id: a.id,
+            alumno_id: a.alumno_id,
             fecha: fechaRecuperaISO,
             tipo: "recuperacion",
             turno: turnoSeleccionado,
@@ -345,8 +368,10 @@ export default function FichaRecuperar() {
   // Turnos filtrados por el día elegido (coincidencia por nombre del día al inicio)
   const turnosDelDia = useMemo(() => {
     if (!diaSeleccionado) return [];
-    const pref = diaSeleccionado.diaNombre; // "lunes"
-    return turnos.filter((t) => t.turno?.toLowerCase().startsWith(pref));
+    const pref = normalizarDia(diaSeleccionado.diaNombre);
+    return turnos.filter(
+      (t) => normalizarDia(t.dia || t.turno?.split(" ")[0]) === pref
+    );
   }, [turnos, diaSeleccionado]);
 
   return (
@@ -391,12 +416,12 @@ export default function FichaRecuperar() {
             <h3 className="text-lg font-semibold mb-2">Alumnos encontrados</h3>
             <ul className="space-y-2">
               {alumnos.map((a) => (
-                <li key={a.id} className="flex items-center gap-3">
+                <li key={a.matricula_id} className="flex items-center gap-3">
                   <input
                     type="checkbox"
                     className="h-4 w-4"
                     checked={a.selected}
-                    onChange={() => toggleAlumno(a.id)}
+                    onChange={() => toggleAlumno(a.matricula_id)}
                   />
                   <span className="text-gray-800 text-sm">{a.nombre} {a.apellido}</span>
                 </li>
@@ -538,6 +563,16 @@ function obtenerNombreMes(m) {
   ][m - 1];
 }
 
+function normalizarDia(valor) {
+  const lower = String(valor || "").toLowerCase();
+  const arreglado = lower
+    .replace("miç¸rcoles", "miercoles")
+    .replace("miã©rcoles", "miercoles")
+    .replace("sç­bado", "sabado")
+    .replace("sã¡bado", "sabado");
+  return arreglado.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function calcularProximaClase(turno) {
   if (!turno) return "";
   const dias = [
@@ -551,7 +586,7 @@ function calcularProximaClase(turno) {
   ];
   const hoy = new Date();
   const [diaNombre] = turno.split(" ");
-  const diaDeseado = dias.findIndex((d) => d === diaNombre);
+  const diaDeseado = dias.findIndex((d) => normalizarDia(d) === normalizarDia(diaNombre));
   if (diaDeseado === -1) return "";
   const delta = ((diaDeseado - hoy.getDay() + 7) % 7) || 7;
   const proxima = new Date(hoy);

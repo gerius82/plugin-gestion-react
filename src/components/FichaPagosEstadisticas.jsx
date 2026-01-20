@@ -7,21 +7,34 @@ const FichaPagosEstadisticas = () => {
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [matriculasMap, setMatriculasMap] = useState({});
+  const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
+  const [cicloFiltro, setCicloFiltro] = useState("");
+  const mesesBase = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+  const mesIndex = useMemo(
+    () =>
+      mesesBase.reduce((acc, m, idx) => {
+        acc[m] = idx;
+        return acc;
+      }, {}),
+    []
+  );
   const [mesSeleccionado, setMesSeleccionado] = useState(() => {
     const ahora = new Date();
-    const indice = ahora.getMonth();
-    return [
-      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ][indice];
+    return mesesBase[ahora.getMonth()];
   });
   const [medioPago, setMedioPago] = useState("todos");
   const [orden, setOrden] = useState("nombre");
   const [ascendente, setAscendente] = useState(true);
 
+  const MES_INSCRIPCION = "Inscripción";
+
   const meses = [
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ...mesesBase,
+    MES_INSCRIPCION
   ];
 
   useEffect(() => {
@@ -35,37 +48,66 @@ const FichaPagosEstadisticas = () => {
   useEffect(() => {
     if (!config) return;
     (async () => {
-      const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/inscripciones?activo=eq.true&select=*`,
-        {
-          headers: {
-            apikey: config.supabaseKey,
-            Authorization: `Bearer ${config.supabaseKey}`,
-          },
-        }
-      );
-      const data = await res.json();
-      setAlumnos(data);
+      const headers = {
+        apikey: config.supabaseKey,
+        Authorization: `Bearer ${config.supabaseKey}`,
+      };
+
+      const [resAlu, resMat, resCiclos] = await Promise.all([
+        fetch(`${config.supabaseUrl}/rest/v1/inscripciones?activo=eq.true&select=*`, {
+          headers,
+        }),
+        fetch(`${config.supabaseUrl}/rest/v1/matriculas?select=alumno_id,ciclo_codigo,estado,fecha_inicio,creado_en&estado=eq.activa`, {
+          headers,
+        }),
+        fetch(`${config.supabaseUrl}/rest/v1/ciclos?select=codigo,nombre_publico,activo,orden&order=orden.asc`, {
+          headers,
+        }),
+      ]);
+
+      const dataAlu = await resAlu.json();
+      setAlumnos(Array.isArray(dataAlu) ? dataAlu : []);
+
+      const dataMat = await resMat.json();
+      const map = {};
+      (Array.isArray(dataMat) ? dataMat : []).forEach((m) => {
+        if (!m.alumno_id || !m.ciclo_codigo || String(m.estado).toLowerCase() !== "activa") return;
+        const fecha = m.fecha_inicio || m.creado_en;
+        const d = fecha ? new Date(fecha) : null;
+        const startMonth = d && !isNaN(d) ? d.getMonth() : null;
+        map[m.alumno_id] = map[m.alumno_id] || [];
+        map[m.alumno_id].push({ ciclo: m.ciclo_codigo, startMonth });
+      });
+      setMatriculasMap(map);
+
+      const dataCiclos = await resCiclos.json();
+      const listaCiclos = Array.isArray(dataCiclos) ? dataCiclos : [];
+      setCiclosDisponibles(listaCiclos);
     })();
   }, [config]);
 
   useEffect(() => {
     if (!config || !mesSeleccionado) return;
     (async () => {
-      let filtro = `mes=eq.${mesSeleccionado}&pago_mes=eq.true`;
+      const headers = {
+        apikey: config.supabaseKey,
+        Authorization: `Bearer ${config.supabaseKey}`,
+      };
+
+      let filtro = "";
+      if (mesSeleccionado === MES_INSCRIPCION) {
+        filtro = "pago_inscripcion=eq.true";
+      } else {
+        filtro = `mes=eq.${mesSeleccionado}&pago_mes=eq.true`;
+      }
       if (medioPago !== "todos") filtro += `&medio_pago=eq.${medioPago}`;
 
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/pagos?select=alumno_id,mes,pago_mes,medio_pago&${filtro}`,
-        {
-          headers: {
-            apikey: config.supabaseKey,
-            Authorization: `Bearer ${config.supabaseKey}`,
-          },
-        }
+        `${config.supabaseUrl}/rest/v1/pagos?select=alumno_id,mes,pago_mes,pago_inscripcion,medio_pago&${filtro}`,
+        { headers }
       );
       const data = await res.json();
-      setPagos(data);
+      setPagos(Array.isArray(data) ? data : []);
     })();
   }, [config, mesSeleccionado, medioPago]);
 
@@ -76,15 +118,30 @@ const FichaPagosEstadisticas = () => {
   }, [pagos]);
 
   const alumnosConEstado = useMemo(() => {
-    const list = alumnos.map((a) => ({
-      ...a,
-      pago: pagosMap.has(a.id),
-      medio_pago: pagosMap.get(a.id) || null,
-    }));
+    const list = alumnos
+      .filter((a) => {
+        const mats = matriculasMap[a.id] || [];
+        if (mats.length === 0) return false; // solo alumnos con al menos una matrícula activa
+        const matsPorCiclo = cicloFiltro ? mats.filter((m) => m.ciclo === cicloFiltro) : mats;
+        if (matsPorCiclo.length === 0) return false;
+
+        if (mesSeleccionado === MES_INSCRIPCION) return true;
+        const idxSel = mesIndex[mesSeleccionado];
+        if (idxSel === undefined) return true;
+        // Corresponde pagar si el inicio es este mes o anterior
+        return matsPorCiclo.some(
+          (m) => m.startMonth == null || m.startMonth <= idxSel
+        );
+      })
+      .map((a) => ({
+        ...a,
+        pago: pagosMap.has(a.id),
+        medio_pago: pagosMap.get(a.id) || null,
+      }));
     return medioPago === "todos"
       ? list
       : list.filter((a) => a.medio_pago === medioPago);
-  }, [alumnos, pagosMap, medioPago]);
+  }, [alumnos, pagosMap, medioPago, matriculasMap, cicloFiltro]);
 
   const alumnosOrdenados = useMemo(() => {
     const arr = [...alumnosConEstado];
@@ -213,7 +270,7 @@ const FichaPagosEstadisticas = () => {
     <div className="max-w-5xl mx-auto mt-10 p-6 bg-white rounded-xl shadow">
       <h2 className="text-2xl font-bold text-center mb-6">Estadísticas de Pagos</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="block font-medium mb-1">Seleccionar Mes:</label>
           <select
@@ -236,6 +293,21 @@ const FichaPagosEstadisticas = () => {
             <option value="todos">Todos</option>
             <option value="efectivo">Efectivo</option>
             <option value="transferencia">Transferencia</option>
+          </select>
+        </div>
+        <div>
+          <label className="block font-medium mb-1">Ciclo:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={cicloFiltro}
+            onChange={(e) => setCicloFiltro(e.target.value)}
+          >
+            <option value="">Todos</option>
+            {ciclosDisponibles.map((c) => (
+              <option key={c.codigo} value={c.codigo}>
+                {c.nombre_publico || c.codigo}
+              </option>
+            ))}
           </select>
         </div>
       </div>

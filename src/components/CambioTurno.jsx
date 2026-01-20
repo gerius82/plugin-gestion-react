@@ -11,13 +11,13 @@ export default function CambioTurno() {
   const [config, setConfig] = useState(null);
   const [telefono, setTelefono] = useState("");
 
-  const [alumnos, setAlumnos] = useState([]); // [{id,nombre,apellido,sede,turno_1,selected}]
+  const [alumnos, setAlumnos] = useState([]); // [{matricula_id,alumno_id,nombre,apellido,sede,dia,hora,turno_1,ciclo_codigo,selected}]
   const [sede, setSede] = useState("");
 
-  const [tipoInscripcion, setTipoInscripcion] = useState("");
+  const [cicloCodigo, setCicloCodigo] = useState("");
 
-  const [cuposMaximos, setCuposMaximos] = useState({}); // {SEDE: {"lunes 18:00": 15, ...}}
-  const [conteoPorTurno, setConteoPorTurno] = useState({}); // {"lunes 18:00": 12}
+  const [cuposMaximos, setCuposMaximos] = useState({}); // {"lunes||18:00": 15}
+  const [conteoPorTurno, setConteoPorTurno] = useState({}); // {"lunes||18:00": 12}
 
   const [turnosDisponibles, setTurnosDisponibles] = useState([]); // [{turno, disponible}]
   const [turnoSeleccionado, setTurnoSeleccionado] = useState("");
@@ -41,15 +41,24 @@ export default function CambioTurno() {
     Authorization: `Bearer ${config?.supabaseKey ?? ""}`,
   });
 
-  // 👇 nuevo: carga turnos.json o turnos_verano.json
-  const cargarCupos = async (tipo) => {
+  // Carga cupos desde la tabla turnos
+  const cargarCupos = async (cicloSel, sedeSel) => {
+    if (!config || !cicloSel || !sedeSel) return;
     try {
-      const archivo =
-        tipo === "TDV" ? "/turnos_verano.json" : "/turnos.json";
-
-      const r = await fetch(archivo);
-      const json = await r.json();
-      setCuposMaximos(json || {});
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/turnos?select=dia,hora,cupo_maximo` +
+          `&ciclo_codigo=eq.${encodeURIComponent(cicloSel)}` +
+          `&sede=eq.${encodeURIComponent(sedeSel)}` +
+          `&activo=eq.true`,
+        { headers: headers() }
+      );
+      const data = await res.json();
+      const cupos = {};
+      (Array.isArray(data) ? data : []).forEach((t) => {
+        const key = `${t.dia}||${t.hora}`;
+        cupos[key] = Number(t.cupo_maximo);
+      });
+      setCuposMaximos(cupos);
     } catch (e) {
       console.error(e);
       setError((prev) => prev || "No pude cargar los cupos de turnos.");
@@ -79,7 +88,9 @@ export default function CambioTurno() {
     setLoading(true);
     try {
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/inscripciones?telefono=ilike.*${tel}*&select=id,nombre,apellido,sede,turno_1,tipo_inscripcion`,
+        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,sede,dia,hora,ciclo_codigo,inscripciones!inner(nombre,apellido,telefono)` +
+          `&estado=eq.activa` +
+          `&inscripciones.telefono=ilike.*${tel}*`,
         { headers: headers() }
       );
       const data = await res.json();
@@ -90,22 +101,26 @@ export default function CambioTurno() {
         return;
       }
 
-      const conCheck = data.map((a) => ({ ...a, selected: true }));
+      const conCheck = data.map((a) => ({
+        matricula_id: a.id,
+        alumno_id: a.alumno_id,
+        nombre: a.inscripciones?.nombre || "",
+        apellido: a.inscripciones?.apellido || "",
+        sede: a.sede,
+        dia: a.dia,
+        hora: a.hora,
+        turno_1: `${a.dia} ${a.hora}`,
+        ciclo_codigo: a.ciclo_codigo,
+        selected: true,
+      }));
       setAlumnos(conCheck);
       setSede(conCheck[0].sede);
 
-      // 👇 nuevo: deducir tipo_inscripcion (default: CICLO_2025)
-      const tipo =
-        conCheck[0].tipo_inscripcion && conCheck[0].tipo_inscripcion !== ""
-          ? conCheck[0].tipo_inscripcion
-          : "CICLO_2025";
+      const ciclo = conCheck[0].ciclo_codigo || "";
+      setCicloCodigo(ciclo);
 
-      setTipoInscripcion(tipo);
-
-      // cargar turnos correctos y calcular disponibilidad
-      await cargarCupos(tipo);
-
-      await calcularDisponibilidad(conCheck, conCheck[0].sede, tipo);
+      await cargarCupos(ciclo, conCheck[0].sede);
+      await calcularDisponibilidad(conCheck, conCheck[0].sede, ciclo);
     } catch (e) {
       console.error(e);
       setError("Error al buscar. Intentá nuevamente.");
@@ -122,26 +137,23 @@ export default function CambioTurno() {
   }, [selectedCount, conteoPorTurno, sede, cuposMaximos, alumnos]);
 
   // Obtiene conteo por turno en la sede y arma lista de turnos (excluyendo turno actual)
-  const calcularDisponibilidad = async (alumnosList, sedeSel, tipo = tipoInscripcion) => {
+  const calcularDisponibilidad = async (alumnosList, sedeSel, cicloSel = cicloCodigo) => {
     if (!config) return;
 
     try {
-      const tipoQuery = tipo
-      ? `&tipo_inscripcion=eq.${encodeURIComponent(tipo)}`
-      : "";
-
-      // Conteo actual de inscriptos por turno en la sede
+      // Conteo actual de matriculas por turno en la sede
       const resInscriptos = await fetch(
-        `${config.supabaseUrl}/rest/v1/inscripciones?activo=eq.true&sede=eq.${encodeURIComponent(
-          sedeSel
-        )}${tipoQuery}&select=turno_1`,
+        `${config.supabaseUrl}/rest/v1/matriculas?select=dia,hora` +
+          `&estado=eq.activa` +
+          `&ciclo_codigo=eq.${encodeURIComponent(cicloSel)}` +
+          `&sede=eq.${encodeURIComponent(sedeSel)}`,
         { headers: headers() }
       );
       const insc = await resInscriptos.json();
       const conteo = {};
-      insc.forEach((i) => {
-        const t = i.turno_1;
-        conteo[t] = (conteo[t] || 0) + 1;
+      (Array.isArray(insc) ? insc : []).forEach((i) => {
+        const key = `${i.dia}||${i.hora}`;
+        conteo[key] = (conteo[key] || 0) + 1;
       });
       setConteoPorTurno(conteo);
 
@@ -158,18 +170,24 @@ export default function CambioTurno() {
     sedeSel = sede,
     conteo = conteoPorTurno
   ) => {
-    if (!sedeSel || !cuposMaximos[sedeSel]) return;
+    if (!sedeSel || !Object.keys(cuposMaximos || {}).length) return;
 
-    const turnosActuales = new Set(alumnosList.map((a) => a.turno_1));
-    const base = Object.keys(cuposMaximos[sedeSel] || {})
-      .filter((t) => !turnosActuales.has(t));
+    const turnosActuales = new Set(
+      alumnosList.map((a) => `${a.dia}||${a.hora}`)
+    );
+    const base = Object.keys(cuposMaximos || {}).filter(
+      (key) => !turnosActuales.has(key)
+    );
 
-    const lista = base.map((t) => {
-      const max = cuposMaximos[sedeSel][t];
-      const actuales = conteo[t] || 0;
+    const lista = base.map((key) => {
+      const max = cuposMaximos[key];
+      const actuales = conteo[key] || 0;
+      const [dia, hora] = key.split("||");
       return {
-        turno: t,
-        disponible: actuales + selectedCount <= max,
+        dia,
+        hora,
+        turno: `${dia} ${hora}`,
+        disponible: Number.isFinite(max) ? actuales + selectedCount <= max : true,
       };
     });
 
@@ -181,9 +199,11 @@ export default function CambioTurno() {
     setTurnosDisponibles(lista);
   };
 
-  const toggleAlumno = (id) => {
+  const toggleAlumno = (matriculaId) => {
     setAlumnos((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, selected: !a.selected } : a))
+      prev.map((a) =>
+        a.matricula_id === matriculaId ? { ...a, selected: !a.selected } : a
+      )
     );
   };
 
@@ -218,29 +238,30 @@ export default function CambioTurno() {
     setProcessing(true);
     try {
       // Actualizar inscripciones en Supabase
+      const idx = turnoSeleccionado.indexOf(" ");
+      const diaNuevo = idx > -1 ? turnoSeleccionado.slice(0, idx) : turnoSeleccionado;
+      const horaNuevo = idx > -1 ? turnoSeleccionado.slice(idx + 1) : "";
       for (const a of seleccionados) {
-        await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?id=eq.${a.id}`,
-          {
-            method: "PATCH",
-            headers: {
-              ...headers(),
-              "Content-Type": "application/json",
-              prefer: "return=representation",
-            },
-            body: JSON.stringify({ turno_1: turnoSeleccionado }),
-          }
-        );
+        await fetch(`${config.supabaseUrl}/rest/v1/matriculas?id=eq.${a.matricula_id}`, {
+          method: "PATCH",
+          headers: {
+            ...headers(),
+            "Content-Type": "application/json",
+            prefer: "return=representation",
+          },
+          body: JSON.stringify({ dia: diaNuevo, hora: horaNuevo }),
+        });
       }
       setOkMsg("Solicitud enviada y turno actualizado en el sistema.");
       // Refrescar datos de capacidad para reflejar el cambio
       await calcularDisponibilidad(
         alumnos.map((x) =>
-          seleccionados.find((s) => s.id === x.id)
-            ? { ...x, turno_1: turnoSeleccionado }
+          seleccionados.find((s) => s.matricula_id === x.matricula_id)
+            ? { ...x, dia: diaNuevo, hora: horaNuevo, turno_1: turnoSeleccionado }
             : x
         ),
         sede,
-        tipoInscripcion
+        cicloCodigo
       );
     } catch (e) {
       console.error(e);
@@ -285,12 +306,12 @@ export default function CambioTurno() {
             <h3 className="text-lg font-semibold mb-2">Alumnos encontrados</h3>
             <ul className="space-y-2">
               {alumnos.map((a) => (
-                <li key={a.id} className="flex items-center gap-3">
+                <li key={a.matricula_id} className="flex items-center gap-3">
                   <input
                     type="checkbox"
                     className="h-4 w-4"
                     checked={a.selected}
-                    onChange={() => toggleAlumno(a.id)}
+                    onChange={() => toggleAlumno(a.matricula_id)}
                   />
                   <span className="text-gray-800 text-sm">
                     {a.nombre} {a.apellido}

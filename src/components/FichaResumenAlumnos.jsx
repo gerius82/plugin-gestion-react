@@ -6,11 +6,16 @@ export default function FichaResumenAlumnos() {
   const [alumnos, setAlumnos] = useState([]);
   const [todosAlumnosMap, setTodosAlumnosMap] = useState({});
   const [filtroSede, setFiltroSede] = useState("");
-  const [filtroTurno, setFiltroTurno] = useState("");
-  const [turnosDisponibles, setTurnosDisponibles] = useState([]);
+  const [filtroEstado, setFiltroEstado] = useState("activos");
+  const [filtroDia, setFiltroDia] = useState("");
+  const [filtroHora, setFiltroHora] = useState("");
+  const [diasDisponibles, setDiasDisponibles] = useState([]);
+  const [horasDisponibles, setHorasDisponibles] = useState([]);
   const [ordenColumna, setOrdenColumna] = useState("creado_en");
   const [ordenAscendente, setOrdenAscendente] = useState(true);
-  const [filtroTipoInscripcion, setFiltroTipoInscripcion] = useState("");
+  const [filtroCiclo, setFiltroCiclo] = useState("");
+  const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
+  const [error, setError] = useState("");
   
 
   useEffect(() => {
@@ -22,7 +27,7 @@ export default function FichaResumenAlumnos() {
   useEffect(() => {
     if (!config) return;
     cargarDatos();
-  }, [config, filtroSede, filtroTurno, filtroTipoInscripcion, ordenColumna, ordenAscendente]);
+  }, [config, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo, ordenColumna, ordenAscendente]);
 
   async function cargarDatos() {
     const headers = {
@@ -30,22 +35,62 @@ export default function FichaResumenAlumnos() {
       Authorization: `Bearer ${config.supabaseKey}`,
     };
 
+    setError("");
     const allRes = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido`, { headers });
     const allData = await allRes.json();
     const map = Object.fromEntries(allData.map(a => [a.id, `${a.nombre} ${a.apellido}`]));
     setTodosAlumnosMap(map);
 
-    let filtro = "&activo=eq.true";
-    if (filtroSede) filtro += `&sede=eq.${encodeURIComponent(filtroSede)}`;
-    if (filtroTurno) filtro += `&turno_1=eq.${encodeURIComponent(filtroTurno)}`;
-    if (filtroTipoInscripcion)
-      filtro += `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`;
-    const alumnosRes = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=*&order=creado_en.asc${filtro}`, { headers });
+    const cicloRes = await fetch(
+      `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,nombre_publico,activo,orden&order=orden.asc`,
+      { headers }
+    );
+    const cicloData = await cicloRes.json();
+    setCiclosDisponibles(Array.isArray(cicloData) ? cicloData : []);
+
+    const filtros = [];
+    if (filtroEstado === "activos") filtros.push("estado=eq.activa");
+    if (filtroEstado === "inactivos") filtros.push("estado=in.(baja,finalizada)");
+    if (filtroSede) filtros.push(`sede=eq.${encodeURIComponent(filtroSede)}`);
+    if (filtroCiclo) filtros.push(`ciclo_codigo=eq.${encodeURIComponent(filtroCiclo)}`);
+    if (filtroDia) filtros.push(`dia=eq.${encodeURIComponent(filtroDia)}`);
+    if (filtroHora) filtros.push(`hora=eq.${encodeURIComponent(filtroHora)}`);
+    const filtro = filtros.length ? `&${filtros.join("&")}` : "";
+    const alumnosRes = await fetch(
+      `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,lista_espera,inscripciones(id,nombre,apellido,edad,escuela,responsable,telefono,email,creado_en,tiene_promo,beneficiario_id,curso)${filtro}`,
+      { headers }
+    );
+    if (!alumnosRes.ok) {
+      const err = await alumnosRes.json().catch(() => ({}));
+      setError(err?.message || "No pude cargar los alumnos.");
+      setAlumnos([]);
+      return;
+    }
     let data = await alumnosRes.json();
 
-    data = data.map(a => ({
-      ...a,
-      beneficiario_nombre: a.beneficiario_id && map[a.beneficiario_id] ? map[a.beneficiario_id] : "-"
+    data = (Array.isArray(data) ? data : []).map(a => ({
+      id: a.id,
+      alumno_id: a.alumno_id,
+      ciclo_codigo: a.ciclo_codigo,
+      sede: a.sede,
+      dia: a.dia,
+      hora: a.hora,
+      turno_1: `${a.dia} ${a.hora}`,
+      nombre: a.inscripciones?.nombre || "",
+      apellido: a.inscripciones?.apellido || "",
+      edad: a.inscripciones?.edad,
+      escuela: a.inscripciones?.escuela || "",
+      responsable: a.inscripciones?.responsable || "",
+      telefono: a.inscripciones?.telefono || "",
+      email: a.inscripciones?.email || "",
+      creado_en: a.inscripciones?.creado_en || "",
+      tiene_promo: a.inscripciones?.tiene_promo,
+      lista_espera: a.lista_espera,
+      curso: a.inscripciones?.curso || "",
+      beneficiario_nombre:
+        a.inscripciones?.beneficiario_id && map[a.inscripciones?.beneficiario_id]
+          ? map[a.inscripciones?.beneficiario_id]
+          : "-",
     }));
 
     data.sort((a, b) => {
@@ -58,22 +103,30 @@ export default function FichaResumenAlumnos() {
     });
 
     setAlumnos(data);
-    
 
-    if (filtroSede) {
-      const turnosRes = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?select=turno_1&sede=eq.${encodeURIComponent(filtroSede)}`, { headers });
-      const turnosData = await turnosRes.json();
-      const turnos = [...new Set(turnosData.map(d => d.turno_1))];
-      const diasOrden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-      turnos.sort((a, b) => {
-        const [diaA] = a.split(" ");
-        const [diaB] = b.split(" ");
-        const idxA = diasOrden.indexOf(diaA);
-        const idxB = diasOrden.indexOf(diaB);
-        return idxA - idxB || a.localeCompare(b);
-      });
-      setTurnosDisponibles(turnos);
-    }
+    const diasOrden = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+    const normalizar = (valor) =>
+      String(valor || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    const dias = [...new Set(data.map((a) => a.dia).filter(Boolean))].sort(
+      (a, b) =>
+        diasOrden.findIndex((d) => normalizar(d) === normalizar(a)) -
+        diasOrden.findIndex((d) => normalizar(d) === normalizar(b))
+    );
+    setDiasDisponibles(dias);
+
+    const horas = [
+      ...new Set(
+        data
+          .filter((a) => (!filtroDia || a.dia === filtroDia))
+          .map((a) => a.hora)
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+      setHorasDisponibles(horas);
   }
 
   const handleOrden = (col) => {
@@ -91,9 +144,48 @@ export default function FichaResumenAlumnos() {
     <div className="max-w-full mx-auto mt-10 p-6 bg-white rounded-xl shadow">
       <h2 className="text-2xl font-bold text-center mb-6">Resumen de Alumnos</h2>
 
+      {error && (
+        <p className="text-sm text-red-600 mb-4 text-center">{error}</p>
+      )}
+
       
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        {/* Estado */}
+        <div>
+          <label className="block font-medium mb-1">Estado:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+          >
+            <option value="activos">Activos</option>
+            <option value="inactivos">Inactivos</option>
+            <option value="todos">Todos</option>
+          </select>
+        </div>
+
+        {/* Ciclo */}
+        <div>
+          <label className="block font-medium mb-1">Ciclo:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={filtroCiclo}
+            onChange={(e) => {
+              setFiltroCiclo(e.target.value);
+              setFiltroDia("");
+              setFiltroHora("");
+            }}
+          >
+            <option value="">Todos</option>
+            {ciclosDisponibles.map((c) => (
+              <option key={c.codigo} value={c.codigo}>
+                {c.nombre_publico || c.codigo}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Sede */}
         <div>
           <label className="block font-medium mb-1">Sede:</label>
@@ -102,7 +194,8 @@ export default function FichaResumenAlumnos() {
             value={filtroSede}
             onChange={(e) => {
               setFiltroSede(e.target.value);
-              setFiltroTurno("");
+              setFiltroDia("");
+              setFiltroHora("");
             }}
           >
             <option value="">Todas</option>
@@ -111,33 +204,37 @@ export default function FichaResumenAlumnos() {
           </select>
         </div>
 
-        {/* Turno */}
+        {/* Dia */}
         <div>
-          <label className="block font-medium mb-1">Turno:</label>
+          <label className="block font-medium mb-1">Dia:</label>
           <select
             className="w-full border p-2 rounded"
-            value={filtroTurno}
-            onChange={(e) => setFiltroTurno(e.target.value)}
+            value={filtroDia}
+            onChange={(e) => {
+              setFiltroDia(e.target.value);
+              setFiltroHora("");
+            }}
           >
             <option value="">Todos</option>
-            {turnosDisponibles.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            {diasDisponibles.map((d) => (
+              <option key={d} value={d}>{d}</option>
             ))}
           </select>
         </div>
 
-        {/* 👇 Nuevo: Tipo de inscripción */}
+        {/* Horario */}
         <div>
-          <label className="block font-medium mb-1">Tipo de inscripción:</label>
+          <label className="block font-medium mb-1">Horario:</label>
           <select
             className="w-full border p-2 rounded"
-            value={filtroTipoInscripcion}
-            onChange={(e) => setFiltroTipoInscripcion(e.target.value)}
+            value={filtroHora}
+            onChange={(e) => setFiltroHora(e.target.value)}
+            disabled={!filtroDia && !filtroSede}
           >
             <option value="">Todos</option>
-            <option value="CICLO_2025">Ciclo 2025</option>
-            <option value="TDV">Taller de Verano</option>
-            <option value="CICLO_2026">Ciclo 2026</option>
+            {horasDisponibles.map((h) => (
+              <option key={h} value={h}>{h}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -211,7 +308,7 @@ export default function FichaResumenAlumnos() {
                     ></span>
                 </td>
                 <td className="px-3 py-2 text-center">
-                    <Link to={`/ficha-alumno/${a.id}`} title="Ver ficha individual">
+                    <Link to={`/ficha-alumno/${a.alumno_id}`} title="Ver ficha individual">
                     📄
                     </Link>
                 </td>
@@ -238,3 +335,4 @@ export default function FichaResumenAlumnos() {
     </div>
   );
 }
+

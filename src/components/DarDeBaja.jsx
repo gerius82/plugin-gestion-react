@@ -10,7 +10,7 @@ export default function DarDeBaja() {
 
   const [config, setConfig] = useState(null);
   const [telefono, setTelefono] = useState("");
-  const [alumnos, setAlumnos] = useState([]); // [{id,nombre,apellido,telefono,beneficiario_id,selected}]
+  const [alumnos, setAlumnos] = useState([]); // [{matricula_id,alumno_id,nombre,apellido,telefono,curso,sede,dia,hora,ciclo_codigo,selected}]
   const [motivo, setMotivo] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -46,10 +46,9 @@ export default function DarDeBaja() {
 
     setLoading(true);
     try {
-      const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/inscripciones?activo=eq.true&telefono=ilike.*${tel}*&select=id,nombre,apellido,telefono,beneficiario_id`,
-        { headers: headers() }
-      );
+      const res = await fetch(`${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,curso_nombre,sede,dia,hora,inscripciones!inner(nombre,apellido,telefono)` +
+          `&estado=eq.activa` +
+          `&inscripciones.telefono=ilike.*${tel}*`, { headers: headers() });
       const data = await res.json();
 
       if (!Array.isArray(data) || data.length === 0) {
@@ -58,7 +57,21 @@ export default function DarDeBaja() {
         return;
       }
 
-      setAlumnos(data.map((a) => ({ ...a, selected: true })));
+      setAlumnos(
+        data.map((a) => ({
+          matricula_id: a.id,
+          alumno_id: a.alumno_id,
+          nombre: a.inscripciones?.nombre || "",
+          apellido: a.inscripciones?.apellido || "",
+          telefono: a.inscripciones?.telefono || "",
+          curso: a.curso_nombre || "",
+          sede: a.sede,
+          dia: a.dia,
+          hora: a.hora,
+          ciclo_codigo: a.ciclo_codigo,
+          selected: true,
+        }))
+      );
     } catch (e) {
       console.error(e);
       setError("Error al buscar. Intentá nuevamente.");
@@ -67,8 +80,12 @@ export default function DarDeBaja() {
     }
   };
 
-  const toggleAlumno = (id) => {
-    setAlumnos((prev) => prev.map((a) => (a.id === id ? { ...a, selected: !a.selected } : a)));
+  const toggleAlumno = (matriculaId) => {
+    setAlumnos((prev) =>
+      prev.map((a) =>
+        a.matricula_id === matriculaId ? { ...a, selected: !a.selected } : a
+      )
+    );
   };
 
   const darDeBaja = async () => {
@@ -87,31 +104,25 @@ export default function DarDeBaja() {
 
     setProcessing(true);
     try {
+      const fechaHoy = new Date().toISOString().slice(0, 10);
       for (const a of selected) {
-        // Si el alumno es beneficiario o tiene beneficiario vinculado, limpiar promo en el beneficiario
-        if (a.beneficiario_id) {
-          await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?id=eq.${a.beneficiario_id}`,
-            {
-              method: "PATCH",
-              headers: { ...headers(), "Content-Type": "application/json", prefer: "return=representation" },
-              body: JSON.stringify({ tiene_promo: false, beneficiario_id: null }),
-            }
-          );
-        }
-        // Baja del alumno
-        await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?id=eq.${a.id}`,
-          {
-            method: "PATCH",
-            headers: { ...headers(), "Content-Type": "application/json", prefer: "return=representation" },
-            body: JSON.stringify({ activo: false, tiene_promo: false, beneficiario_id: null }),
-          }
-        );
+        await fetch(`${config.supabaseUrl}/rest/v1/matriculas?id=eq.${a.matricula_id}`, {
+          method: "PATCH",
+          headers: { ...headers(), "Content-Type": "application/json", prefer: "return=representation" },
+          body: JSON.stringify({ estado: "baja", fecha_fin: fechaHoy }),
+        });
       }
 
       // WhatsApp
       const nombres = selected.map((a) => `${a.nombre} ${a.apellido}`);
+      const detalles = selected.map((a) => `${a.nombre} ${a.apellido} - ${a.curso || "Curso"} (${a.dia} ${a.hora})`);
       const texto = encodeURIComponent(
-        `Solicitud de baja:\n👤 Alumno(s): ${nombres.join(", ")}\n📝 Motivo: ${motivo.trim()}`
+        `Solicitud de baja:
+Alumno(s): ${nombres.join(", ")}
+Motivo: ${motivo.trim()}
+
+Cursos:
+${detalles.join("\n")}`
       );
       const link = `https://wa.me/543412153057?text=${texto}`;
       window.open(link, "_blank");
@@ -163,17 +174,19 @@ export default function DarDeBaja() {
         <div id="resultado" className="mt-6">
           <h4 className="text-lg font-semibold mb-2">Resultados encontrados</h4>
           <ul id="listaAlumnos" className="space-y-2">
-            {alumnos.map((a) => (
-              <li key={a.id} className="flex items-center gap-3 border-b pb-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={a.selected}
-                  onChange={() => toggleAlumno(a.id)}
-                />
-                <span className="text-gray-800">{a.nombre} {a.apellido}</span>
-              </li>
-            ))}
+              {alumnos.map((a) => (
+                <li key={a.matricula_id} className="flex items-center gap-3 border-b pb-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={a.selected}
+                    onChange={() => toggleAlumno(a.matricula_id)}
+                  />
+                  <span className="text-gray-800">
+                    {a.nombre} {a.apellido} — {a.curso || "Curso"} ({a.dia} {a.hora})
+                  </span>
+                </li>
+              ))}
           </ul>
 
           <label className="block font-medium mt-4 mb-1">Motivo de baja</label>

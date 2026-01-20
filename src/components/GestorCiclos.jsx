@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-
-
 
 // Estructura base de un ciclo nuevo
 const cicloInicial = {
@@ -29,16 +27,25 @@ function formatearFecha(fecha) {
   return `${dia}-${mes}-${anio}`;
 }
 
-
-
 export default function GestorCiclos() {
   const [config, setConfig] = useState(null);
   const [ciclos, setCiclos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
 
   const [nuevoCiclo, setNuevoCiclo] = useState(cicloInicial);
   const [cicloEditando, setCicloEditando] = useState(null);
+
+  const ciclosOrdenados = useMemo(() => {
+    return [...ciclos].sort((a, b) => {
+      const ordenA = a.orden ?? 9999;
+      const ordenB = b.orden ?? 9999;
+      if (ordenA !== ordenB) return ordenA - ordenB;
+      return (a.nombre_publico || "").localeCompare(b.nombre_publico || "");
+    });
+  }, [ciclos]);
 
   // Cargar config.json
   useEffect(() => {
@@ -48,45 +55,48 @@ export default function GestorCiclos() {
       .catch(() => setMensaje("No pude cargar config.json"));
   }, []);
 
-  const headers = () => ({
-    apikey: config?.supabaseKey ?? "",
-    Authorization: `Bearer ${config?.supabaseKey ?? ""}`,
-    "Content-Type": "application/json",
-  });
+  const headers = useCallback(
+    () => ({
+      apikey: config?.supabaseKey ?? "",
+      Authorization: `Bearer ${config?.supabaseKey ?? ""}`,
+      "Content-Type": "application/json",
+    }),
+    [config?.supabaseKey]
+  );
 
   // Cargar ciclos desde Supabase
-  const cargarCiclos = async () => {
+  const cargarCiclos = useCallback(async () => {
     if (!config) return;
     setLoading(true);
     setMensaje("");
     try {
-        const res = await fetch(
+      const res = await fetch(
         `${config.supabaseUrl}/rest/v1/ciclos?select=*`,
         { headers: headers() }
-        );
-        const data = await res.json();
+      );
+      const data = await res.json();
 
-        if (!res.ok) {
+      if (!res.ok) {
         console.error("Error al cargar ciclos:", data);
         setMensaje("No se pudo cargar ciclos");
-        setCiclos([]); // dejamos un array vacío para que no rompa el .map
-        return;
-        }
-
-        setCiclos(Array.isArray(data) ? data : []);
-    } catch (e) {
-        console.error(e);
-        setMensaje("Error al cargar ciclos");
         setCiclos([]);
+        return;
+      }
+
+      setCiclos(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+      setMensaje("Error al cargar ciclos");
+      setCiclos([]);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  }, [config, headers]);
 
 
   useEffect(() => {
     if (config) cargarCiclos();
-  }, [config]);
+  }, [config, cargarCiclos]);
 
   // Handlers formulario nuevo ciclo
     const handleNuevoChange = (e) => {
@@ -115,8 +125,15 @@ export default function GestorCiclos() {
       return;
     }
 
-    if (!nuevoCiclo.codigo || !nuevoCiclo.nombre_publico) {
+    if (!nuevoCiclo.codigo.trim() || !nuevoCiclo.nombre_publico.trim()) {
       setMensaje("Completá código y nombre público");
+      return;
+    }
+
+    const inicio = nuevoCiclo.fecha_inicio || nuevoCiclo.fecha_inicio_ciclo;
+    const fin = nuevoCiclo.fecha_fin;
+    if (inicio && fin && new Date(inicio) > new Date(fin)) {
+      setMensaje("La fecha de inicio no puede ser mayor a la fecha fin");
       return;
     }
 
@@ -132,6 +149,7 @@ export default function GestorCiclos() {
     };
 
     try {
+      setGuardando(true);
       setMensaje("Creando ciclo...");
       const res = await fetch(`${config.supabaseUrl}/rest/v1/ciclos`, {
         method: "POST",
@@ -152,6 +170,8 @@ export default function GestorCiclos() {
     } catch (e) {
       console.error(e);
       setMensaje("Error al crear ciclo");
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -190,6 +210,7 @@ export default function GestorCiclos() {
     if (!config) return;
     setMensaje("Actualizando ciclo...");
     try {
+      setGuardandoEdit(true);
       const res = await fetch(
         `${config.supabaseUrl}/rest/v1/ciclos?id=eq.${id}`,
         {
@@ -211,12 +232,26 @@ export default function GestorCiclos() {
     } catch (e) {
       console.error(e);
       setMensaje("Error al actualizar ciclo");
+    } finally {
+      setGuardandoEdit(false);
     }
   };
 
   const guardarEdicion = async (e) => {
     e.preventDefault();
     if (!cicloEditando) return;
+
+    if (!cicloEditando.codigo.trim() || !cicloEditando.nombre_publico.trim()) {
+      setMensaje("Completá código y nombre público");
+      return;
+    }
+
+    const inicio = cicloEditando.fecha_inicio || cicloEditando.fecha_inicio_ciclo;
+    const fin = cicloEditando.fecha_fin;
+    if (inicio && fin && new Date(inicio) > new Date(fin)) {
+      setMensaje("La fecha de inicio no puede ser mayor a la fecha fin");
+      return;
+    }
 
     const cambios = {
       codigo: cicloEditando.codigo.trim(),
@@ -285,10 +320,6 @@ export default function GestorCiclos() {
           Volver
         </Link>
       </div>
-
-      {mensaje && (
-        <div className="mb-4 text-sm text-center text-gray-700">{mensaje}</div>
-      )}
 
       {/* Formulario de nuevo ciclo */}
       <div className="bg-white rounded-xl shadow-md border p-4 mb-6">
@@ -407,11 +438,18 @@ export default function GestorCiclos() {
 
             <button
                 type="submit"
-                className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow"
+                disabled={guardando}
+                className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                Crear ciclo
+                {guardando ? "Creando..." : "Crear ciclo"}
             </button>
         </div>
+
+        {mensaje && (
+          <div className="text-sm px-3 py-2 rounded-lg border bg-yellow-50 text-yellow-800 mt-3">
+            {mensaje}
+          </div>
+        )}
 
         </form>
       </div>
@@ -425,13 +463,13 @@ export default function GestorCiclos() {
           )}
         </div>
 
-        {ciclos.length === 0 ? (
+        {ciclosOrdenados.length === 0 ? (
           <p className="text-sm text-gray-500">
             Todavía no hay ciclos cargados.
           </p>
         ) : (
           <div className="space-y-2">
-            {ciclos.map((c) => (
+            {ciclosOrdenados.map((c) => (
               <div
                 key={c.id}
                 className="border rounded-lg px-3 py-2 flex items-start justify-between gap-3"
@@ -495,31 +533,31 @@ export default function GestorCiclos() {
 
                 </div>
 
-                <div className="flex flex-col items-end gap-2 text-xs">
-                  <label className="inline-flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={c.activo}
-                      onChange={() => toggleActivo(c)}
-                    />
-                    <span>{c.activo ? "Habilitado" : "Deshabilitado"}</span>
-                  </label>
+              <div className="flex flex-col items-end gap-2 text-xs">
+                <label className="inline-flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={c.activo}
+                    onChange={() => toggleActivo(c)}
+                  />
+                  <span>{c.activo ? "Habilitado" : "Deshabilitado"}</span>
+                </label>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => abrirModalEdicion(c)}
-                      className="text-blue-600 hover:text-blue-800 hover:bg-white"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleEliminarCiclo(c)}
-                      className="text-red-600 hover:text-red-800 hover:bg-white" 
-                    >
-                      Eliminar
-                    </button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => abrirModalEdicion(c)}
+                    className="text-blue-600 hover:text-blue-800 hover:bg-white"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleEliminarCiclo(c)}
+                    className="text-red-600 hover:text-red-800 hover:bg-white" 
+                  >
+                    Eliminar
+                  </button>
                 </div>
+              </div>
               </div>
             ))}
           </div>
@@ -648,9 +686,10 @@ export default function GestorCiclos() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold"
+                  disabled={guardandoEdit}
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Guardar cambios
+                  {guardandoEdit ? "Guardando..." : "Guardar cambios"}
                 </button>
               </div>
             </form>

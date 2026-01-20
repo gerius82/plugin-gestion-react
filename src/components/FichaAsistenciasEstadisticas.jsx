@@ -5,9 +5,12 @@ export default function FichaAsistenciasEstadisticas() {
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
   const [filtroSede, setFiltroSede] = useState("");
-  const [filtroTurno, setFiltroTurno] = useState("");
-  const [turnosDisponibles, setTurnosDisponibles] = useState([]);
-  const [filtroTipoInscripcion, setFiltroTipoInscripcion] = useState("CICLO_2025");
+  const [filtroDia, setFiltroDia] = useState("");
+  const [filtroHora, setFiltroHora] = useState("");
+  const [diasDisponibles, setDiasDisponibles] = useState([]);
+  const [horasDisponibles, setHorasDisponibles] = useState([]);
+  const [filtroCiclo, setFiltroCiclo] = useState("");
+  const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
   const [filtroMes, setFiltroMes] = useState("");
   const [solo4Semanas, setSolo4Semanas] = useState(false);
 
@@ -23,7 +26,7 @@ export default function FichaAsistenciasEstadisticas() {
   useEffect(() => {
     if (!config) return;
     cargarResumen();
-  }, [config, filtroSede, filtroTurno, filtroTipoInscripcion, filtroMes, solo4Semanas]);
+  }, [config, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroMes, solo4Semanas]);
 
   useEffect(() => {
     if (filtroMes !== "") {
@@ -31,86 +34,34 @@ export default function FichaAsistenciasEstadisticas() {
     }
   }, [filtroMes]);
 
+  useEffect(() => {
+    if (!config) return;
+    (async () => {
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,nombre_publico,activo,orden&order=orden.asc`,
+        {
+          headers: {
+            apikey: config.supabaseKey,
+            Authorization: `Bearer ${config.supabaseKey}`,
+          },
+        }
+      );
+      const data = await res.json();
+      setCiclosDisponibles(Array.isArray(data) ? data : []);
+    })();
+  }, [config]);
 
-  async function cargarResumen() {
-  // 1) Armar filtro de inscripciones
-  let filtro = "&activo=eq.true";
-  if (filtroSede) filtro += `&sede=eq.${encodeURIComponent(filtroSede)}`;
-  if (filtroTurno) filtro += `&turno_1=eq.${encodeURIComponent(filtroTurno)}`;
-  if (filtroTipoInscripcion) filtro += `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`;
+    async function cargarResumen() {
+    const filtrosBase = ["estado=eq.activa"];
+    if (filtroSede) filtrosBase.push(`sede=eq.${encodeURIComponent(filtroSede)}`);
+    if (filtroCiclo) filtrosBase.push(`ciclo_codigo=eq.${encodeURIComponent(filtroCiclo)}`);
 
-  // 2) Traer alumnos
-  const alumnosRes = await fetch(
-    `${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido,turno_1,sede${filtro}`,
-    {
-      headers: {
-        apikey: config.supabaseKey,
-        Authorization: `Bearer ${config.supabaseKey}`,
-      },
-    }
-  );
+    const filtros = [...filtrosBase];
+    if (filtroDia) filtros.push(`dia=eq.${encodeURIComponent(filtroDia)}`);
+    if (filtroHora) filtros.push(`hora=eq.${encodeURIComponent(filtroHora)}`);
 
-  let alumnosData = await alumnosRes.json();
-  alumnosData.sort((a, b) => a.nombre.localeCompare(b.nombre));
-
-  // 3) Traer asistencias (podés subir el limit si querés más historial)
-  // si hay filtro de tiempo, traigo más historial
-  const limit = filtroMes || solo4Semanas ? 200 : 10;
-
-  const asistenciasPromises = alumnosData.map((a) =>
-    fetch(
-      `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.id}&select=tipo,fecha&order=fecha.desc&limit=${limit}`,
-      {
-        headers: {
-          apikey: config.supabaseKey,
-          Authorization: `Bearer ${config.supabaseKey}`,
-        },
-      }
-    ).then((res) => res.json())
-  );
-
-  const asistenciasData = await Promise.all(asistenciasPromises);
-
-  // 4) Aplicar filtros de mes y últimas 4 semanas SOBRE las asistencias ya cargadas
-  const hoy = new Date();
-  const cuatroSemanas = 28;
-
-  const alumnosConAsistencias = alumnosData.map((a, idx) => {
-    let lista = asistenciasData[idx] || [];
-
-    if (filtroMes) {
-      lista = lista.filter((x) => {
-        const m = new Date(x.fecha).toLocaleString("es-AR", { month: "long" });
-        return m.toLowerCase() === filtroMes.toLowerCase();
-      });
-    }
-
-    if (solo4Semanas && !filtroMes) {
-      lista = lista.filter((x) => {
-        const f = new Date(x.fecha);
-        const dif = (hoy - f) / (1000 * 3600 * 24);
-        return dif <= cuatroSemanas;
-      });
-    }
-
-    return { ...a, asistencias: lista };
-  });
-
-  setAlumnos(alumnosConAsistencias);
-
-
-  
-
-  // 5) Turnos disponibles según sede + tipo de inscripción (esto lo dejo casi igual)
-  if (config && filtroSede) {
-    const filtroTipo = filtroTipoInscripcion
-      ? `&tipo_inscripcion=eq.${encodeURIComponent(filtroTipoInscripcion)}`
-      : "";
-
-    const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/inscripciones?select=turno_1&sede=eq.${encodeURIComponent(
-        filtroSede
-      )}${filtroTipo}`,
+    const alumnosRes = await fetch(
+      `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,sede,dia,hora,ciclo_codigo,inscripciones(nombre,apellido)&${filtros.join("&")}`,
       {
         headers: {
           apikey: config.supabaseKey,
@@ -118,23 +69,101 @@ export default function FichaAsistenciasEstadisticas() {
         },
       }
     );
-    const datos = await res.json();
-    const turnosUnicos = [...new Set(datos.map(d => d.turno_1))];
 
-    const diasOrden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-    turnosUnicos.sort((a, b) => {
-      const [diaA] = a.split(" ");
-      const [diaB] = b.split(" ");
-      const idxA = diasOrden.indexOf(diaA);
-      const idxB = diasOrden.indexOf(diaB);
-      return idxA - idxB || a.localeCompare(b);
+    let alumnosData = await alumnosRes.json();
+    alumnosData = (Array.isArray(alumnosData) ? alumnosData : []).map((m) => {
+      const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
+      const turno = [m.dia, m.hora].filter(Boolean).join(" ");
+      return {
+        id: m.id,
+        alumno_id: m.alumno_id,
+        nombre: alumno.nombre,
+        apellido: alumno.apellido,
+        sede: m.sede,
+        dia: m.dia,
+        hora: m.hora,
+        turno,
+        ciclo_codigo: m.ciclo_codigo,
+      };
+    });
+    alumnosData.sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || "")));
+
+    const limit = filtroMes || solo4Semanas ? 200 : 10;
+
+    const asistenciasPromises = alumnosData.map((a) => {
+      const filtroTurnoAsis = a.turno ? `&turno=eq.${encodeURIComponent(a.turno)}` : "";
+      const filtroSedeAsis = a.sede ? `&sede=eq.${encodeURIComponent(a.sede)}` : "";
+      return fetch(
+        `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.alumno_id}${filtroTurnoAsis}${filtroSedeAsis}&select=tipo,fecha&order=fecha.desc&limit=${limit}`,
+        {
+          headers: {
+            apikey: config.supabaseKey,
+            Authorization: `Bearer ${config.supabaseKey}`,
+          },
+        }
+      ).then((res) => res.json());
     });
 
-    setTurnosDisponibles(turnosUnicos);
-  } else {
-    setTurnosDisponibles([]);
+    const asistenciasData = await Promise.all(asistenciasPromises);
+
+    const hoy = new Date();
+    const cuatroSemanas = 28;
+
+    const alumnosConAsistencias = alumnosData.map((a, idx) => {
+      let lista = asistenciasData[idx] || [];
+
+      if (filtroMes) {
+        lista = lista.filter((x) => {
+          const m = new Date(x.fecha).toLocaleString("es-AR", { month: "long" });
+          return m.toLowerCase() === filtroMes.toLowerCase();
+        });
+      }
+
+      if (solo4Semanas && !filtroMes) {
+        lista = lista.filter((x) => {
+          const f = new Date(x.fecha);
+          const dif = (hoy - f) / (1000 * 3600 * 24);
+          return dif <= cuatroSemanas;
+        });
+      }
+
+      return { ...a, asistencias: lista };
+    });
+
+        setAlumnos(alumnosConAsistencias);
+
+    let turnosBase = alumnosData;
+    if (filtroDia || filtroHora) {
+      const resTurnos = await fetch(
+        `${config.supabaseUrl}/rest/v1/matriculas?select=dia,hora&${filtrosBase.join("&")}`,
+        {
+          headers: {
+            apikey: config.supabaseKey,
+            Authorization: `Bearer ${config.supabaseKey}`,
+          },
+        }
+      );
+      const dataTurnos = await resTurnos.json();
+      turnosBase = Array.isArray(dataTurnos) ? dataTurnos : [];
+    }
+
+    const diasOrden = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+    const diasUnicos = [
+      ...new Set(turnosBase.map((a) => a.dia).filter(Boolean)),
+    ];
+    diasUnicos.sort((a, b) => diasOrden.indexOf(a) - diasOrden.indexOf(b));
+    setDiasDisponibles(diasUnicos);
+
+    const horasUnicas = [
+      ...new Set(
+        turnosBase
+          .filter((a) => (!filtroDia || a.dia === filtroDia))
+          .map((a) => a.hora)
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+    setHorasDisponibles(horasUnicas);
   }
-}
 
 
   const colorClase = tipo => {
@@ -163,7 +192,8 @@ export default function FichaAsistenciasEstadisticas() {
             value={filtroSede}
             onChange={(e) => {
               setFiltroSede(e.target.value);
-              setFiltroTurno("");
+              setFiltroDia("");
+              setFiltroHora("");
             }}
           >
             <option value="">Todas</option>
@@ -172,39 +202,60 @@ export default function FichaAsistenciasEstadisticas() {
           </select>
         </div>
 
-        {/* Turno */}
+{/* Nuevo: Ciclo */}
         <div>
-          <label className="block font-medium mb-1">Turno:</label>
+          <label className="block font-medium mb-1">Ciclo:</label>
           <select
             className="w-full border p-2 rounded"
-            value={filtroTurno}
-            onChange={(e) => setFiltroTurno(e.target.value)}
+            value={filtroCiclo}
+            onChange={(e) => setFiltroCiclo(e.target.value)}
           >
             <option value="">Todos</option>
-            {turnosDisponibles.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            {ciclosDisponibles.map((c) => (
+              <option key={c.codigo} value={c.codigo}>
+                {c.nombre_publico || c.codigo}
               </option>
             ))}
           </select>
         </div>
 
-        {/* 👉 Nuevo: Tipo de inscripción / ciclo */}
+                {/* Dia */}
         <div>
-          <label className="block font-medium mb-1">Tipo de inscripción:</label>
+          <label className="block font-medium mb-1">Dia:</label>
           <select
             className="w-full border p-2 rounded"
-            value={filtroTipoInscripcion}
-            onChange={(e) => setFiltroTipoInscripcion(e.target.value)}
+            value={filtroDia}
+            onChange={(e) => {
+              setFiltroDia(e.target.value);
+              setFiltroHora("");
+            }}
           >
-            <option value="CICLO_2025">Ciclo 2025</option>
-            <option value="TDV">Taller de Verano</option>
-            <option value="CICLO_2026">Ciclo 2026</option>
             <option value="">Todos</option>
+            {diasDisponibles.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
           </select>
         </div>
 
-          {/* Mes + últimas 4 semanas */}
+        {/* Horario */}
+        <div>
+          <label className="block font-medium mb-1">Horario:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={filtroHora}
+            onChange={(e) => setFiltroHora(e.target.value)}
+            disabled={!filtroDia && !filtroSede}
+          >
+            <option value="">Todos</option>
+            {horasDisponibles.map((h) => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
+        </div>
+
+        
+
+          {/* Mes + ultimas 4 semanas */}
         <div>
           <label className="block font-medium mb-1">Mes:</label>
           <select
@@ -260,7 +311,7 @@ export default function FichaAsistenciasEstadisticas() {
           {alumnos.map((a) => (
             <tr key={a.id} className="border-t">
               <td className="py-2 px-3 whitespace-nowrap">{a.nombre} {a.apellido}</td>
-              <td className="py-2 px-3 whitespace-nowrap">{a.turno_1}</td>
+              <td className="py-2 px-3 whitespace-nowrap">{a.turno}</td>
               <td className="py-2 px-3">
                 <div className="flex gap-1 flex-wrap">
                   {a.asistencias.slice().reverse().map((r, i) => (
@@ -289,3 +340,12 @@ export default function FichaAsistenciasEstadisticas() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

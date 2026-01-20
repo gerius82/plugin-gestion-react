@@ -1,72 +1,96 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { FaEdit, FaTrash } from "react-icons/fa";
 
 // Versión visual de sedes + días + horarios
 const ORDEN_DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const SEDES = [
+  { id: "Fisherton", label: "Sede Fisherton" },
+  { id: "Calle Mendoza", label: "Sede Mendoza" },
+];
+
+const ordenarDias = (diasEntries) =>
+  diasEntries.sort(([diaA], [diaB]) => {
+    const idxA = ORDEN_DIAS.indexOf(diaA);
+    const idxB = ORDEN_DIAS.indexOf(diaB);
+    return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+  });
+
+const esHHMM = (s) => /^\d{1,2}:\d{2}$/.test(String(s || "").trim());
+
+const hhmmToMinutes = (hhmm) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const pad = (s) => String(s).padStart(5, "0");
+const armarRango = (inicio, fin) => `${pad(inicio)} a ${pad(fin)}`;
+
+const validarRango = (inicio, fin) => {
+  if (!esHHMM(inicio) || !esHHMM(fin)) return "Completá inicio y fin (HH:MM).";
+  if (hhmmToMinutes(fin) <= hhmmToMinutes(inicio))
+    return "La hora fin debe ser mayor que la de inicio.";
+  return "";
+};
+
+const inicioDeRango = (valor) => {
+  const m = String(valor || "").match(/(\d{1,2}:\d{2})/);
+  return m ? m[1].padStart(5, "0") : String(valor || "");
+};
+
+const ordenarHorarios = (horarios) =>
+  [...horarios].sort((a, b) => inicioDeRango(a).localeCompare(inicioDeRango(b)));
 
 function TurnosResumen({ turnos }) {
-  if (
-    !turnos ||
-    typeof turnos !== "object" ||
-    Object.keys(turnos).length === 0
-  ) {
+  const resumen = useMemo(() => {
+    if (
+      !turnos ||
+      typeof turnos !== "object" ||
+      Object.keys(turnos).length === 0
+    ) {
+      return [];
+    }
+
+    return Object.entries(turnos).map(([sede, dias]) => ({
+      sede,
+      diasOrdenados: ordenarDias(Object.entries(dias || {})),
+    }));
+  }, [turnos]);
+
+  if (!resumen.length) {
     return (
-      <span className="text-xs text-gray-400">
-        Sin turnos configurados
-      </span>
+      <span className="text-xs text-gray-400">Sin turnos configurados</span>
     );
   }
 
-  const ordenarDias = (diasEntries) => {
-    return diasEntries.sort(([diaA], [diaB]) => {
-      const idxA = ORDEN_DIAS.indexOf(diaA);
-      const idxB = ORDEN_DIAS.indexOf(diaB);
-      // si algún día no está en la lista, lo mandamos al final
-      return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
-    });
-  };
-
-  const ordenarHorarios = (horarios) => {
-    // asume formato HH:MM
-    return [...horarios].sort((a, b) => (a || "").localeCompare(b || ""));
-  };
-
   return (
     <div className="space-y-1">
-      {Object.entries(turnos).map(([sede, dias]) => {
-        if (!dias || typeof dias !== "object") return null;
+      {resumen.map(({ sede, diasOrdenados }) => (
+        <div key={sede}>
+          {/* Nombre de la sede */}
+          <p className="text-[11px] font-semibold text-gray-700 mb-0.5">
+            {sede}
+          </p>
 
-        const diasOrdenados = ordenarDias(Object.entries(dias));
+          {/* Chips día + horarios */}
+          <div className="flex flex-wrap gap-1">
+            {diasOrdenados.map(([dia, horarios]) => {
+              const lista = Array.isArray(horarios) && horarios.length
+                ? ordenarHorarios(horarios).join(", ")
+                : "-";
 
-        return (
-          <div key={sede}>
-            {/* Nombre de la sede */}
-            <p className="text-[11px] font-semibold text-gray-700 mb-0.5">
-              {sede}
-            </p>
-
-            {/* Chips día + horarios */}
-            <div className="flex flex-wrap gap-1">
-              {diasOrdenados.map(([dia, horarios]) => {
-                const lista =
-                  Array.isArray(horarios) && horarios.length
-                    ? ordenarHorarios(horarios).join(", ")
-                    : "—";
-
-                return (
-                  <span
-                    key={sede + dia}
-                    className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-700"
-                  >
-                    {dia}: {lista}
-                  </span>
-                );
-              })}
-            </div>
+              return (
+                <span
+                  key={sede + dia}
+                  className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-700"
+                >
+                  {dia}: {lista}
+                </span>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -77,16 +101,25 @@ export default function GestorCursos() {
     const [ciclos, setCiclos] = useState([]);          // 🔹 ciclos desde Supabase
     const [loading, setLoading] = useState(false);
     const [mensaje, setMensaje] = useState("");
-    const [filtroCiclo, setFiltroCiclo] = useState("TODOS");
-    const [soloActivos, setSoloActivos] = useState(false);
+    const [filtroCiclo, setFiltroCiclo] = useState(() => {
+        if (typeof window === "undefined") return "TODOS";
+        return localStorage.getItem("filtroCiclo") || "TODOS";
+    });
+    const [soloActivos, setSoloActivos] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("soloActivos") === "true";
+    });
     const [subiendoImagen, setSubiendoImagen] = useState(false);
     const [errorImagen, setErrorImagen] = useState("");
     const [sedesSeleccionadas, setSedesSeleccionadas] = useState({});
     const [turnosConfig, setTurnosConfig] = useState({});
     const [nuevoHorario, setNuevoHorario] = useState({});
+    const [nuevoHorarioFin, setNuevoHorarioFin] = useState({});
+
     const [editSedesSeleccionadas, setEditSedesSeleccionadas] = useState({});
     const [editTurnosConfig, setEditTurnosConfig] = useState({});
     const [editNuevoHorario, setEditNuevoHorario] = useState({});
+    const [editNuevoHorarioFin, setEditNuevoHorarioFin] = useState({});
     const [subiendoImagenEdit, setSubiendoImagenEdit] = useState(false);
     const [errorImagenEdit, setErrorImagenEdit] = useState("");
 
@@ -104,12 +137,13 @@ export default function GestorCursos() {
 
     const [cursoEditando, setCursoEditando] = useState(null); // para el modal
 
-    const SEDES = [
-        { id: "Fisherton", label: "Sede Fisherton" },
-        { id: "Mendoza", label: "Sede Mendoza" },
-    ];
-
-    const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const tieneTurnosConfigurados = useCallback((configTurnos) => {
+        return Object.values(configTurnos || {}).some((dias) =>
+            Object.values(dias || {}).some(
+                (horarios) => Array.isArray(horarios) && horarios.length > 0
+            )
+        );
+    }, []);
 
     // Cargar config
     useEffect(() => {
@@ -119,19 +153,87 @@ export default function GestorCursos() {
         .catch(() => setMensaje("No pude cargar config.json"));
     }, []);
 
-    const headers = () => ({
-        apikey: config?.supabaseKey ?? "",
-        Authorization: `Bearer ${config?.supabaseKey ?? ""}`,
-        "Content-Type": "application/json",
-    });
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        localStorage.setItem("filtroCiclo", filtroCiclo);
+    }, [filtroCiclo]);
 
-    // 🔹 Helper para mostrar nombre del ciclo usando la lista de ciclos
-    const getNombreCiclo = (codigo) => {
-        const ciclo = ciclos.find((c) => c.codigo === codigo);
-        return ciclo?.nombre_publico || codigo || "Sin ciclo";
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        localStorage.setItem("soloActivos", String(soloActivos));
+    }, [soloActivos]);
+
+    const headers = useCallback(
+        () => ({
+            apikey: config?.supabaseKey ?? "",
+            Authorization: `Bearer ${config?.supabaseKey ?? ""}`,
+            "Content-Type": "application/json",
+        }),
+        [config?.supabaseKey]
+    );
+
+    const asegurarTurnosFisicos = async (cicloCodigo, turnosCfg) => {
+      if (!config || !cicloCodigo || !turnosCfg) return;
+
+      // 1) Traer existentes para no tocar cupos ya seteados
+      const resExist = await fetch(
+        `${config.supabaseUrl}/rest/v1/turnos?select=sede,dia,hora&ciclo_codigo=eq.${cicloCodigo}`,
+        { headers: headers() }
+      );
+      const exist = await resExist.json();
+      const setExist = new Set(
+        (Array.isArray(exist) ? exist : []).map((t) => `${t.sede}||${t.dia}||${t.hora}`)
+      );
+
+      // 2) Armar lista de turnos faltantes desde turnos_config
+      const toInsert = [];
+      for (const [sede, dias] of Object.entries(turnosCfg || {})) {
+        for (const [dia, horas] of Object.entries(dias || {})) {
+          (Array.isArray(horas) ? horas : []).forEach((hora) => {
+            const key = `${sede}||${dia}||${hora}`;
+            if (!setExist.has(key)) {
+              toInsert.push({
+                ciclo_codigo: cicloCodigo,
+                sede,
+                dia,
+                hora,
+                activo: true,
+                cupo_maximo: 13, // valor inicial; luego se ajusta en GestorTurnos
+              });
+            }
+          });
+        }
+      }
+
+      if (toInsert.length === 0) return;
+
+      // 3) Insert masivo ignorando duplicados
+      await fetch(`${config.supabaseUrl}/rest/v1/turnos?on_conflict=ciclo_codigo,sede,dia,hora`, {
+        method: "POST",
+        headers: {
+          ...headers(),
+          Prefer: "resolution=ignore-duplicates,return=minimal",
+        },
+        body: JSON.stringify(toInsert),
+      });
     };
 
-  const cargarCursos = async () => {
+
+    // 🔹 Helper para mostrar nombre del ciclo usando la lista de ciclos
+    const getNombreCiclo = useCallback(
+        (codigo) => {
+            const ciclo = ciclos.find((c) => c.codigo === codigo);
+            return ciclo?.nombre_publico || codigo || "Sin ciclo";
+        },
+        [ciclos]
+    );
+
+  const formatCurrency = useMemo(
+    () => new Intl.NumberFormat("es-AR"),
+    []
+  );
+
+  const cargarCursos = useCallback(async () => {
     if (!config) return;
     setLoading(true);
     setMensaje("");
@@ -148,31 +250,31 @@ export default function GestorCursos() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [config, headers]);
 
   // 🔹 Cargar ciclos desde Supabase (sólo activos, por prolijidad)
-  const cargarCiclos = async () => {
-  if (!config) return;
-  try {
-    const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/ciclos?select=*`,
-      { headers: headers() }
-    );
-    const data = await res.json();
+  const cargarCiclos = useCallback(async () => {
+    if (!config) return;
+    try {
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/ciclos?select=*`,
+        { headers: headers() }
+      );
+      const data = await res.json();
 
-    if (!res.ok) {
-      console.error("Error al cargar ciclos:", data);
+      if (!res.ok) {
+        console.error("Error al cargar ciclos:", data);
+        setCiclos([]);
+        return;
+      }
+
+      // ✅ ahora guardamos TODOS los ciclos, activos e inactivos
+      setCiclos(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
       setCiclos([]);
-      return;
     }
-
-    // ✅ ahora guardamos TODOS los ciclos, activos e inactivos
-    setCiclos(Array.isArray(data) ? data : []);
-  } catch (e) {
-    console.error(e);
-    setCiclos([]);
-  }
-};
+  }, [config, headers]);
 
 
   // Cuando tengo config, cargo cursos y ciclos
@@ -181,7 +283,7 @@ export default function GestorCursos() {
       cargarCursos();
       cargarCiclos();
     }
-  }, [config]);
+  }, [config, cargarCursos, cargarCiclos]);
 
   // Cuando llegan los ciclos, si el curso nuevo no tiene ciclo elegido, usar el primero
   useEffect(() => {
@@ -295,6 +397,25 @@ export default function GestorCursos() {
     e.preventDefault();
     if (!config) return;
 
+    if (!nuevoCurso.nombre.trim() || !nuevoCurso.ciclo) {
+      setMensaje("Completá nombre y ciclo");
+      return;
+    }
+
+    if (
+      nuevoCurso.edad_min &&
+      nuevoCurso.edad_max &&
+      parseInt(nuevoCurso.edad_min, 10) > parseInt(nuevoCurso.edad_max, 10)
+    ) {
+      setMensaje("La edad mínima no puede ser mayor que la máxima");
+      return;
+    }
+
+    if (!tieneTurnosConfigurados(turnosConfig)) {
+      setMensaje("Configura al menos un turno antes de guardar");
+      return;
+    }
+
     setMensaje("Guardando curso...");
     try {
       const body = {
@@ -314,11 +435,20 @@ export default function GestorCursos() {
         activo: true,
       };
 
-      await fetch(`${config.supabaseUrl}/rest/v1/cursos`, {
+      const res = await fetch(`${config.supabaseUrl}/rest/v1/cursos`, {
         method: "POST",
         headers: headers(),
         body: JSON.stringify(body),
       });
+
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("Error creando curso:", err);
+        setMensaje("❌ No se pudo crear el curso");
+        return;
+      }
+
+      await asegurarTurnosFisicos(body.ciclo, body.turnos_config);
 
       setMensaje("Curso creado ✅");
       setNuevoCurso({
@@ -334,6 +464,7 @@ export default function GestorCursos() {
       setSedesSeleccionadas({});
       setTurnosConfig({});
       setNuevoHorario({});
+      setNuevoHorarioFin({});
       cargarCursos();
     } catch (e) {
       console.error(e);
@@ -345,18 +476,29 @@ export default function GestorCursos() {
     if (!config) return;
     setMensaje("Actualizando...");
     try {
-      await fetch(`${config.supabaseUrl}/rest/v1/cursos?id=eq.${id}`, {
+      const res = await fetch(`${config.supabaseUrl}/rest/v1/cursos?id=eq.${id}`, {
         method: "PATCH",
         headers: headers(),
         body: JSON.stringify(cambios),
       });
+
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("Error actualizando curso:", err);
+        setMensaje("❌ No se pudo actualizar");
+        return false;
+      }
+
       setMensaje("Curso actualizado ✅");
       await cargarCursos();
+      return true;
     } catch (e) {
       console.error(e);
-      setMensaje("No se pudo actualizar");
+      setMensaje("❌ No se pudo actualizar");
+      return false;
     }
   };
+
 
   const toggleActivo = (curso) => {
     actualizarCurso(curso.id, { activo: !curso.activo });
@@ -430,6 +572,8 @@ export default function GestorCursos() {
         return;
       }
 
+      await asegurarTurnosFisicos(body.ciclo, body.turnos_config);
+
       setMensaje("Curso duplicado correctamente ✅");
       await cargarCursos();
     } catch (err) {
@@ -461,6 +605,7 @@ export default function GestorCursos() {
     setEditSedesSeleccionadas(sedesIniciales);
     setEditTurnosConfig(turnos);
     setEditNuevoHorario({});
+    setEditNuevoHorarioFin({});
   };
 
   const cerrarModalEdicion = () => {
@@ -468,6 +613,7 @@ export default function GestorCursos() {
     setEditSedesSeleccionadas({});
     setEditTurnosConfig({});
     setEditNuevoHorario({});
+    setEditNuevoHorarioFin({});
   };
 
   const handleEditarChange = (e) => {
@@ -481,6 +627,26 @@ export default function GestorCursos() {
   const guardarEdicion = async (e) => {
     e.preventDefault();
     if (!cursoEditando) return;
+
+    if (!cursoEditando.nombre.trim() || !cursoEditando.ciclo) {
+      setMensaje("Completá nombre y ciclo");
+      return;
+    }
+
+    if (
+      cursoEditando.edad_min &&
+      cursoEditando.edad_max &&
+      parseInt(cursoEditando.edad_min, 10) >
+        parseInt(cursoEditando.edad_max, 10)
+    ) {
+      setMensaje("La edad mínima no puede ser mayor que la máxima");
+      return;
+    }
+
+    if (!tieneTurnosConfigurados(editTurnosConfig)) {
+      setMensaje("Configura al menos un turno antes de guardar");
+      return;
+    }
 
     const cambios = {
       nombre: cursoEditando.nombre,
@@ -500,8 +666,11 @@ export default function GestorCursos() {
         : null,
     };
 
-    await actualizarCurso(cursoEditando.id, cambios);
+    const ok = await actualizarCurso(cursoEditando.id, cambios);
+    if (!ok) return;
     cerrarModalEdicion();
+    await asegurarTurnosFisicos(cambios.ciclo, cambios.turnos_config);
+
   };
 
   const cursosFiltrados = cursos.filter((c) => {
@@ -607,23 +776,44 @@ export default function GestorCursos() {
     }));
   };
 
+  const handleEditNuevoHorarioFinChange = (sedeId, dia, valor) => {
+    setEditNuevoHorarioFin((prev) => ({
+      ...prev,
+      [sedeId]: {
+        ...(prev[sedeId] || {}),
+        [dia]: valor,
+      },
+    }));
+  };
+
   const agregarHorarioEdit = (sedeId, dia) => {
-    const valor = editNuevoHorario[sedeId]?.[dia];
-    if (!valor || !valor.trim()) return;
+    const inicio = editNuevoHorario[sedeId]?.[dia]?.trim();
+    const fin = editNuevoHorarioFin[sedeId]?.[dia]?.trim();
+    const err = validarRango(inicio, fin);
+    if (err) {
+      setMensaje(err);
+      return;
+    }
+    const rango = armarRango(inicio, fin);
 
     setEditTurnosConfig((prev) => {
       const sede = prev[sedeId] || {};
       const horariosDia = sede[dia] || [];
+      if (horariosDia.includes(rango)) return prev;
       return {
         ...prev,
         [sedeId]: {
           ...sede,
-          [dia]: [...horariosDia, valor.trim()],
+          [dia]: ordenarHorarios([...horariosDia, rango]),
         },
       };
     });
 
     setEditNuevoHorario((prev) => ({
+      ...prev,
+      [sedeId]: { ...(prev[sedeId] || {}), [dia]: "" },
+    }));
+    setEditNuevoHorarioFin((prev) => ({
       ...prev,
       [sedeId]: { ...(prev[sedeId] || {}), [dia]: "" },
     }));
@@ -653,29 +843,49 @@ export default function GestorCursos() {
     }));
   };
 
+  const handleNuevoHorarioFinChange = (sedeId, dia, valor) => {
+    setNuevoHorarioFin((prev) => ({
+      ...prev,
+      [sedeId]: {
+        ...(prev[sedeId] || {}),
+        [dia]: valor,
+      },
+    }));
+  };
+
+
   const agregarHorario = (sedeId, dia) => {
-    const valor = nuevoHorario[sedeId]?.[dia];
-    if (!valor || !valor.trim()) return;
+    const inicio = nuevoHorario[sedeId]?.[dia]?.trim();
+    const fin = nuevoHorarioFin[sedeId]?.[dia]?.trim();
+    const err = validarRango(inicio, fin);
+    if (err) {
+      setMensaje(err);
+      return;
+    }
+    const rango = armarRango(inicio, fin);
 
     setTurnosConfig((prev) => {
       const sede = prev[sedeId] || {};
       const horariosDia = sede[dia] || [];
+      if (horariosDia.includes(rango)) return prev;
       return {
         ...prev,
         [sedeId]: {
           ...sede,
-          [dia]: [...horariosDia, valor.trim()],
+          [dia]: ordenarHorarios([...horariosDia, rango]),
         },
       };
     });
 
-    // limpiar input
     setNuevoHorario((prev) => ({
       ...prev,
-      [sedeId]: { ...(prev[sedeId] || {}), [dia]: "" },
+      [sedeId]: { ...(prev[sedeId] || {}), [dia]: '' },
+    }));
+    setNuevoHorarioFin((prev) => ({
+      ...prev,
+      [sedeId]: { ...(prev[sedeId] || {}), [dia]: '' },
     }));
   };
-
   const eliminarHorario = (sedeId, dia, idx) => {
     setTurnosConfig((prev) => {
       const sede = prev[sedeId] || {};
@@ -692,7 +902,7 @@ export default function GestorCursos() {
 
   return (
     <div className="w-full max-w-6xl mx-auto mt-8 px-4">
-        <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-center flex-1">
             Gestión de Cursos
         </h1>
@@ -703,7 +913,6 @@ export default function GestorCursos() {
             Volver
         </Link>
         </div>
-
 
       {/* Formulario para nuevo curso */}
       <form
@@ -911,19 +1120,17 @@ export default function GestorCursos() {
                       <div className="flex flex-wrap gap-2 mb-1">
                         {horarios.length > 0 ? (
                           horarios.map((h, idx) => (
-                            <span
+                            <div
                               key={idx}
-                              className="inline-flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-0.5"
+                              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 text-sm whitespace-nowrap"
                             >
-                              {h}
+                                  <span className="whitespace-nowrap">{h}</span>
                               <button
                                 type="button"
                                 onClick={() => eliminarHorario(s.id, dia, idx)}
-                                className="text-red-500 hover:text-red-700 hover:bg-gray-100"
-                              >
-                                ×
-                              </button>
-                            </span>
+                                className="text-red-500 hover:text-red-700 ml-1 hover:bg-gray-100"
+                              > ✕ </button>
+                            </div>
                           ))
                         ) : (
                           <span className="text-xs text-gray-400">
@@ -933,7 +1140,7 @@ export default function GestorCursos() {
                       </div>
 
                       {/* Agregar horario */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <input
                           type="time"
                           value={nuevoHorario[s.id]?.[dia] || ""}
@@ -942,6 +1149,15 @@ export default function GestorCursos() {
                           }
                           className="border rounded px-2 py-1 text-xs w-28"
                         />
+                              <span className="text-xs text-gray-500">a</span>
+                              <input
+                                type="time"
+                                value={nuevoHorarioFin[s.id]?.[dia] || ""}
+                                onChange={(e) =>
+                            handleNuevoHorarioFinChange(s.id, dia, e.target.value)
+                                }
+                                className="border rounded px-2 py-1 text-xs w-28"
+                              />
                         <button
                           type="button"
                           onClick={() => agregarHorario(s.id, dia)}
@@ -962,6 +1178,7 @@ export default function GestorCursos() {
           <button
             type="submit"
             form="formCrearCurso"
+            disabled={subiendoImagen}
             className="
               inline-flex items-center justify-center
               bg-green-500 text-white font-semibold 
@@ -971,10 +1188,17 @@ export default function GestorCursos() {
               active:scale-[0.97]
               text-sm
               w-auto
+              disabled:opacity-50 disabled:cursor-not-allowed
             "
           >
-            Crear curso
+            {subiendoImagen ? "Subiendo imagen..." : "Crear curso"}
           </button>
+
+          {mensaje && (
+            <div className="text-sm px-3 py-2 rounded-lg border bg-yellow-50 text-yellow-800">
+              {mensaje}
+            </div>
+          )}
 
         </div>
       </form>
@@ -1067,13 +1291,13 @@ export default function GestorCursos() {
                       {c.precio_curso != null && (
                         <p>
                           <span className="font-semibold">Cuota mensual:</span>{" "}
-                          ${Number(c.precio_curso).toLocaleString("es-AR")}
+                          ${formatCurrency.format(Number(c.precio_curso))}
                         </p>
                       )}
                       {c.precio_inscripcion != null && (
                         <p>
                           <span className="font-semibold">Inscripción:</span>{" "}
-                          ${Number(c.precio_inscripcion).toLocaleString("es-AR")}
+                          ${formatCurrency.format(Number(c.precio_inscripcion))}
                         </p>
                       )}
                     </div>
@@ -1351,25 +1575,21 @@ export default function GestorCursos() {
 
                             <div className="flex flex-wrap gap-2">
                               {horarios.map((h, idx) => (
-                                <span
+                                <div
                                   key={idx}
-                                  className="inline-flex items-center bg-gray-100 px-2 py-0.5 rounded-full text-[11px]"
+                                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 text-sm whitespace-nowrap"
                                 >
-                                  {h}
+                                  <span className="whitespace-nowrap">{h}</span>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      eliminarHorarioEdit(s.id, dia, idx)
-                                    }
-                                    className="text-red-500 ml-1 hover:bg-gray-100"
-                                  >
-                                    ×
-                                  </button>
-                                </span>
+                                    onClick={() => eliminarHorarioEdit(s.id, dia, idx)}
+                                    className="text-red-500 hover:text-red-700 ml-1"
+                                  > ✕ </button>
+                                </div>
                               ))}
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <input
                                 type="time"
                                 value={editNuevoHorario[s.id]?.[dia] || ""}
@@ -1382,6 +1602,20 @@ export default function GestorCursos() {
                                 }
                                 className="border rounded px-2 py-1 text-[11px] w-24"
                               />
+                              <span className="text-xs text-gray-500">a</span>
+                              <input
+                                type="time"
+                                value={editNuevoHorarioFin[s.id]?.[dia] || ""}
+                                onChange={(e) =>
+                                  handleEditNuevoHorarioFinChange(
+                                    s.id,
+                                    dia,
+                                    e.target.value
+                                  )
+                                }
+                                className="border rounded px-2 py-1 text-[11px] w-24"
+                              />
+
                               <button
                                 type="button"
                                 onClick={() => agregarHorarioEdit(s.id, dia)}
@@ -1407,9 +1641,10 @@ export default function GestorCursos() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow"
+                  disabled={subiendoImagenEdit}
+                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Guardar cambios
+                  {subiendoImagenEdit ? "Subiendo imagen..." : "Guardar cambios"}
                 </button>
               </div>
             </form>
@@ -1419,3 +1654,26 @@ export default function GestorCursos() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

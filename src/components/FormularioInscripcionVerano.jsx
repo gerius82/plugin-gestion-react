@@ -1,4 +1,4 @@
-/*
+﻿/*
   Formulario de Inscripción modificado para que al confirmar solo se muestre el mensaje de éxito
 */
 
@@ -11,14 +11,54 @@ const FormularioInscripcionVerano = () => {
   const navigate = useNavigate();
   const [mensajeExito, setMensajeExito] = useState("");
   const [config, setConfig] = useState(null);
-  const [turnos, setTurnos] = useState({});
-  const [turnosDisponibles, setTurnosDisponibles] = useState([]);
+  //const [turnos, setTurnos] = useState({});
+  const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
   const [telefonoValido, setTelefonoValido] = useState(true);
   const [emailValido, setEmailValido] = useState(true);
-  const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
+  //const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
   const [searchParams] = useSearchParams();
   const origen = searchParams.get("origen");
   const from = searchParams.get("from");
+
+  const [ciclos, setCiclos] = useState([]);
+  const [cicloSel, setCicloSel] = useState("");      // ejemplo: "TDV" o "CICLO_2026"
+  const [cursos, setCursos] = useState([]);
+  const [cursoSelId, setCursoSelId] = useState(null);
+  const [turnosConfig, setTurnosConfig] = useState(null);
+
+  const [sedes, setSedes] = useState([]);
+  const [dias, setDias] = useState([]);
+  const [horarios, setHorarios] = useState([]);
+
+  const [diaSel, setDiaSel] = useState("");
+  const [horaSel, setHoraSel] = useState("");
+  const [cupoMaximo, setCupoMaximo] = useState(null);
+  const [anotadosTurno, setAnotadosTurno] = useState(0);
+  const [turnosCards, setTurnosCards] = useState([]); // [{dia,hora,cupo,anotados,listaEspera}]
+  const [cargandoTurnos, setCargandoTurnos] = useState(false);
+
+  const ORDEN_DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+  const ordenarDias = (dias = []) => {
+    const ordenMap = {
+      lunes: 0,
+      martes: 1,
+      miercoles: 2,
+      miércoles: 2,
+      jueves: 3,
+      viernes: 4,
+      sabado: 5,
+      sÁbado: 5,
+      sábado: 5,
+      domingo: 6,
+    };
+    return [...dias].sort((a, b) => {
+      const ia = ordenMap[String(a || "").toLowerCase()] ?? 99;
+      const ib = ordenMap[String(b || "").toLowerCase()] ?? 99;
+      return ia - ib;
+    });
+  };
+
 
   const rutaSalida =
   origen === "gestion"
@@ -44,6 +84,157 @@ const FormularioInscripcionVerano = () => {
 
   const TIPO_INSCRIPCION = "TDV";
 
+  const supaHeaders = (cfg) => ({
+    apikey: cfg.supabaseKey,
+    Authorization: `Bearer ${cfg.supabaseKey}`,
+  });
+
+  const contarMatriculasActivasPorTurno = async ({ cicloCodigo, sede, dia, hora }) => {
+    const url =
+      `${config.supabaseUrl}/rest/v1/matriculas` +
+      `?select=id` +
+      `&estado=eq.activa` +
+      `&ciclo_codigo=eq.${encodeURIComponent(cicloCodigo)}` +
+      `&sede=eq.${encodeURIComponent(sede)}` +
+      `&dia=eq.${encodeURIComponent(dia)}` +
+      `&hora=eq.${encodeURIComponent(hora)}`;
+
+    const res = await fetch(url, {
+      headers: {
+        apikey: config.supabaseKey,
+        Authorization: `Bearer ${config.supabaseKey}`,
+        Prefer: "count=exact",
+      },
+    });
+
+    const cr = res.headers.get("content-range") || "";
+    const total = parseInt(cr.split("/")[1] || "0", 10);
+    return Number.isFinite(total) ? total : 0;
+  };
+
+  const obtenerCupoTurno = async ({ cicloCodigo, sede, dia, hora }) => {
+    const url =
+      `${config.supabaseUrl}/rest/v1/turnos` +
+      `?select=cupo_maximo` +
+      `&ciclo_codigo=eq.${encodeURIComponent(cicloCodigo)}` +
+      `&sede=eq.${encodeURIComponent(sede)}` +
+      `&dia=eq.${encodeURIComponent(dia)}` +
+      `&hora=eq.${encodeURIComponent(hora)}` +
+      `&limit=1`;
+
+    const res = await fetch(url, {
+      headers: {
+        apikey: config.supabaseKey,
+        Authorization: `Bearer ${config.supabaseKey}`,
+      },
+    });
+
+    const data = await res.json();
+    const cupo = data?.[0]?.cupo_maximo ?? null;
+    return cupo != null ? Number(cupo) : null;
+  };
+
+  const calcularDisponibilidadTurno = async () => {
+    if (!config) return { cupo: null, anotados: 0, listaEspera: false };
+
+    const cicloCodigo = "TDV";
+    const sede = formulario.sede;
+    const dia = diaSel;
+    const hora = horaSel;
+
+    if (!sede || !dia || !hora) return { cupo: null, anotados: 0, listaEspera: false };
+
+    const cupo = await obtenerCupoTurno({ cicloCodigo, sede, dia, hora });
+    const anotados = await contarMatriculasActivasPorTurno({ cicloCodigo, sede, dia, hora });
+
+    const listaEspera = cupo != null ? anotados >= cupo : false;
+
+    setCupoMaximo(cupo);
+    setAnotadosTurno(anotados);
+    setTurnoEnListaEspera(listaEspera);
+
+    return { cupo, anotados, listaEspera };
+  };
+
+  const cargarTurnosConEstado = async (sede) => {
+    if (!config || !sede) return;
+    setCargandoTurnos(true);
+
+    try {
+      const urlTurnos =
+        `${config.supabaseUrl}/rest/v1/turnos` +
+        `?select=dia,hora,cupo_maximo` +
+        `&ciclo_codigo=eq.TDV` +
+        `&sede=eq.${encodeURIComponent(sede)}` +
+        `&activo=eq.true`;
+
+      const resTurnos = await fetch(urlTurnos, {
+        headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` },
+      });
+      const turnos = await resTurnos.json();
+
+      const urlMats =
+        `${config.supabaseUrl}/rest/v1/matriculas` +
+        `?select=dia,hora` +
+        `&estado=eq.activa` +
+        `&ciclo_codigo=eq.TDV` +
+        `&sede=eq.${encodeURIComponent(sede)}`;
+
+      const resMats = await fetch(urlMats, {
+        headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` },
+      });
+      const mats = await resMats.json();
+
+      const counts = new Map();
+      (Array.isArray(mats) ? mats : []).forEach((m) => {
+        const key = `${m.dia}||${m.hora}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+
+      const cards = (Array.isArray(turnos) ? turnos : []).map((t) => {
+        const key = `${t.dia}||${t.hora}`;
+        const anotados = counts.get(key) || 0;
+        const cupo = Number(t.cupo_maximo);
+        const listaEspera = Number.isFinite(cupo) ? anotados >= cupo : false;
+
+        return {
+          dia: t.dia,
+          hora: t.hora,
+          cupo,
+          anotados,
+          listaEspera,
+        };
+      });
+
+      const ordenMap = {
+        lunes: 0,
+        martes: 1,
+        miercoles: 2,
+        miércoles: 2,
+        jueves: 3,
+        viernes: 4,
+        sabado: 5,
+        sábado: 5,
+        sábado: 5,
+        domingo: 6,
+      };
+
+      cards.sort((a, b) => {
+        const da = ordenMap[String(a.dia || "").toLowerCase()] ?? 99;
+        const db = ordenMap[String(b.dia || "").toLowerCase()] ?? 99;
+        if (da !== db) return da - db;
+        return String(a.hora).localeCompare(String(b.hora));
+      });
+
+      setTurnosCards(cards);
+    } catch (e) {
+      console.error(e);
+      setTurnosCards([]);
+    } finally {
+      setCargandoTurnos(false);
+    }
+  };
+
 
   const limpiarFormulario = () => {
     setFormulario({
@@ -60,19 +251,20 @@ const FormularioInscripcionVerano = () => {
       comentarios: ""
     });
     setTurnoEnListaEspera(false);
+    setCupoMaximo(null);
+    setAnotadosTurno(0);
   };
 
   const mostrarResumenTurno = () => {
     if (turnoEnListaEspera) {
       return (
         <p className="text-red-600 text-sm mt-2">
-          Este turno está completo. Quedarás en lista de espera y te avisaremos cuando se libere un lugar.
+          Este turno est� completo. Quedar�s en lista de espera y te avisaremos cuando se libere un lugar.
         </p>
       );
     }
     return null;
   };
-
   const [mostrarResumen, setMostrarResumen] = useState(false);
 
   const direcciones = {
@@ -85,12 +277,91 @@ const FormularioInscripcionVerano = () => {
       .then((res) => res.json())
       .then((data) => setConfig(data));
 
-    fetch("/turnos_verano.json")
-      .then((res) => res.json())
-      .then((data) => setTurnos(data));
+    //fetch("/turnos_verano.json")
+    //  .then((res) => res.json())
+    //  .then((data) => setTurnos(data));
 
     emailjs.init("Vkl0XSUcG-KApScqq");
   }, []);
+
+  useEffect(() => {
+  if (!config) return;
+
+  (async () => {
+    // 1) Seteo ciclo fijo TDV
+    setCicloSel("TDV");
+
+    // 2) Traigo cursos activos del TDV (debería venir Robótica)
+    const resCursos = await fetch(
+      `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,ciclo,turnos_config&ciclo=eq.TDV&activo=eq.true&order=nombre.asc`,
+      { headers: supaHeaders(config) }
+    );
+    const dataCursos = await resCursos.json();
+    const lista = Array.isArray(dataCursos) ? dataCursos : [];
+    setCursos(lista);
+
+    // si hay uno solo, lo dejo seleccionado
+    if (lista.length >= 1) {
+      setCursoSelId(lista[0].id);
+      setTurnosConfig(lista[0].turnos_config || {});
+      // guardo el curso correcto en el formulario (no "Taller de Verano")
+      setFormulario((prev) => ({ ...prev, curso: lista[0].nombre }));
+    } else {
+      setCursoSelId(null);
+      setTurnosConfig({});
+      setFormulario((prev) => ({ ...prev, curso: "" }));
+    }
+  })();
+}, [config]);
+
+useEffect(() => {
+  const s = Object.keys(turnosConfig || {});
+  setSedes(s);
+
+  // reset de selección
+  setDias([]);
+  setHorarios([]);
+  setDiaSel("");
+  setHoraSel("");
+  setFormulario((prev) => ({ ...prev, sede: "", turno_1: "" }));
+}, [turnosConfig]);
+
+const elegirSede = (sede) => {
+  setFormulario((prev) => ({ ...prev, sede, turno_1: "" }));
+  const d = Object.keys((turnosConfig?.[sede]) || {});
+  setDias(ordenarDias(d));
+
+  setHorarios([]);
+  setDiaSel("");
+  setHoraSel("");
+  setTurnoEnListaEspera(false);
+  cargarTurnosConEstado(sede);
+};
+
+const elegirDia = async (dia) => {
+  setDiaSel(dia);
+  const h = (turnosConfig?.[formulario.sede]?.[dia]) || [];
+  const activos = await obtenerHorariosActivos({
+    cicloCodigo: "TDV",
+    sede: formulario.sede,
+    dia,
+  });
+
+  // deja solo los que estén activos en turnos
+  const setActivos = new Set(activos);
+  setHorarios(h.filter((x) => setActivos.has(x)));
+
+
+  setHoraSel("");
+  setFormulario((prev) => ({ ...prev, turno_1: "" }));
+};
+
+const elegirHorario = (hora) => {
+  setHoraSel(hora);
+  setFormulario((prev) => ({ ...prev, turno_1: `${diaSel} ${hora}` }));
+};
+
+
 
   const handleChange = async (e) => {
     const { id, value } = e.target;
@@ -106,12 +377,13 @@ const FormularioInscripcionVerano = () => {
       setEmailValido(regex.test(value));
     }
 
-    if (id === "sede" && value) {
+    /*if (id === "sede" && value) {
       const nuevosTurnos = await cargarTurnosDisponibles(value);
       setTurnosDisponibles(nuevosTurnos);
     }
+    */
   };
-
+/*
   const cargarTurnosDisponibles = async (sedeSeleccionada) => {
     if (!config || !sedeSeleccionada || !turnos[sedeSeleccionada]) return [];
 
@@ -154,66 +426,132 @@ const FormularioInscripcionVerano = () => {
       { nombre: "Arduino", habilitado: false }
     ];
   };
-
-  const handleSubmit = (e) => {
+*/
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formulario.sede || !diaSel || !horaSel) {
+      alert("⚠️ Elegí sede, día y horario.");
+      return;
+    }
+
+    await calcularDisponibilidadTurno();
     setMostrarResumen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const confirmarEnvio = async () => {
-    setMostrarResumen(false);
-    setMensajeExito("Procesando inscripción... Esto puede tardar unos segundos.");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const obtenerHorariosActivos = async ({ cicloCodigo, sede, dia }) => {
+    const url =
+      `${config.supabaseUrl}/rest/v1/turnos` +
+      `?select=hora` +
+      `&ciclo_codigo=eq.${encodeURIComponent(cicloCodigo)}` +
+      `&sede=eq.${encodeURIComponent(sede)}` +
+      `&dia=eq.${encodeURIComponent(dia)}` +
+      `&activo=eq.true`;
 
-    (async () => {
-        if (!config) return;
-        const payload = {
-          ...formulario,
-          edad: parseInt(formulario.edad),
-          creado_en: new Date().toISOString(),
-          tipo_inscripcion: TIPO_INSCRIPCION,   // 👈 marca que es Taller de Verano
-        };
-    
-        try {
-          const res = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: config.supabaseKey,
-              Authorization: `Bearer ${config.supabaseKey}`
-            },
-            body: JSON.stringify(payload)
-          });
-    
-          if (res.ok) {
-            await emailjs.send("service_efu6ess", "template_92ev0wo", {
-              nombre: formulario.nombre,
-              apellido: formulario.apellido,
-              edad: formulario.edad,
-              responsable: formulario.responsable,
-              telefono: formulario.telefono,
-              email: formulario.email,
-              sede: formulario.sede,
-              curso: formulario.curso,
-              turno_1: formulario.turno_1,
-              escuela: formulario.escuela,
-              comentarios: formulario.comentarios,
-              lista_espera: turnosDisponibles.find((t) => t.turno === formulario.turno_1)?.lleno ? "Sí" : "No"
-            });
-    
-            // ✅ Actualizamos mensaje final
-            setMensajeExito(
-              "✅ Inscripción enviada correctamente. También se envió un correo de confirmación."
-            );
-          } else {
-            setMensajeExito("❌ Ocurrió un error al enviar la inscripción. Intenta nuevamente.");
-          }
-        } catch (error) {
-          console.error(error);
-          setMensajeExito("❌ Error de conexión. Intenta nuevamente más tarde.");
-        }
-      })();
-    };
+    const res = await fetch(url, {
+      headers: {
+        apikey: config.supabaseKey,
+        Authorization: `Bearer ${config.supabaseKey}`,
+      },
+    });
+
+    const data = await res.json();
+    return Array.isArray(data) ? data.map((x) => x.hora) : [];
+  };
+
+
+  const confirmarEnvio = async () => {
+  setMostrarResumen(false);
+  setMensajeExito("Procesando inscripción... Esto puede tardar unos segundos.");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (!config) return;
+
+  // Validación mínima del flujo nuevo
+  if (!formulario.sede || !diaSel || !horaSel || !cursoSelId) {
+    setMensajeExito("❌ Falta seleccionar sede, día y horario.");
+    return;
+  }
+
+    const { listaEspera } = await calcularDisponibilidadTurno();
+
+    const cursoObj = cursos.find((c) => c.id === Number(cursoSelId));
+  const cursoNombre = cursoObj?.nombre || formulario.curso || "Robótica";
+
+  const payload = {
+    ...formulario,
+    edad: parseInt(formulario.edad),
+    creado_en: new Date().toISOString(),
+    tipo_inscripcion: TIPO_INSCRIPCION,  // TDV
+    curso: cursoNombre,                  // ✅ Robótica (no “Taller de Verano”)
+    turno_1: `${diaSel} ${horaSel}`,      // legacy
+      lista_espera: listaEspera || false,
+  };
+
+  try {
+    // 1) crear inscripcion y recuperar id
+    const res = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...supaHeaders(config),
+        prefer: "return=representation",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const insData = await res.json();
+    const alumnoId = insData?.[0]?.id;
+
+    if (!res.ok || !alumnoId) {
+      setMensajeExito("❌ Ocurrió un error al enviar la inscripción. Intenta nuevamente.");
+      return;
+    }
+
+    // 2) crear matricula activa
+      await fetch(`${config.supabaseUrl}/rest/v1/matriculas`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...supaHeaders(config),
+        },
+        body: JSON.stringify({
+          alumno_id: alumnoId,
+          ciclo_codigo: "TDV",
+          curso_id: Number(cursoSelId),
+          curso_nombre: cursoNombre, // legacy opcional
+          sede: formulario.sede,
+          dia: diaSel,
+          hora: horaSel,
+          estado: "activa",
+          lista_espera: listaEspera || false,
+          fecha_inicio: new Date().toISOString().slice(0, 10),
+        }),
+      });
+
+    // Email
+    await emailjs.send("service_efu6ess", "template_92ev0wo", {
+      nombre: formulario.nombre,
+      apellido: formulario.apellido,
+      edad: formulario.edad,
+      responsable: formulario.responsable,
+      telefono: formulario.telefono,
+      email: formulario.email,
+      sede: formulario.sede,
+      curso: cursoNombre,
+      turno_1: `${diaSel} ${horaSel}`,
+      escuela: formulario.escuela,
+      comentarios: formulario.comentarios,
+        lista_espera: listaEspera ? "Sí" : "No",
+    });
+
+    setMensajeExito("✅ Inscripción enviada correctamente. También se envió un correo de confirmación.");
+  } catch (error) {
+    console.error(error);
+    setMensajeExito("❌ Error de conexión. Intenta nuevamente más tarde.");
+  }
+};
 
   return (
     <div className="max-w-[700px] w-full mx-auto p-8 bg-white rounded-xl shadow-lg mt-8">
@@ -227,17 +565,19 @@ const FormularioInscripcionVerano = () => {
           <p className="text-sm leading-relaxed">{mensajeExito}</p>
           <div className="mt-4 flex justify-center gap-4">
             <button
+              type="button"
               onClick={() => {
                 limpiarFormulario();
                 setMensajeExito("");
                 setMostrarResumen(false);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               className="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 sm:py-3 px-6 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
             >
               Inscribir otro alumno
             </button>
             <button
+              type="button"
               onClick={() => {
                 setMensajeExito("");
                 setMostrarResumen(false);
@@ -440,15 +780,14 @@ const FormularioInscripcionVerano = () => {
 
           {/* Sedes */}
           <div>
-            {/*<label className="block font-medium mb-2">Selecciona la sede:</label>*/}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-              {Object.keys(turnos).map((sede) => {
+              {sedes.map((sede) => {
                 const seleccionada = formulario.sede === sede;
                 return (
                   <button
                     key={sede}
                     type="button"
-                    onClick={() => handleChange({ target: { id: "sede", value: sede } })}
+                    onClick={() => elegirSede(sede)}
                     className={`p-2 rounded-lg border shadow-md text-center transition-transform duration-200 ${
                       seleccionada
                         ? "bg-green-100 border-green-200 ring-2 ring-green-300 hover:bg-green-300"
@@ -456,12 +795,13 @@ const FormularioInscripcionVerano = () => {
                     }`}
                   >
                     <h4 className="text-lg">{sede}</h4>
-                    <p className="text-sm text-gray-500">{direcciones[sede]}</p>
+                    <p className="text-sm text-gray-500">{direcciones[sede] || ""}</p>
                   </button>
                 );
               })}
             </div>
           </div>
+
 
         
 
@@ -488,39 +828,61 @@ const FormularioInscripcionVerano = () => {
 
           {/* Turnos */}
           {formulario.sede && (
-            <div>
-              <label htmlFor="turno_1" className="block font-medium mb-1">Turno preferido:</label>
-              <p className="text-sm text-gray-600 mb-2">
-                <span className="inline-block w-4 h-4 bg-green-100 border border-green-500 mr-2"></span>Disponible
-                <span className="inline-block w-4 h-4 bg-red-50 border border-red-300 ml-4 mr-2"></span>Lista de espera
-              </p>
+            <div className="space-y-4">
+              <div className="mt-4">
+                <div className="font-semibold mb-2">Turno preferido:</div>
 
-              {turnosDisponibles.length === 0 && (
-                <p className="text-center text-gray-500 mb-4">No hay turnos disponibles para esta sede.</p>
-              )}
+                <div className="flex items-center gap-4 text-sm mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 rounded border bg-green-100 border-green-400" />
+                    Disponible
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 rounded border bg-red-100 border-red-300" />
+                    Lista de espera
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {turnosDisponibles.map(({ turno, label, lleno }) => (
-                  <button
-                    key={turno}
-                    type="button"
-                    onClick={() => {
-                      setFormulario((prev) => ({ ...prev, turno_1: turno }));
-                      setTurnoEnListaEspera(lleno);
-                    }}
-                    className={`p-4 rounded-lg border shadow-md text-left transition-transform duration-200 ${
-                      lleno
-                        ? formulario.turno_1 === turno
-                          ? "bg-red-100 border-red-200 text-red-700 ring-2 ring-red-200 hover:bg-red-200"
-                          : "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 hover:scale-105"
-                        : formulario.turno_1 === turno
-                        ? "bg-green-100 border-green-200 text-green-700 ring-2 ring-green-300 hover:bg-green-300"
-                        : "bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:scale-105"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+                {cargandoTurnos ? (
+                  <div className="text-sm text-gray-600">Cargando turnos...</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {turnosCards.map((t) => {
+                      const seleccionado = diaSel === t.dia && horaSel === t.hora;
+
+                      return (
+                        <button
+                          key={`${t.dia}-${t.hora}`}
+                          type="button"
+                          onClick={() => {
+                            setDiaSel(t.dia);
+                            setHoraSel(t.hora);
+                            setTurnoEnListaEspera(t.listaEspera);
+                            setFormulario((prev) => ({ ...prev, turno_1: `${t.dia} ${t.hora}` }));
+                          }}
+                          className={[
+                            "text-left rounded-xl p-4 border shadow-sm transition",
+                            t.listaEspera
+                              ? "bg-red-50 border-red-200 hover:bg-red-100"
+                              : "bg-green-50 border-green-200 hover:bg-green-100",
+                            seleccionado ? "ring-2 ring-green-400" : "hover:shadow-md",
+                          ].join(" ")}
+                        >
+                          <div className={t.listaEspera ? "text-red-700 font-medium" : "text-green-800 font-medium"}>
+                            {t.dia} {t.hora}hs
+                          </div>
+
+                          <div className="text-xs mt-1">
+                            Cupo:{" "}
+                            <span className={t.listaEspera ? "text-red-700 font-semibold" : "text-green-700 font-semibold"}>
+                              {t.listaEspera ? "Lista de espera" : "Disponible"}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -542,23 +904,23 @@ const FormularioInscripcionVerano = () => {
         {!mostrarResumen && !mensajeExito && (
         <div className="flex justify-center gap-4 mt-6">
             <button
-            onClick={() => {
-               
-                
+              type="submit"
+              onClick={() => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="w-full max-w-sm mx-auto bg-green-400 hover:bg-green-500 text-white font-medium py-2 sm:py-3 px-4 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
+              }}
+              className="w-full max-w-sm mx-auto bg-green-400 hover:bg-green-500 text-white font-medium py-2 sm:py-3 px-4 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
             >
-            Siguiente
+              Siguiente
             </button>
             <button
-            onClick={() => {
+              type="button"
+              onClick={() => {
                 navigate(rutaSalida);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="w-full max-w-sm mx-auto bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 sm:py-3 px-4 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
+              }}
+              className="w-full max-w-sm mx-auto bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 sm:py-3 px-4 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
             >
-            Volver
+              Volver
             </button>
         </div>
         )}
@@ -600,6 +962,16 @@ const FormularioInscripcionVerano = () => {
                     <p><span className="font-semibold">Sede:</span> <span className="text-green-700">{formulario.sede}</span></p>
                     <p><span className="font-semibold">Taller:</span> <span className="text-green-700">{formulario.curso}</span></p>
                     <p><span className="font-semibold">Turno:</span> {formulario.turno_1}</p>
+                    {cupoMaximo != null && (
+                      <p className="text-sm">
+                        <span className="font-medium">Cupo:</span>{" "}
+                        {turnoEnListaEspera ? (
+                          <span className="text-red-600 font-semibold">Lista de espera</span>
+                        ) : (
+                          <span className="text-green-700 font-semibold">Disponible</span>
+                        )}
+                      </p>
+                    )}
                     {mostrarResumenTurno()}
                 </div>
 
@@ -637,16 +1009,14 @@ const FormularioInscripcionVerano = () => {
             {/* Botones en la pantalla de resumen */}
             
           <div className="flex justify-center gap-4 mt-6">
-            <button
-              onClick={() => {
+            <button type="submit"           onClick={() => {
                 confirmarEnvio();
               }}
               className="w-full sm:w-auto bg-green-400 hover:bg-green-500 text-white font-medium py-2 sm:py-3 px-6 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
             >
               Confirmar envío
             </button>
-            <button
-              onClick={() => {
+            <button type="submit"          onClick={() => {
                 setMostrarResumen(false);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
@@ -672,3 +1042,7 @@ const FormularioInscripcionVerano = () => {
 };
 
 export default FormularioInscripcionVerano;
+
+
+
+

@@ -1,5 +1,14 @@
 import { Link } from "react-router-dom";
-import { FaUserEdit, FaClipboardList, FaUserCheck, FaMoneyBillWave, FaThLarge, FaChartPie, FaCog } from "react-icons/fa";
+import {
+  FaUserEdit,
+  FaClipboardList,
+  FaUserCheck,
+  FaMoneyBillWave,
+  FaThLarge,
+  FaChartPie,
+  FaCog,
+  FaClock
+} from "react-icons/fa";
 
 export default function MenuGestion() {
   return (
@@ -76,6 +85,15 @@ export default function MenuGestion() {
           <FaCog className="text-purple-500 text-3xl" />
           <span className="font-semibold text-lg">Gestión de cursos</span>
         </Link>
+
+        <Link
+          to="/gestor-turnos"
+          className="bg-white rounded-xl border-l-8 border-indigo-500 p-4 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaClock className="text-indigo-500 text-3xl" />
+          <span className="font-semibold text-lg">Gestor de Turnos</span>
+        </Link>
+
 
       </div>
     </div>
