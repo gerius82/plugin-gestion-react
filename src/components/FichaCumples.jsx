@@ -4,7 +4,7 @@ const IMG_CUMPLES =
   "https://cvogoablzgymmodegfft.supabase.co/storage/v1/object/sign/cumples/cumples%20info.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWJmYzhjNy0wZGU5LTRkMGQtODc2YS0zODEyNjZmMjRmOWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjdW1wbGVzL2N1bXBsZXMgaW5mby5wbmciLCJpYXQiOjE3Njg4NzYwODMsImV4cCI6MjA4NDIzNjA4M30.fViNIiMR5BubUrqEqem3H6VQ6bV28MhsIkhy2KsvjGQ";
 
 const ESTADOS_RESERVA = ["pendiente", "confirmada", "cancelada"];
-const HORAS_DEFAULT = ["15:00", "18:00"];
+const HORAS_DEFAULT = ["14:30", "18:00"];
 const MESES = [
   "Enero",
   "Febrero",
@@ -407,7 +407,7 @@ export default function FichaCumples() {
 
   return (
     <div className="w-full mt-6 px-2 sm:px-4">
-      <div className="p-4 sm:p-6 mb-4">
+      <div className="p-4 sm:p-6 mb-4 w-full">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
@@ -420,8 +420,8 @@ export default function FichaCumples() {
           <div className="text-center text-sm text-emerald-700 mt-4">{mensaje}</div>
         )}
 
-        <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="p-3 sm:p-4">
+        <div className="mt-6 w-full">
+          <div className="p-3 sm:p-4 w-full">
             <h3 className="text-lg font-semibold mb-4">Gestion de agenda</h3>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
               <label className="text-sm font-medium">Mes:</label>
@@ -444,22 +444,30 @@ export default function FichaCumples() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-7 gap-2 text-center text-xs mb-2 text-gray-500">
+              {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((d) => (
+                <div key={d}>{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2 w-full">
+              {Array.from({
+                length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
+              }).map((_, i) => (
+                <div key={`empty-${i}`} />
+              ))}
               {daysInMonth.map((d) => {
                 const slots = slotsPorDia[d.fecha] || [];
-                const ocupados = slots.filter((s) => {
-                  if (!s.activo || !s.hora) return false;
-                  const key = `${s.fecha}-${s.hora}`;
-                  return reservasPorSlot.has(key);
-                }).length;
+                const activos = slots.filter((s) => s.activo && s.hora).length;
                 const color =
-                  ocupados >= 2 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200";
+                  activos === 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200";
 
                 return (
                   <div key={d.fecha} className={`rounded-xl border p-3 sm:p-4 ${color}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold">Dia {d.day}</span>
-                      <span className="text-[11px] text-gray-500">{formatFecha(d.fecha)}</span>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-3xl font-semibold text-gray-800 leading-none">
+                        {d.day}
+                      </span>
+                      <span className="text-[11px] text-gray-500">{activos}/2 activos</span>
                     </div>
                     {slots.map((s) => (
                       <div key={`${d.fecha}-${s.slot_num}`} className="flex flex-wrap items-center gap-2 mb-2">
@@ -493,9 +501,6 @@ export default function FichaCumples() {
                           />
                           Activo
                         </label>
-                        <span className="w-full sm:w-auto sm:ml-auto text-[11px] text-gray-500">
-                          Slot {s.slot_num}
-                        </span>
                       </div>
                     ))}
                   </div>

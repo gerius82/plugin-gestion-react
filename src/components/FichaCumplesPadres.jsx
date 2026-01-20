@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 const IMG_CUMPLES =
   "https://cvogoablzgymmodegfft.supabase.co/storage/v1/object/sign/cumples/cumples%20info.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWJmYzhjNy0wZGU5LTRkMGQtODc2YS0zODEyNjZmMjRmOWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjdW1wbGVzL2N1bXBsZXMgaW5mby5wbmciLCJpYXQiOjE3Njg4NzYwODMsImV4cCI6MjA4NDIzNjA4M30.fViNIiMR5BubUrqEqem3H6VQ6bV28MhsIkhy2KsvjGQ";
 
-const HORAS_DEFAULT = ["15:00", "18:00"];
+const HORAS_DEFAULT = ["14:30", "18:00"];
 const MESES = [
   "Enero",
   "Febrero",
@@ -44,6 +44,16 @@ const buildMonthDays = (ym) => {
     });
   }
   return days;
+};
+
+const addMinutes = (hora, minutos) => {
+  if (!hora) return "";
+  const [h, m] = String(hora).split(":").map((v) => Number(v));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return "";
+  const total = h * 60 + m + minutos;
+  const hh = Math.floor((total % 1440) / 60);
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 };
 
 export default function FichaCumplesPadres() {
@@ -313,15 +323,17 @@ export default function FichaCumplesPadres() {
           </select>
         </div>
 
-          <div className="overflow-x-auto sm:overflow-visible">
-          <div className="min-w-[360px] sm:min-w-0">
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500">
-              {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
+          <div className="overflow-x-auto sm:overflow-visible w-full">
+          <div className="min-w-[360px] sm:min-w-0 w-full">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500 w-full">
+              {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((d) => (
                 <div key={d}>{d}</div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
-              {Array.from({ length: daysInMonth[0]?.weekDay || 0 }).map((_, i) => (
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4 w-full">
+              {Array.from({
+                length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
+              }).map((_, i) => (
                 <div key={`empty-${i}`} />
               ))}
               {daysInMonth.map((d) => {
@@ -332,6 +344,7 @@ export default function FichaCumplesPadres() {
                   return !reservasPorSlot.has(key);
                 });
                 const disponiblesCount = disponibles.length;
+                const disponibleLabel = disponiblesCount > 0 ? "Disponible" : "No disponible";
                 const isSelected = diaSeleccionado === d.fecha;
                 const color =
                   disponiblesCount === 0
@@ -356,8 +369,8 @@ export default function FichaCumplesPadres() {
                       setSlotSeleccionado(null);
                     }}
                   >
-                    <div className="text-sm font-semibold">{d.day}</div>
-                    <div className="text-[10px] whitespace-nowrap">{disponiblesCount}/2</div>
+                    <div className="text-2xl sm:text-3xl font-semibold">{d.day}</div>
+                    <div className="text-[10px] whitespace-nowrap">{disponibleLabel}</div>
                   </button>
                 );
               })}
@@ -370,7 +383,7 @@ export default function FichaCumplesPadres() {
             <div className="text-sm font-semibold mb-2">
               Horarios disponibles para {formatFecha(diaSeleccionado)}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 flex-nowrap overflow-x-auto">
               {slotsDisponibles.map((s) => {
                 const isHoraSelected =
                   slotSeleccionado &&
@@ -379,13 +392,14 @@ export default function FichaCumplesPadres() {
                 const horaCls = isHoraSelected
                   ? "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-100 ring-2 ring-emerald-300"
                   : "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 ring-1 ring-gray-200";
+                const horaFin = addMinutes(s.hora, 150);
                 return (
                   <button
                     key={`${s.fecha}-${s.slot_num}`}
                     className={`px-3 py-2 text-xs rounded-lg border transition ${horaCls}`}
                     onClick={() => setSlotSeleccionado(s)}
                   >
-                    {s.hora}
+                    {s.hora} a {horaFin}hs
                   </button>
                 );
               })}
@@ -399,7 +413,8 @@ export default function FichaCumplesPadres() {
         {slotSeleccionado && (
           <div className="border rounded-xl p-4">
             <div className="text-sm font-semibold mb-2">
-              Reserva para {formatFecha(slotSeleccionado.fecha)} a las {slotSeleccionado.hora}
+              Reserva para {formatFecha(slotSeleccionado.fecha)} de {slotSeleccionado.hora} a{" "}
+              {addMinutes(slotSeleccionado.hora, 150)}hs
             </div>
             <div className="text-xs text-gray-500 mb-3">
               Completa los datos de contacto y del cumpleanero para enviar la solicitud.
