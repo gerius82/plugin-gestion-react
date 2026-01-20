@@ -263,7 +263,7 @@ export default function FichaCumplesPadres() {
         <div className="text-center text-sm text-emerald-700 mt-4 px-3 sm:px-4">{mensaje}</div>
       )}
 
-      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 sm:p-5 mt-6 mx-3 sm:mx-4">
+      <div className="mt-6 px-3 sm:px-4">
         <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
         <div className="text-xs sm:text-sm text-gray-600 mb-4">
           <div className="font-medium text-gray-700 mb-1">Como reservar</div>
