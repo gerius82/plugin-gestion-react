@@ -249,7 +249,7 @@ export default function FichaCumplesPadres() {
 
   return (
     <div className="w-full mt-6">
-      <div className="px-3 sm:px-4">
+      <div className="px-2 sm:px-4">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
@@ -260,10 +260,10 @@ export default function FichaCumplesPadres() {
         <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
       </div>
       {mensaje && (
-        <div className="text-center text-sm text-emerald-700 mt-4 px-3 sm:px-4">{mensaje}</div>
+        <div className="text-center text-sm text-emerald-700 mt-4 px-2 sm:px-4">{mensaje}</div>
       )}
 
-      <div className="mt-6 px-3 sm:px-4">
+      <div className="mt-6 px-2 sm:px-4">
         <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
         <div className="text-xs sm:text-sm text-gray-600 mb-4">
           <div className="font-medium text-gray-700 mb-1">Como reservar</div>
@@ -282,8 +282,8 @@ export default function FichaCumplesPadres() {
           />
         </div>
 
-        <div className="overflow-x-auto">
-          <div className="min-w-[360px]">
+          <div className="overflow-x-auto sm:overflow-visible">
+          <div className="min-w-[360px] sm:min-w-0">
             <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500">
               {["D", "L", "M", "M", "J", "V", "S"].map((d) => (
                 <div key={d}>{d}</div>
@@ -301,14 +301,20 @@ export default function FichaCumplesPadres() {
                   return !reservasPorSlot.has(key);
                 });
                 const disponiblesCount = disponibles.length;
+                const isSelected = diaSeleccionado === d.fecha;
                 const color =
                   disponiblesCount === 0
-                    ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-                    : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100";
+                    ? isSelected
+                      ? "bg-red-100 border-red-300 text-red-700 hover:bg-red-100"
+                      : "bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
+                    : isSelected
+                    ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                    : "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100";
+                const selectedCls = isSelected ? "border-2" : "border";
                 return (
                   <button
                     key={d.fecha}
-                    className={`rounded-lg border py-1 sm:py-2 text-[10px] sm:text-xs font-medium transition ${color} flex flex-col items-center justify-center min-h-[54px] sm:min-h-[64px]`}
+                    className={`rounded-lg py-1 sm:py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[54px] sm:min-h-[64px] w-full`}
                     onClick={() => {
                       setDiaSeleccionado(d.fecha);
                       setSlotSeleccionado(null);
