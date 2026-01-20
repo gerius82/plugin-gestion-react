@@ -19,21 +19,37 @@ export default function FichaInactivos() {
   }, [config]);
 
   async function cargarInactivos() {
-    const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,estado,ciclo_codigo,curso_nombre,sede,dia,hora,inscripciones(nombre,apellido,telefono)&estado=neq.activa`,
-      {
-        headers: {
-          apikey: config.supabaseKey,
-          Authorization: `Bearer ${config.supabaseKey}`,
-        },
-      }
+    const headers = {
+      apikey: config.supabaseKey,
+      Authorization: `Bearer ${config.supabaseKey}`,
+    };
+
+    const [resInactivos, resActivas] = await Promise.all([
+      fetch(
+        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,estado,ciclo_codigo,curso_nombre,sede,dia,hora,inscripciones(persona_id,nombre,apellido,telefono)&estado=not.ilike.activa`,
+        { headers }
+      ),
+      fetch(
+        `${config.supabaseUrl}/rest/v1/matriculas?select=alumno_id,inscripciones(persona_id)&estado=ilike.activa`,
+        { headers }
+      ),
+    ]);
+
+    const dataInactivos = await resInactivos.json();
+    const dataActivas = await resActivas.json();
+    const alumnosConActiva = new Set(
+      (Array.isArray(dataActivas) ? dataActivas : []).map((m) => {
+        const insc = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
+        return String(insc.persona_id || m.alumno_id);
+      })
     );
-    const data = await res.json();
-    const lista = (Array.isArray(data) ? data : []).map((m) => {
+
+    const lista = (Array.isArray(dataInactivos) ? dataInactivos : []).map((m) => {
       const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
       return {
         id: m.id,
         alumno_id: m.alumno_id,
+        persona_id: alumno.persona_id || m.alumno_id,
         nombre: alumno.nombre || "",
         apellido: alumno.apellido || "",
         telefono: alumno.telefono || "",
@@ -44,7 +60,7 @@ export default function FichaInactivos() {
         dia: m.dia || "",
         hora: m.hora || "",
       };
-    });
+    }).filter((m) => !alumnosConActiva.has(String(m.persona_id || m.alumno_id)));
     lista.sort((a, b) => a.nombre.localeCompare(b.nombre));
     setAlumnos(lista);
   }
