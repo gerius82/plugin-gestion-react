@@ -284,9 +284,10 @@ export default function FichaCumplesPadres() {
   };
 
   return (
-    <div className="w-full overflow-x-auto">
-      <div className="min-w-[700px]">
-      <div className="w-full mt-6 px-2 sm:px-4">
+    <div className="w-full mt-6 px-2 sm:px-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+          <div className="w-full px-3 sm:px-6 py-4">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
@@ -309,10 +310,10 @@ export default function FichaCumplesPadres() {
           <div>3) Completa los datos de contacto y del cumpleanero.</div>
           <div>4) Envia la solicitud para coordinar.</div>
         </div>
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
           <label className="text-sm font-medium">Mes:</label>
           <select
-            className="border rounded px-3 py-2 text-sm"
+            className="border rounded px-3 py-2 text-sm w-full sm:w-auto"
             value={mesSeleccionado}
             onChange={(e) => setMesSeleccionado(e.target.value)}
           >
@@ -325,15 +326,15 @@ export default function FichaCumplesPadres() {
         </div>
 
         <div className="w-full overflow-x-auto">
-          <div className="min-w-[840px]">
-            <div className="grid grid-cols-7 gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500 whitespace-nowrap">
+          <div className="min-w-[840px] px-2">
+            <div className="grid grid-cols-[repeat(7,minmax(110px,1fr))] gap-1 sm:gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500">
               {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((d) => (
                 <div key={d} className="whitespace-nowrap">
                   {d}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-2 mb-4">
+            <div className="grid grid-cols-[repeat(7,minmax(110px,1fr))] gap-1 sm:gap-2 mb-4 pb-1">
               {Array.from({
                 length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
               }).map((_, i) => (
@@ -366,7 +367,7 @@ export default function FichaCumplesPadres() {
                 return (
                   <button
                     key={d.fecha}
-                    className={`rounded-lg border-2 py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[72px] sm:min-h-[64px] w-full`}
+                    className={`rounded-lg border-2 py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[72px] sm:min-h-[64px] w-full min-w-[110px]`}
                     onClick={() => {
                       setDiaSeleccionado(d.fecha);
                       setSlotSeleccionado(null);
@@ -388,7 +389,7 @@ export default function FichaCumplesPadres() {
             <div className="text-sm font-semibold mb-2">
               Horarios disponibles para {formatFecha(diaSeleccionado)}
             </div>
-            <div className="flex gap-2 flex-nowrap overflow-x-auto">
+            <div className="flex gap-2 flex-nowrap overflow-x-auto px-2 py-1">
               {slotsDisponibles.map((s) => {
                 const isHoraSelected =
                   slotSeleccionado &&
@@ -543,7 +544,8 @@ export default function FichaCumplesPadres() {
             </div>
           </div>
         )}
-      </div>
+          </div>
+        </div>
       </div>
     </div>
   );

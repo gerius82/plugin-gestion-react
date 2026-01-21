@@ -448,77 +448,150 @@ export default function FichaCumples() {
               </button>
             </div>
 
-            <div className="grid grid-cols-7 gap-2 text-center text-xs mb-2 text-gray-500">
-              {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((d) => (
-                <div key={d}>{d}</div>
-              ))}
+            
+            {/* Calendario / agenda */}
+            <div className="hidden md:block">
+              <div className="overflow-x-auto">
+                <div className="min-w-[1260px]">
+                  <div className="grid grid-cols-[repeat(7,minmax(180px,1fr))] gap-3 text-center text-xs mb-2 text-gray-500">
+                    {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((d) => (
+                      <div key={d}>{d}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-[repeat(7,minmax(180px,1fr))] gap-3">
+                    {Array.from({
+                      length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
+                    }).map((_, i) => (
+                      <div key={`empty-${i}`} />
+                    ))}
+
+                    {daysInMonth.map((d) => {
+                      const slots = slotsPorDia[d.fecha] || [];
+                      const activos = slots.filter((s) => s.activo && s.hora).length;
+                      const color =
+                        activos === 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200";
+
+                      return (
+                        <div key={d.fecha} className={`rounded-xl border p-3 sm:p-4 ${color}`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-3xl font-semibold text-gray-800 leading-none">
+                              {d.day}
+                            </span>
+                            <span className="text-[11px] text-gray-500">{activos}/2 activos</span>
+                          </div>
+
+                          {slots.map((s) => (
+                            <div
+                              key={`${d.fecha}-${s.slot_num}`}
+                              className="flex flex-wrap items-center gap-2 mb-2"
+                            >
+                              <input
+                                type="time"
+                                className="border rounded px-2 py-1 text-xs w-full sm:w-24"
+                                value={s.hora || ""}
+                                onChange={(e) =>
+                                  setSlotsDraft((prev) => ({
+                                    ...prev,
+                                    [`${s.fecha}-${s.slot_num}`]: {
+                                      ...s,
+                                      hora: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+
+                              <label className="flex items-center gap-2 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={!!s.activo}
+                                  onChange={(e) =>
+                                    setSlotsDraft((prev) => ({
+                                      ...prev,
+                                      [`${s.fecha}-${s.slot_num}`]: {
+                                        ...s,
+                                        activo: e.target.checked,
+                                      },
+                                    }))
+                                  }
+                                />
+                                Activo
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <div className="min-w-[1260px]">
-                <div className="grid grid-cols-[repeat(7,minmax(180px,1fr))] gap-3">
-              {Array.from({
-                length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
-              }).map((_, i) => (
-                <div key={`empty-${i}`} />
-              ))}
+
+            {/* Mobile: lista por dia (sin scroll horizontal) */}
+            <div className="block md:hidden space-y-3">
               {daysInMonth.map((d) => {
                 const slots = slotsPorDia[d.fecha] || [];
                 const activos = slots.filter((s) => s.activo && s.hora).length;
+                const wd = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"][d.weekDay];
                 const color =
                   activos === 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200";
 
                 return (
-                  <div key={d.fecha} className={`rounded-xl border p-3 sm:p-4 ${color}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-3xl font-semibold text-gray-800 leading-none">
-                        {d.day}
-                      </span>
-                      <span className="text-[11px] text-gray-500">{activos}/2 activos</span>
+                  <div key={d.fecha} className={`rounded-xl border p-3 ${color}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-baseline gap-2">
+                        <div className="text-2xl font-semibold leading-none">{d.day}</div>
+                        <div className="text-xs text-gray-600">{wd}</div>
+                        <div className="text-[11px] text-gray-500">{formatFecha(d.fecha)}</div>
+                      </div>
+                      <div className="text-[11px] text-gray-500">{activos}/2 activos</div>
                     </div>
-                    {slots.map((s) => (
-                      <div key={`${d.fecha}-${s.slot_num}`} className="flex flex-wrap items-center gap-2 mb-2">
-                        <input
-                          type="time"
-                          className="border rounded px-2 py-1 text-xs w-full sm:w-24"
-                          value={s.hora || ""}
-                          onChange={(e) =>
-                            setSlotsDraft((prev) => ({
-                              ...prev,
-                              [`${s.fecha}-${s.slot_num}`]: {
-                                ...s,
-                                hora: e.target.value,
-                              },
-                            }))
-                          }
-                        />
-                        <label className="flex items-center gap-2 text-xs">
+
+                    <div className="mt-3 space-y-2">
+                      {slots.map((s) => (
+                        <div key={`${d.fecha}-${s.slot_num}`} className="flex flex-wrap items-center gap-2">
                           <input
-                            type="checkbox"
-                            checked={!!s.activo}
+                            type="time"
+                            className="border rounded px-2 py-2 text-sm w-28"
+                            value={s.hora || ""}
                             onChange={(e) =>
                               setSlotsDraft((prev) => ({
                                 ...prev,
                                 [`${s.fecha}-${s.slot_num}`]: {
                                   ...s,
-                                  activo: e.target.checked,
+                                  hora: e.target.value,
                                 },
                               }))
                             }
                           />
-                          Activo
-                        </label>
-                      </div>
-                    ))}
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={!!s.activo}
+                              onChange={(e) =>
+                                setSlotsDraft((prev) => ({
+                                  ...prev,
+                                  [`${s.fecha}-${s.slot_num}`]: {
+                                    ...s,
+                                    activo: e.target.checked,
+                                  },
+                                }))
+                              }
+                            />
+                            Activo
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
-                </div>
-              </div>
             </div>
 
             <div className="mt-6">
               <h4 className="text-sm font-semibold mb-2">Reservas del mes</h4>
-              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+
+              {/* Desktop/tablet: tabla */}
+              <div className="hidden sm:block overflow-x-auto border border-gray-200 rounded-lg">
                 <table className="min-w-full text-xs sm:text-sm">
                   <thead className="bg-gray-50 text-[11px] sm:text-sm">
                     <tr>
@@ -543,7 +616,9 @@ export default function FichaCumples() {
                         <tr key={r.id} className={filaCls}>
                           <td className="px-3 py-2">{formatFecha(r.fecha)}</td>
                           <td className="px-3 py-2">{r.hora}</td>
-                          <td className="px-3 py-2">{r.nombre} {r.apellido}</td>
+                          <td className="px-3 py-2">
+                            {r.nombre} {r.apellido}
+                          </td>
                           <td className="px-3 py-2">{r.telefono}</td>
                           <td className="px-3 py-2">
                             <select
@@ -552,13 +627,15 @@ export default function FichaCumples() {
                               onChange={(e) => actualizarEstadoReserva(r.id, e.target.value)}
                             >
                               {ESTADOS_RESERVA.map((e) => (
-                                <option key={e} value={e}>{e}</option>
+                                <option key={e} value={e}>
+                                  {e}
+                                </option>
                               ))}
                             </select>
                           </td>
                           <td className="px-3 py-2">
                             <button
-                              className="text-xs text-emerald-700 hover:text-emerald-900 transition px-2 py-1 rounded hover:bg-emerald-50"
+                              className="text-emerald-700 hover:text-emerald-900 underline text-xs"
                               onClick={() => abrirDetalle(r)}
                             >
                               Ver
@@ -567,35 +644,78 @@ export default function FichaCumples() {
                         </tr>
                       );
                     })}
-                    {(!reservasMes || reservasMes.length === 0) && (
-                      <tr>
-                        <td colSpan="6" className="px-3 py-3 text-center text-gray-500">
-                          Sin reservas en este mes.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
 
-        </div>
-      </div>
+              {/* Mobile: cards */}
+              <div className="sm:hidden space-y-2">
+                {(reservasMes || []).length === 0 ? (
+                  <div className="text-sm text-gray-500">No hay reservas en este mes.</div>
+                ) : (
+                  (reservasMes || []).map((r) => {
+                    const estado = String(r.estado || "").toLowerCase();
+                    const cardCls =
+                      estado === "cancelada"
+                        ? "border-red-200 bg-red-50"
+                        : estado === "confirmada"
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-gray-200 bg-white";
+                    return (
+                      <div key={r.id} className={`border rounded-xl p-3 ${cardCls}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="font-semibold text-sm">
+                              {r.nombre} {r.apellido}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {formatFecha(r.fecha)} - {r.hora}
+                            </div>
+                            <div className="text-xs text-gray-600">{r.telefono}</div>
+                          </div>
 
-      {reservaDetalle && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-emerald-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-50 to-white px-6 py-4 border-b border-emerald-100">
-              <div className="flex items-start justify-between">
-              <div>
-                <h4 className="text-lg font-semibold">Detalle de la reserva</h4>
-                <p className="text-xs text-gray-500">
-                  {formatFecha(reservaDetalle.fecha)} - {reservaDetalle.hora}
-                </p>
+                          <button
+                            className="text-emerald-700 underline text-xs whitespace-nowrap"
+                            onClick={() => abrirDetalle(r)}
+                          >
+                            Detalle
+                          </button>
+                        </div>
+
+                        <div className="mt-2">
+                          <label className="text-[11px] text-gray-500">Estado</label>
+                          <select
+                            className="mt-1 w-full border rounded px-2 py-2 text-sm bg-white"
+                            value={r.estado || "pendiente"}
+                            onChange={(e) => actualizarEstadoReserva(r.id, e.target.value)}
+                          >
+                            {ESTADOS_RESERVA.map((e) => (
+                              <option key={e} value={e}>
+                                {e}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-            </div>
+
+            {reservaDetalle && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-emerald-100 overflow-hidden">
+                  <div className="bg-gradient-to-r from-emerald-50 to-white px-6 py-4 border-b border-emerald-100">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="text-lg font-semibold">Detalle de la reserva</h4>
+                        <p className="text-xs text-gray-500">
+                          {formatFecha(reservaDetalle.fecha)} - {reservaDetalle.hora}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
             <div className="px-6 py-5 max-h-[75vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
@@ -783,7 +903,7 @@ export default function FichaCumples() {
                   <div className="text-sm">
                     {Array.isArray(reservaDetalle.invitados) && reservaDetalle.invitados.filter(Boolean).length
                       ? reservaDetalle.invitados.filter(Boolean).join(", ")
-                      : "—"}
+                      : "-"}
                   </div>
                 </div>
                 <div className="md:col-span-2">
@@ -813,6 +933,9 @@ export default function FichaCumples() {
           </div>
         </div>
       )}
+        </div>
+      </div>
+    </div>
     </div>
   );
 }
