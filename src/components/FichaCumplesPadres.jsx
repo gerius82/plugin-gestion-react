@@ -285,9 +285,8 @@ export default function FichaCumplesPadres() {
 
   return (
     <div className="w-full mt-6 px-2 sm:px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-          <div className="w-full px-3 sm:px-6 py-4">
+      <div className="w-full">
+        <div className="w-full px-3 sm:px-6 py-4">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
@@ -302,13 +301,13 @@ export default function FichaCumplesPadres() {
       )}
 
       <div className="mt-6">
-        <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
+        <h3 className="text-lg font-semibold mb-4">Solicitud de reserva</h3>
         <div className="text-xs sm:text-sm text-gray-600 mb-4">
-          <div className="font-medium text-gray-700 mb-1">Como reservar</div>
-          <div>1) Elegi el mes y tocá el dia con cupo.</div>
-          <div>2) Selecciona el horario disponible.</div>
-          <div>3) Completa los datos de contacto y del cumpleanero.</div>
-          <div>4) Envia la solicitud para coordinar.</div>
+          <div className="font-medium text-gray-700 mb-1">Cómo reservar...</div>
+          <div>1) Elegí el mes y toca el día que desees realizar el cumple.</div>
+          <div>2) Selecciona uno de los horario disponibles.</div>
+          <div>3) Completa los datos de contacto y del cumpleañero.</div>
+          <div>4) Envía la solicitud para que nos contactemos.</div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
           <label className="text-sm font-medium">Mes:</label>
@@ -544,9 +543,8 @@ export default function FichaCumplesPadres() {
             </div>
           </div>
         )}
-          </div>
-        </div>
       </div>
+    </div>
     </div>
   );
 }
