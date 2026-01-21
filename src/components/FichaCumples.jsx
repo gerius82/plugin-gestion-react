@@ -128,8 +128,7 @@ export default function FichaCumples() {
     const urlReservas =
       `${config.supabaseUrl}/rest/v1/cumple_reservas` +
       `?select=id,fecha,hora,nombre,apellido,telefono,mensaje,estado,creado_en,cumpleanero_nombre,cumpleanero_edad,invitados,menu_especial,menu_especial_cantidad` +
-      `&fecha=gte.${from}` +
-      `&fecha=lte.${to}`;
+      `&order=fecha.asc&order=hora.asc`;
 
     const [resSlots, resReservas] = await Promise.all([
       fetch(urlSlots, { headers }),
@@ -588,101 +587,43 @@ export default function FichaCumples() {
             </div>
 
             <div className="mt-6">
-              <h4 className="text-sm font-semibold mb-2">Reservas del mes</h4>
-
-              {/* Desktop/tablet: tabla */}
-              <div className="hidden sm:block overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="min-w-full text-xs sm:text-sm">
-                  <thead className="bg-gray-50 text-[11px] sm:text-sm">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Fecha</th>
-                      <th className="px-3 py-2 text-left">Hora</th>
-                      <th className="px-3 py-2 text-left">Nombre</th>
-                      <th className="px-3 py-2 text-left">Telefono</th>
-                      <th className="px-3 py-2 text-left">Estado</th>
-                      <th className="px-3 py-2 text-left">Detalle</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(reservasMes || []).map((r) => {
-                      const estado = String(r.estado || "").toLowerCase();
-                      const filaCls =
-                        estado === "cancelada"
-                          ? "border-t bg-red-50"
-                          : estado === "confirmada"
-                          ? "border-t bg-emerald-50"
-                          : "border-t";
-                      return (
-                        <tr key={r.id} className={filaCls}>
-                          <td className="px-3 py-2">{formatFecha(r.fecha)}</td>
-                          <td className="px-3 py-2">{r.hora}</td>
-                          <td className="px-3 py-2">
-                            {r.nombre} {r.apellido}
-                          </td>
-                          <td className="px-3 py-2">{r.telefono}</td>
-                          <td className="px-3 py-2">
-                            <select
-                              className="border rounded px-2 py-1 text-xs"
-                              value={r.estado || "pendiente"}
-                              onChange={(e) => actualizarEstadoReserva(r.id, e.target.value)}
-                            >
-                              {ESTADOS_RESERVA.map((e) => (
-                                <option key={e} value={e}>
-                                  {e}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-3 py-2">
-                            <button
-                              className="text-emerald-700 hover:text-emerald-900 underline text-xs"
-                              onClick={() => abrirDetalle(r)}
-                            >
-                              Ver
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile: cards */}
-              <div className="sm:hidden space-y-2">
-                {(reservasMes || []).length === 0 ? (
-                  <div className="text-sm text-gray-500">No hay reservas en este mes.</div>
-                ) : (
-                  (reservasMes || []).map((r) => {
-                    const estado = String(r.estado || "").toLowerCase();
-                    const cardCls =
+              <h4 className="text-sm font-semibold mb-2">Reservas (todas)</h4>
+              {(reservasMes || []).length === 0 ? (
+                <div className="text-sm text-gray-500">No hay reservas cargadas.</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(reservasMes || []).map((r) => {
+                    const estado = String(r.estado || "pendiente").toLowerCase();
+                    const badgeCls =
                       estado === "cancelada"
-                        ? "border-red-200 bg-red-50"
+                        ? "bg-red-50 text-red-700 border-red-200"
                         : estado === "confirmada"
-                        ? "border-emerald-200 bg-emerald-50"
-                        : "border-gray-200 bg-white";
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-gray-50 text-gray-700 border-gray-200";
+                    const cumpleNombre = r.cumpleanero_nombre || `${r.nombre || ""} ${r.apellido || ""}`.trim();
                     return (
-                      <div key={r.id} className={`border rounded-xl p-3 ${cardCls}`}>
+                      <div key={r.id} className="border rounded-xl p-3 bg-white">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <div className="font-semibold text-sm">
+                            <div className="text-base font-semibold text-gray-900">
+                              {cumpleNombre || "Cumpleanero sin nombre"}
+                            </div>
+                            <div className="mt-1 text-[11px] text-gray-500">Fecha de reserva</div>
+                            <div className="text-xs text-gray-700">{formatFecha(r.fecha)}</div>
+                            <div className="mt-1 text-[11px] text-gray-500">Horario</div>
+                            <div className="text-xs text-gray-700">{r.hora || "-"}</div>
+                            <div className="mt-1 text-[11px] text-gray-500">Contacto</div>
+                            <div className="text-xs text-gray-700">
                               {r.nombre} {r.apellido}
+                              {r.telefono ? ` • ${r.telefono}` : ""}
                             </div>
-                            <div className="text-xs text-gray-600">
-                              {formatFecha(r.fecha)} - {r.hora}
-                            </div>
-                            <div className="text-xs text-gray-600">{r.telefono}</div>
                           </div>
-
-                          <button
-                            className="text-emerald-700 underline text-xs whitespace-nowrap"
-                            onClick={() => abrirDetalle(r)}
-                          >
-                            Detalle
-                          </button>
+                          <span className={`text-[11px] px-2 py-1 rounded-full border ${badgeCls}`}>
+                            {estado || "pendiente"}
+                          </span>
                         </div>
 
-                        <div className="mt-2">
+                        <div className="mt-3">
                           <label className="text-[11px] text-gray-500">Estado</label>
                           <select
                             className="mt-1 w-full border rounded px-2 py-2 text-sm bg-white"
@@ -696,11 +637,20 @@ export default function FichaCumples() {
                             ))}
                           </select>
                         </div>
+
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            className="text-emerald-700 hover:bg-emerald-50 rounded px-2 py-1 text-xs transition"
+                            onClick={() => abrirDetalle(r)}
+                          >
+                            Ver detalle
+                          </button>
+                        </div>
                       </div>
                     );
-                  })
-                )}
-              </div>
+                  })}
+                </div>
+              )}
             </div>
 
             {reservaDetalle && (
