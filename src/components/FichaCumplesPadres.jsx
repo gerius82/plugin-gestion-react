@@ -324,61 +324,63 @@ export default function FichaCumplesPadres() {
           </select>
         </div>
 
-        <div className="w-full overflow-x-auto">
-          <div className="min-w-[840px] px-2">
-            <div className="grid grid-cols-[repeat(7,minmax(110px,1fr))] gap-1 sm:gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500">
+        <div className="w-full">
+          <div className="px-2">
+            <div>
+              <div className="grid grid-cols-7 gap-1 text-center text-[9px] sm:text-xs mb-2 text-gray-500">
               {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((d) => (
                 <div key={d} className="whitespace-nowrap">
                   {d}
                 </div>
               ))}
-            </div>
-            <div className="grid grid-cols-[repeat(7,minmax(110px,1fr))] gap-1 sm:gap-2 mb-4 pb-1">
-              {Array.from({
-                length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
-              }).map((_, i) => (
-                <div key={`empty-${i}`} />
-              ))}
-              {daysInMonth.map((d) => {
-                const slots = slotsPorDia[d.fecha] || [];
-                const disponibles = slots.filter((s) => {
-                  if (!s.activo || !s.hora) return false;
-                  const key = `${s.fecha}-${s.hora}`;
-                  return !reservasPorSlot.has(key);
-                });
-                const disponiblesCount = disponibles.length;
-                const disponibleLabel = disponiblesCount > 0 ? "Disponible" : "No disponible";
-                const isSelected = diaSeleccionado === d.fecha;
-                const color =
-                  disponiblesCount === 0
-                    ? isSelected
-                      ? "bg-red-100 border-red-500 text-red-700 hover:bg-red-100 shadow-[0_0_0_1px_rgba(248,113,113,0.5)]"
-                      : "bg-red-50 border-red-500 text-red-700 hover:bg-red-100 shadow-[0_0_0_1px_rgba(248,113,113,0.35)]"
-                    : isSelected
-                    ? "bg-emerald-100 border-emerald-500 text-emerald-700 hover:bg-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.5)]"
-                    : "bg-emerald-50 border-emerald-500 text-emerald-700 hover:bg-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]";
-                const selectedCls =
-                  isSelected && disponiblesCount === 0
-                    ? "ring-2 ring-red-300"
-                    : isSelected
-                    ? "ring-2 ring-emerald-300"
-                    : "ring-1 ring-gray-200";
-                return (
-                  <button
-                    key={d.fecha}
-                    className={`rounded-lg border-2 py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[72px] sm:min-h-[64px] w-full min-w-[110px]`}
-                    onClick={() => {
-                      setDiaSeleccionado(d.fecha);
-                      setSlotSeleccionado(null);
-                    }}
-                  >
-                    <div className="text-xl sm:text-3xl font-semibold leading-none">{d.day}</div>
-                    <div className="text-[9px] sm:text-[10px] leading-tight text-center px-1">
-                      {disponibleLabel}
-                    </div>
-                  </button>
-                );
-              })}
+              </div>
+              <div className="grid grid-cols-7 gap-1 mb-4 pb-1">
+                {Array.from({
+                  length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
+                }).map((_, i) => (
+                  <div key={`empty-${i}`} />
+                ))}
+                {daysInMonth.map((d) => {
+                  const slots = slotsPorDia[d.fecha] || [];
+                  const disponibles = slots.filter((s) => {
+                    if (!s.activo || !s.hora) return false;
+                    const key = `${s.fecha}-${s.hora}`;
+                    return !reservasPorSlot.has(key);
+                  });
+                  const disponiblesCount = disponibles.length;
+                  const disponibleLabel = disponiblesCount > 0 ? "Disponible" : "No disponible";
+                  const isSelected = diaSeleccionado === d.fecha;
+                  const color =
+                    disponiblesCount === 0
+                      ? isSelected
+                        ? "bg-red-100 border-red-500 text-red-700 hover:bg-red-100 shadow-[0_0_0_1px_rgba(248,113,113,0.5)]"
+                        : "bg-red-50 border-red-500 text-red-700 hover:bg-red-100 shadow-[0_0_0_1px_rgba(248,113,113,0.35)]"
+                      : isSelected
+                      ? "bg-emerald-100 border-emerald-500 text-emerald-700 hover:bg-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.5)]"
+                      : "bg-emerald-50 border-emerald-500 text-emerald-700 hover:bg-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]";
+                  const selectedCls =
+                    isSelected && disponiblesCount === 0
+                      ? "ring-2 ring-red-300"
+                      : isSelected
+                      ? "ring-2 ring-emerald-300"
+                      : "ring-1 ring-gray-200";
+                  return (
+                    <button
+                      key={d.fecha}
+                      className={`rounded-lg border-2 py-1 text-[8px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[52px] sm:min-h-[64px] w-full`}
+                      onClick={() => {
+                        setDiaSeleccionado(d.fecha);
+                        setSlotSeleccionado(null);
+                      }}
+                    >
+                      <div className="text-base sm:text-3xl font-semibold leading-none">{d.day}</div>
+                      <div className="text-[7px] sm:text-[10px] leading-tight text-center px-1">
+                        {disponibleLabel}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
