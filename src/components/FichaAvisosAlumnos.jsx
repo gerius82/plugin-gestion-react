@@ -21,15 +21,19 @@ export default function FichaAvisosAlumnos() {
       id: "bienvenida",
       label: "Bienvenida",
       text:
-        "Hola {nombre} {apellido}! 🎉 Bienvenidos a {ciclo}. " +
-        "El cursado es {dia} a las {hora}hs. 🤖 Cualquier duda, escribinos.",
+        "Hola {nombre} {apellido}! 🎉\n" +
+        "Bienvenidos a {ciclo}.\n" +
+        "El cursado es en el turno de los {dia} de {hora}hs.\n" +
+        "🤖 Cualquier duda, escribinos.",
     },
     {
       id: "transferencia",
       label: "Datos de transferencia",
       text:
-        "Hola {nombre} {apellido}! 💳 Te paso los datos para abonar la cuota. " +
-        "Alias: plugin.robotica (German Iusto). ¡Gracias! 🙌",
+        "Hola {nombre} {apellido}! 💳\n" +
+        "Te paso los datos para abonar la cuota.\n" +
+        "Alias: plugin.robotica (German Iusto).\n" +
+        "Gracias! 🙌",
     },
   ];
   useEffect(() => {
@@ -42,7 +46,7 @@ export default function FichaAvisosAlumnos() {
   useEffect(() => {
     if (!config) return;
     cargarAlumnos();
-  }, [config, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo]);
+  }, [config, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo, ciclosDisponibles]);
 
   useEffect(() => {
     if (!config) return;
@@ -92,20 +96,27 @@ export default function FichaAvisosAlumnos() {
       }
       const data = await res.json();
 
+      const ciclosMap = new Map(
+        (Array.isArray(ciclosDisponibles) ? ciclosDisponibles : []).map((c) => [
+          c.codigo,
+          c.nombre_publico || c.codigo,
+        ])
+      );
       const listaBase = (Array.isArray(data) ? data : []).map((m) => {
         const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
         const estadoNormalizado = String(m.estado || "").toLowerCase();
         return {
           id: m.id,
           alumno_id: m.alumno_id,
-          nombre: alumno.nombre,
-          apellido: alumno.apellido,
+          nombre: (alumno.nombre || "").trimEnd(),
+          apellido: (alumno.apellido || "").trimEnd(),
           telefono: alumno.telefono,
           sede: m.sede,
           dia: m.dia,
           hora: m.hora,
           estado_normalizado: estadoNormalizado,
           ciclo_codigo: m.ciclo_codigo,
+          ciclo_nombre: ciclosMap.get(m.ciclo_codigo) || m.ciclo_codigo || "",
         };
       });
 
@@ -153,12 +164,12 @@ export default function FichaAvisosAlumnos() {
   const interpolarMensaje = (plantilla, alumno) => {
     if (!plantilla) return "";
     const reemplazos = {
-      "{nombre}": alumno?.nombre || "",
-      "{apellido}": alumno?.apellido || "",
+      "{nombre}": (alumno?.nombre || "").trim(),
+      "{apellido}": (alumno?.apellido || "").trim(),
       "{sede}": alumno?.sede || "",
       "{dia}": alumno?.dia || "",
       "{hora}": alumno?.hora || "",
-      "{ciclo}": alumno?.ciclo_codigo || "",
+      "{ciclo}": alumno?.ciclo_nombre || alumno?.ciclo_codigo || "",
     };
     return Object.keys(reemplazos).reduce(
       (acc, key) => acc.split(key).join(reemplazos[key]),
@@ -417,6 +428,7 @@ export default function FichaAvisosAlumnos() {
     </div>
   );
 }
+
 
 
 
