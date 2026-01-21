@@ -13,8 +13,25 @@ export default function FichaAvisosAlumnos() {
   const [diasDisponibles, setDiasDisponibles] = useState([]);
   const [horasDisponibles, setHorasDisponibles] = useState([]);
   const [mensaje, setMensaje] = useState("");
+  const [plantillaActiva, setPlantillaActiva] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
+  const plantillas = [
+    {
+      id: "bienvenida",
+      label: "Bienvenida",
+      text:
+        "Hola {nombre} {apellido}! 🎉 Bienvenidos a {ciclo}. " +
+        "El cursado es {dia} a las {hora}hs. 🤖 Cualquier duda, escribinos.",
+    },
+    {
+      id: "transferencia",
+      label: "Datos de transferencia",
+      text:
+        "Hola {nombre} {apellido}! 💳 Te paso los datos para abonar la cuota. " +
+        "Alias: plugin.robotica (German Iusto). ¡Gracias! 🙌",
+    },
+  ];
   useEffect(() => {
     fetch("/config.json")
       .then((res) => res.json())
@@ -261,11 +278,49 @@ export default function FichaAvisosAlumnos() {
         <label className="block font-medium mb-1 text-sm">
           Mensaje a enviar por WhatsApp:
         </label>
+        <div className="mb-2">
+          <div className="text-xs text-gray-600 mb-2">
+            Mensajes predisenados (marcar para cargar en el texto):
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {plantillas.map((p) => (
+              <label
+                key={p.id}
+                className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-full border border-gray-200 bg-gray-50"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={plantillaActiva === p.id}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setPlantillaActiva(p.id);
+                      setMensaje(p.text);
+                    } else {
+                      setPlantillaActiva("");
+                      setMensaje("");
+                    }
+                  }}
+                />
+                <span className={p.id === "transferencia" ? "whitespace-nowrap" : ""}>
+                  {p.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
         <textarea
           className="w-full border rounded p-3 text-sm min-h-[90px]"
           placeholder="Ej: Hola! Te escribimos desde Plugin para avisarte que..."
           value={mensaje}
-          onChange={(e) => setMensaje(e.target.value)}
+          onChange={(e) => {
+            const valor = e.target.value;
+            setMensaje(valor);
+            const activa = plantillas.find((p) => p.id === plantillaActiva);
+            if (activa && valor !== activa.text) {
+              setPlantillaActiva("");
+            }
+          }}
         />
         <p className="mt-1 text-xs text-gray-500">
           Podés usar {`{nombre}`}, {`{apellido}`}, {`{sede}`}, {`{dia}`}, {`{hora}`},{" "}
