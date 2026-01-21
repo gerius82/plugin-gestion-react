@@ -251,17 +251,30 @@ export default function FichaCumplesPadres() {
         ? ` (${reservaForm.menu_especial_cantidad || 0})`
         : "";
       const detalleMsg = [
-        "Solicitud cumple",
-        `Fecha: ${formatFecha(slotSeleccionado.fecha)}`,
-        `Hora: ${slotSeleccionado.hora}`,
-        `Contacto: ${reservaForm.nombre} ${reservaForm.apellido}`,
-        `Telefono: ${reservaForm.telefono}`,
-        `Cumpleanero: ${reservaForm.cumpleanero_nombre || "-"}`,
-        `Edad: ${reservaForm.cumpleanero_edad || "-"}`,
-        `Invitados: ${invitadosTxt || "-"}`,
-        `Menu especial: ${menuEspecial}${menuCantidad}`,
-        `Mensaje: ${reservaForm.mensaje || "-"}`,
+        "🎉 *Solicitud de fecha para Cumple Robótico* 🤖",
+        "",
+        "📅 *Datos del evento*",
+        `• Fecha: ${formatFecha(slotSeleccionado.fecha)}`,
+        `• Hora: ${slotSeleccionado.hora}`,
+        "",
+        "👤 *Datos de contacto*",
+        `• Nombre: ${reservaForm.nombre} ${reservaForm.apellido}`,
+        `• Teléfono: ${reservaForm.telefono}`,
+        "",
+        "🎂 *Cumpleañero/a*",
+        `• Nombre: ${reservaForm.cumpleanero_nombre || "-"}`,
+        `• Edad: ${reservaForm.cumpleanero_edad || "-"}`,
+        "",
+        "👫 *Invitados*",
+        `• Cantidad: ${invitadosTxt || "-"}`,
+        "",
+        "🍔 *Menú especial*",
+        `• ${menuEspecial}${menuCantidad}`,
+        "",
+        "💬 *Mensaje adicional*",
+        `${reservaForm.mensaje || "-"}`,
       ].join("\n");
+
       const waUrl = `https://wa.me/5493415064891?text=${encodeURIComponent(detalleMsg)}`;
       window.open(waUrl, "_blank");
     }
