@@ -22,7 +22,7 @@ export default function FichaAvisosAlumnos() {
       label: "Bienvenida",
       text:
         "Hola {nombre} {apellido}! 🎉\n" +
-        "Bienvenidos a {ciclo}.\n" +
+        "Bienvenido al {ciclo}.\n" +
         "El cursado es en el turno de los {dia} de {hora}hs.\n" +
         "🤖 Cualquier duda, escribinos.",
     },
@@ -32,7 +32,7 @@ export default function FichaAvisosAlumnos() {
       text:
         "Hola {nombre} {apellido}! 💳\n" +
         "Te paso los datos para abonar la cuota.\n" +
-        "Alias: plugin.robotica (German Iusto).\n" +
+        "Alias: plugin.robotica (a nombre de German Iusto).\n" +
         "Gracias! 🙌",
     },
   ];
