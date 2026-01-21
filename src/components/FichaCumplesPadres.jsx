@@ -284,8 +284,9 @@ export default function FichaCumplesPadres() {
   };
 
   return (
-    <div className="w-full mt-6 overflow-x-auto">
-      <div className="min-w-max px-1 sm:px-4">
+    <div className="w-full overflow-x-auto">
+      <div className="min-w-[700px]">
+      <div className="w-full mt-6 px-2 sm:px-4">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
@@ -299,7 +300,7 @@ export default function FichaCumplesPadres() {
         <div className="text-center text-sm text-emerald-700 mt-4 px-2 sm:px-4">{mensaje}</div>
       )}
 
-      <div className="mt-6 px-1 sm:px-4">
+      <div className="mt-6">
         <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
         <div className="text-xs sm:text-sm text-gray-600 mb-4">
           <div className="font-medium text-gray-700 mb-1">Como reservar</div>
@@ -323,14 +324,16 @@ export default function FichaCumplesPadres() {
           </select>
         </div>
 
-          <div className="overflow-x-auto sm:overflow-visible w-full">
-          <div className="min-w-[360px] sm:min-w-0 w-full">
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500 w-full">
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[840px]">
+            <div className="grid grid-cols-7 gap-2 text-center text-[10px] sm:text-xs mb-2 text-gray-500 whitespace-nowrap">
               {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((d) => (
-                <div key={d}>{d}</div>
+                <div key={d} className="whitespace-nowrap">
+                  {d}
+                </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4 w-full">
+            <div className="grid grid-cols-7 gap-2 mb-4">
               {Array.from({
                 length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
               }).map((_, i) => (
@@ -349,11 +352,11 @@ export default function FichaCumplesPadres() {
                 const color =
                   disponiblesCount === 0
                     ? isSelected
-                      ? "bg-red-100 border-red-300 text-red-700 hover:bg-red-100"
-                      : "bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
+                      ? "bg-red-100 border-red-500 text-red-700 hover:bg-red-100 shadow-[0_0_0_1px_rgba(248,113,113,0.5)]"
+                      : "bg-red-50 border-red-500 text-red-700 hover:bg-red-100 shadow-[0_0_0_1px_rgba(248,113,113,0.35)]"
                     : isSelected
-                    ? "bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
-                    : "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100";
+                    ? "bg-emerald-100 border-emerald-500 text-emerald-700 hover:bg-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.5)]"
+                    : "bg-emerald-50 border-emerald-500 text-emerald-700 hover:bg-emerald-100 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]";
                 const selectedCls =
                   isSelected && disponiblesCount === 0
                     ? "ring-2 ring-red-300"
@@ -363,14 +366,16 @@ export default function FichaCumplesPadres() {
                 return (
                   <button
                     key={d.fecha}
-                    className={`rounded-lg border py-1 sm:py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[54px] sm:min-h-[64px] w-full`}
+                    className={`rounded-lg border-2 py-2 text-[10px] sm:text-xs font-medium transition ${color} ${selectedCls} flex flex-col items-center justify-center min-h-[72px] sm:min-h-[64px] w-full`}
                     onClick={() => {
                       setDiaSeleccionado(d.fecha);
                       setSlotSeleccionado(null);
                     }}
                   >
-                    <div className="text-2xl sm:text-3xl font-semibold">{d.day}</div>
-                    <div className="text-[10px] whitespace-nowrap">{disponibleLabel}</div>
+                    <div className="text-xl sm:text-3xl font-semibold leading-none">{d.day}</div>
+                    <div className="text-[9px] sm:text-[10px] leading-tight text-center px-1">
+                      {disponibleLabel}
+                    </div>
                   </button>
                 );
               })}
@@ -390,13 +395,13 @@ export default function FichaCumplesPadres() {
                   slotSeleccionado.fecha === s.fecha &&
                   slotSeleccionado.hora === s.hora;
                 const horaCls = isHoraSelected
-                  ? "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-100 ring-2 ring-emerald-300"
-                  : "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 ring-1 ring-gray-200";
+                  ? "bg-emerald-100 border-emerald-500 text-emerald-800 hover:bg-emerald-100 ring-2 ring-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.5)]"
+                  : "bg-emerald-50 border-emerald-500 text-emerald-700 hover:bg-emerald-100 ring-1 ring-gray-200 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]";
                 const horaFin = addMinutes(s.hora, 150);
                 return (
                   <button
                     key={`${s.fecha}-${s.slot_num}`}
-                    className={`px-3 py-2 text-xs rounded-lg border transition ${horaCls}`}
+                    className={`px-3 py-2 text-xs rounded-lg border-2 transition ${horaCls}`}
                     onClick={() => setSlotSeleccionado(s)}
                   >
                     {s.hora} a {horaFin}hs
@@ -539,7 +544,7 @@ export default function FichaCumplesPadres() {
           </div>
         )}
       </div>
-
+      </div>
     </div>
   );
 }
