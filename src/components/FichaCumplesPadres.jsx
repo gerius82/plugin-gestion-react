@@ -284,8 +284,8 @@ export default function FichaCumplesPadres() {
   };
 
   return (
-    <div className="w-full mt-6">
-      <div className="px-2 sm:px-4">
+    <div className="w-full mt-6 overflow-x-auto">
+      <div className="min-w-max px-1 sm:px-4">
         <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
@@ -299,7 +299,7 @@ export default function FichaCumplesPadres() {
         <div className="text-center text-sm text-emerald-700 mt-4 px-2 sm:px-4">{mensaje}</div>
       )}
 
-      <div className="mt-6 px-2 sm:px-4">
+      <div className="mt-6 px-1 sm:px-4">
         <h3 className="text-lg font-semibold mb-4">Reservas (padres)</h3>
         <div className="text-xs sm:text-sm text-gray-600 mb-4">
           <div className="font-medium text-gray-700 mb-1">Como reservar</div>

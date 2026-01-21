@@ -414,7 +414,11 @@ export default function FichaCumples() {
           nos encargamos del resto.
         </p>
         <div className="mt-4 overflow-hidden">
-          <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
+          <img
+            src={IMG_CUMPLES}
+            alt="Festeja tu cumple"
+            className="w-full h-auto max-h-[520px] object-cover"
+          />
         </div>
         {mensaje && (
           <div className="text-center text-sm text-emerald-700 mt-4">{mensaje}</div>
@@ -449,7 +453,9 @@ export default function FichaCumples() {
                 <div key={d}>{d}</div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-2 w-full">
+            <div className="overflow-x-auto">
+              <div className="min-w-[1260px]">
+                <div className="grid grid-cols-[repeat(7,minmax(180px,1fr))] gap-3">
               {Array.from({
                 length: daysInMonth[0] ? (daysInMonth[0].weekDay + 6) % 7 : 0,
               }).map((_, i) => (
@@ -506,6 +512,8 @@ export default function FichaCumples() {
                   </div>
                 );
               })}
+                </div>
+              </div>
             </div>
 
             <div className="mt-6">
