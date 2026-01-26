@@ -54,6 +54,40 @@ const FormularioInscripcion = () => {
     Authorization: `Bearer ${cfg.supabaseKey}`,
   });
 
+  const buscarPersonaId = async () => {
+    if (!config) return null;
+    const nombre = (formulario.nombre || "").trim();
+    const apellido = (formulario.apellido || "").trim();
+    const telefonoRaw = (formulario.telefono || "").trim();
+    const telefono = telefonoRaw.replace(/\D/g, "");
+    const email = (formulario.email || "").trim().toLowerCase();
+    const filtrosOr = [];
+    if (telefono) {
+      filtrosOr.push(`telefono.ilike.${encodeURIComponent(`%${telefono}%`)}`);
+    }
+    if (email) {
+      filtrosOr.push(`email.ilike.${encodeURIComponent(email)}`);
+    }
+    if (nombre && apellido) {
+      filtrosOr.push(
+        `and(nombre.ilike.${encodeURIComponent(nombre)},apellido.ilike.${encodeURIComponent(apellido)})`
+      );
+    }
+    if (filtrosOr.length === 0) return null;
+    const url =
+      `${config.supabaseUrl}/rest/v1/inscripciones` +
+      `?select=id,persona_id&order=creado_en.asc&limit=1&or=(${filtrosOr.join(",")})`;
+    try {
+      const res = await fetch(url, { headers: supaHeaders(config) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const persona = Array.isArray(data) ? data[0] : null;
+      return persona?.persona_id || persona?.id || null;
+    } catch {
+      return null;
+    }
+  };
+
   const parseTurnosConfig = (cfg) => {
     if (!cfg) return {};
     if (typeof cfg === "string") {
@@ -385,54 +419,100 @@ const FormularioInscripcion = () => {
     const cursoObj = cursos.find((c) => c.id === Number(cursoSelId));
     const cursoNombre = cursoObj?.nombre || formulario.curso || "";
 
-    const payload = {
+    const personaId = await buscarPersonaId();
+    const payloadBase = {
       ...formulario,
       edad: parseInt(formulario.edad),
-      creado_en: new Date().toISOString(),
       tipo_inscripcion: cicloSel,
       curso: cursoNombre,
       turno_1: `${diaSel} ${horaSel}`,
       lista_espera: listaEspera || false,
     };
+    const payload = {
+      ...payloadBase,
+      creado_en: new Date().toISOString(),
+      persona_id: personaId || null,
+    };
 
     try {
-      const res = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...supaHeaders(config),
-          prefer: "return=representation",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const insData = await res.json();
-      const alumnoId = insData?.[0]?.id;
-
-      if (!res.ok || !alumnoId) {
-        setMensajeExito("Ocurrio un error al enviar la inscripcion. Intenta nuevamente.");
-        return;
+      let alumnoId = personaId || null;
+      if (personaId) {
+        await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?id=eq.${personaId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...supaHeaders(config),
+          },
+          body: JSON.stringify(payloadBase),
+        });
+      } else {
+        const res = await fetch(`${config.supabaseUrl}/rest/v1/inscripciones`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...supaHeaders(config),
+            prefer: "return=representation",
+          },
+          body: JSON.stringify(payload),
+        });
+        const insData = await res.json();
+        alumnoId = insData?.[0]?.id;
+        if (!res.ok || !alumnoId) {
+          setMensajeExito("Ocurrio un error al enviar la inscripcion. Intenta nuevamente.");
+          return;
+        }
       }
 
-      await fetch(`${config.supabaseUrl}/rest/v1/matriculas`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...supaHeaders(config),
-        },
-        body: JSON.stringify({
-          alumno_id: alumnoId,
-          ciclo_codigo: cicloSel,
-          curso_id: Number(cursoSelId),
-          curso_nombre: cursoNombre,
-          sede: formulario.sede,
-          dia: diaSel,
-          hora: horaSel,
-          estado: "activa",
-          lista_espera: listaEspera || false,
-          fecha_inicio: new Date().toISOString().slice(0, 10),
-        }),
-      });
+      const personaFinal = personaId || alumnoId;
+      if (!personaId && alumnoId) {
+        await fetch(`${config.supabaseUrl}/rest/v1/inscripciones?id=eq.${alumnoId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...supaHeaders(config),
+          },
+          body: JSON.stringify({ persona_id: alumnoId }),
+        });
+      }
+      const matriculaPayload = {
+        alumno_id: personaFinal,
+        ciclo_codigo: cicloSel,
+        curso_id: Number(cursoSelId),
+        curso_nombre: cursoNombre,
+        sede: formulario.sede,
+        dia: diaSel,
+        hora: horaSel,
+        estado: "activa",
+        lista_espera: listaEspera || false,
+        fecha_inicio: new Date().toISOString().slice(0, 10),
+      };
+      const resMat = await fetch(
+        `${config.supabaseUrl}/rest/v1/matriculas?select=id&alumno_id=eq.${personaFinal}` +
+          `&ciclo_codigo=eq.${encodeURIComponent(cicloSel)}` +
+          `&curso_id=eq.${Number(cursoSelId)}&order=creado_en.desc&limit=1`,
+        { headers: supaHeaders(config) }
+      );
+      const dataMat = await resMat.json();
+      const existente = Array.isArray(dataMat) ? dataMat[0] : null;
+      if (existente?.id) {
+        await fetch(`${config.supabaseUrl}/rest/v1/matriculas?id=eq.${existente.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...supaHeaders(config),
+          },
+          body: JSON.stringify(matriculaPayload),
+        });
+      } else {
+        await fetch(`${config.supabaseUrl}/rest/v1/matriculas`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...supaHeaders(config),
+          },
+          body: JSON.stringify(matriculaPayload),
+        });
+      }
 
       await emailjs.send("service_efu6ess", "template_92ev0wo", {
         nombre: formulario.nombre,

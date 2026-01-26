@@ -309,6 +309,64 @@ export default function FichaCumplesPadres() {
       <div className="mt-4 overflow-hidden">
         <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
       </div>
+      <div className="mt-6 px-2 sm:px-4 text-sm text-gray-700 space-y-4">
+        <div className="text-lg font-semibold text-gray-900">
+          🎉 Cumpleaños en Plugin – Información para familias 🤖🎂
+        </div>
+        <p>
+          En Plugin celebramos cumpleaños distintos, llenos de juego, robótica y diversión. A
+          continuación te contamos todos los detalles para que tengas claridad antes de contratar:
+        </p>
+        <div className="space-y-3">
+          <div>
+            <div className="font-semibold">⏱️ Duración</div>
+            <div>2 horas y media de actividades guiadas, juegos y festejo.</div>
+          </div>
+          <div>
+            <div className="font-semibold">👧🧒 Cantidad de niños</div>
+            <div>Máximo 12 chicos en total: el cumpleañero/a + 11 invitados.</div>
+          </div>
+          <div>
+            <div className="font-semibold">🎈 Edad del cumpleañero</div>
+            <div>Cumpleaños pensados para niños y niñas de 7 a 12 años.</div>
+          </div>
+          <div>
+            <div className="font-semibold">👨‍👩‍👦 Presencia de adultos</div>
+            <div>Participan solo los chicos invitados.</div>
+            <div>Los únicos adultos que pueden permanecer durante el cumpleaños son los padres del cumpleañero.</div>
+          </div>
+          <div>
+            <div className="font-semibold">🍽️ Menú para los chicos</div>
+            <div>El menú se elige previamente por los padres y puede incluir:</div>
+            <ul className="list-disc list-inside">
+              <li>Patitas de pollo</li>
+              <li>Pizzetines</li>
+              <li>Sanguchitos de miga</li>
+              <li>Empanadas</li>
+              <li>Snacks</li>
+            </ul>
+            <div>👉 Opción para celíacos disponible, avisando con anticipación.</div>
+          </div>
+          <div>
+            <div className="font-semibold">🥤 Bebidas</div>
+            <div>Bebida libre durante todo el cumple, provista por el local:</div>
+            <div>Coca-Cola · Sprite · Fanta</div>
+          </div>
+          <div>
+            <div className="font-semibold">🎂 Torta</div>
+            <div>La torta la trae el cumpleañero/a.</div>
+          </div>
+          <div>
+            <div className="font-semibold">🎁 Piñata</div>
+            <div>El relleno de la piñata es opcional.</div>
+            <div>Puede traerlo el cumpleañero/a o bien no incluirse.</div>
+          </div>
+          <div>
+            <div className="font-semibold">🚑 Seguridad</div>
+            <div>El espacio cuenta con seguro médico de Urgencias para mayor tranquilidad de las familias.</div>
+          </div>
+        </div>
+      </div>
       {mensaje && (
         <div className="text-center text-sm text-emerald-700 mt-4 px-2 sm:px-4">{mensaje}</div>
       )}
@@ -323,18 +381,36 @@ export default function FichaCumplesPadres() {
           <div>4) Envía la solicitud para que nos contactemos.</div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
-          <label className="text-sm font-medium">Mes:</label>
-          <select
-            className="border rounded px-3 py-2 text-sm w-full sm:w-auto"
-            value={mesSeleccionado}
-            onChange={(e) => setMesSeleccionado(e.target.value)}
-          >
-            {mesesDisponibles.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+          <span className="text-sm font-medium">Mes:</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="h-9 w-9 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50 transition shadow-md"
+              onClick={() => {
+                const idx = mesesDisponibles.findIndex((m) => m.value === mesSeleccionado);
+                if (idx > 0) setMesSeleccionado(mesesDisponibles[idx - 1].value);
+              }}
+              aria-label="Mes anterior"
+            >
+              ‹
+            </button>
+            <div className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-800 min-w-[160px] text-center">
+              {mesesDisponibles.find((m) => m.value === mesSeleccionado)?.label || "Mes"}
+            </div>
+            <button
+              type="button"
+              className="h-9 w-9 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50 transition shadow-md"
+              onClick={() => {
+                const idx = mesesDisponibles.findIndex((m) => m.value === mesSeleccionado);
+                if (idx >= 0 && idx < mesesDisponibles.length - 1) {
+                  setMesSeleccionado(mesesDisponibles[idx + 1].value);
+                }
+              }}
+              aria-label="Mes siguiente"
+            >
+              ›
+            </button>
+          </div>
         </div>
 
         <div className="w-full">
@@ -403,28 +479,36 @@ export default function FichaCumplesPadres() {
             <div className="text-sm font-semibold mb-2">
               Horarios disponibles para {formatFecha(diaSeleccionado)}
             </div>
-            <div className="flex gap-2 flex-nowrap overflow-x-auto px-2 py-1">
-              {slotsDisponibles.map((s) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {slotsDisponibles.map((s, idx) => {
                 const isHoraSelected =
                   slotSeleccionado &&
                   slotSeleccionado.fecha === s.fecha &&
                   slotSeleccionado.hora === s.hora;
                 const horaCls = isHoraSelected
-                  ? "bg-emerald-100 border-emerald-500 text-emerald-800 hover:bg-emerald-100 ring-2 ring-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.5)]"
-                  : "bg-emerald-50 border-emerald-500 text-emerald-700 hover:bg-emerald-100 ring-1 ring-gray-200 shadow-[0_0_0_1px_rgba(16,185,129,0.35)]";
+                  ? "bg-emerald-100 border-emerald-500 text-emerald-800 ring-2 ring-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.5)] hover:bg-emerald-100"
+                  : "bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50 ring-1 ring-gray-200 shadow-sm";
                 const horaFin = addMinutes(s.hora, 150);
                 return (
                   <button
                     key={`${s.fecha}-${s.slot_num}`}
-                    className={`px-3 py-2 text-xs rounded-lg border-2 transition ${horaCls}`}
+                    className={`w-full rounded-xl border-2 px-4 py-4 text-left transition ${horaCls}`}
                     onClick={() => setSlotSeleccionado(s)}
                   >
-                    {s.hora} a {horaFin}hs
+                    <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                      Turno {idx + 1}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-lg font-semibold">
+                      <span>🕒</span>
+                      <span>
+                        {s.hora} a {horaFin}hs
+                      </span>
+                    </div>
                   </button>
                 );
               })}
               {slotsDisponibles.length === 0 && (
-                <span className="text-xs text-gray-500">No hay horarios disponibles.</span>
+                <div className="text-xs text-gray-500">No hay horarios disponibles.</div>
               )}
             </div>
           </div>
