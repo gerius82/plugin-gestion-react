@@ -88,17 +88,40 @@ const FormularioInscripcion = () => {
     }
   };
 
+  const normalizeTurnosConfig = (cfg) => {
+    if (!cfg) return {};
+    if (Array.isArray(cfg)) {
+      const out = {};
+      cfg.forEach((item) => {
+        if (!item) return;
+        const sede = item.sede;
+        const dia = item.dia;
+        let horarios = item.horarios || item.horas || item.turnos || item.horario;
+        if (!sede || !dia || !horarios) return;
+        if (!Array.isArray(horarios)) horarios = [horarios];
+        out[sede] = out[sede] || {};
+        out[sede][dia] = out[sede][dia] || [];
+        horarios.forEach((h) => {
+          if (h) out[sede][dia].push(h);
+        });
+      });
+      return out;
+    }
+    if (typeof cfg === "object") return cfg;
+    return {};
+  };
+
   const parseTurnosConfig = (cfg) => {
     if (!cfg) return {};
     if (typeof cfg === "string") {
       try {
-        return JSON.parse(cfg);
+        return normalizeTurnosConfig(JSON.parse(cfg));
       } catch (error) {
         console.error("turnos_config invalido", error);
         return {};
       }
     }
-    return cfg;
+    return normalizeTurnosConfig(cfg);
   };
 
   const limpiarFormulario = () => {
@@ -274,6 +297,11 @@ const FormularioInscripcion = () => {
     return { cupo, anotados, listaEspera };
   };
 
+  const inicioDeRango = (valor) => {
+    const match = String(valor || "").match(/(\d{1,2}:\d{2})/);
+    return match ? match[1].padStart(5, "0") : String(valor || "");
+  };
+
   const cargarTurnosConEstado = async (sede) => {
     if (!config || !sede || !cicloSel) return;
     setCargandoTurnos(true);
@@ -305,20 +333,35 @@ const FormularioInscripcion = () => {
 
       const counts = new Map();
       (Array.isArray(mats) ? mats : []).forEach((m) => {
-        const key = `${m.dia}||${m.hora}`;
+        const key = `${m.dia}||${inicioDeRango(m.hora)}`;
         counts.set(key, (counts.get(key) || 0) + 1);
       });
 
-      const cards = (Array.isArray(turnos) ? turnos : []).map((t) => {
-        const key = `${t.dia}||${t.hora}`;
+      const cupos = new Map();
+      (Array.isArray(turnos) ? turnos : []).forEach((t) => {
+        const key = `${t.dia}||${inicioDeRango(t.hora)}`;
+        cupos.set(key, Number(t.cupo_maximo));
+      });
+
+      const turnosPorSede = turnosConfig?.[sede] || {};
+      const baseTurnos = [];
+      Object.entries(turnosPorSede).forEach(([dia, horarios]) => {
+        const lista = Array.isArray(horarios) ? horarios : [];
+        lista.forEach((hora) => {
+          if (hora) baseTurnos.push({ dia, hora });
+        });
+      });
+
+      const cards = baseTurnos.map((t) => {
+        const key = `${t.dia}||${inicioDeRango(t.hora)}`;
         const anotados = counts.get(key) || 0;
-        const cupo = Number(t.cupo_maximo);
+        const cupo = cupos.get(key);
         const listaEspera = Number.isFinite(cupo) ? anotados >= cupo : false;
 
         return {
           dia: t.dia,
           hora: t.hora,
-          cupo,
+          cupo: Number.isFinite(cupo) ? cupo : null,
           anotados,
           listaEspera,
         };
@@ -714,8 +757,8 @@ const FormularioInscripcion = () => {
                     onClick={() => seleccionarCurso(c)}
                     className={`overflow-hidden rounded-xl border shadow-sm text-left transition ${
                       seleccionado
-                        ? "border-green-300 ring-2 ring-green-200 bg-white hover:bg-white"
-                        : "border-gray-200 hover:shadow-md bg-white"
+                        ? "border-green-400 ring-2 ring-green-300 bg-white hover:bg-white"
+                        : "border-gray-200 hover:shadow-md bg-white hover:bg-gray-50"
                     }`}
                   >
                     <img

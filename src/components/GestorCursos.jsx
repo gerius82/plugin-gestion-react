@@ -1071,7 +1071,7 @@ export default function GestorCursos() {
             <h3 className="font-semibold text-sm">Sedes, días y horarios</h3>
 
             {/* Sedes */}
-            <div className="flex items-center gap-6 mb-2 whitespace-nowrap">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 mb-2 whitespace-nowrap">
               {SEDES.map((s) => (
                 <label key={s.id} className="inline-flex items-center gap-1 text-sm">
                   <input
@@ -1249,24 +1249,24 @@ export default function GestorCursos() {
             {cursosFiltrados.map((c) => (
               <div
                 key={c.id}
-                className="bg-white border rounded-xl p-3 shadow-sm flex gap-3 items-start"
+                className="bg-white border rounded-xl p-3 shadow-sm flex flex-col sm:flex-row gap-3 items-start"
               >
                 {/* Imagen */}
                 {c.imagen_url ? (
                   <img
                     src={c.imagen_url}
                     alt={c.nombre}
-                    className="w-24 h-24 rounded-lg object-cover border"
+                    className="w-full sm:w-24 h-40 sm:h-24 rounded-lg object-cover border"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-lg border flex items-center justify-center text-xs text-gray-400">
+                  <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg border flex items-center justify-center text-xs text-gray-400">
                     Sin imagen
                   </div>
                 )}
 
                 {/* Contenido a la derecha */}
                 <div className="flex-1 space-y-1">
-                  <div className="flex justify-between items-start gap-2">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                     <div>
                       <h3 className="font-semibold text-sm">{c.nombre}</h3>
 
@@ -1287,7 +1287,7 @@ export default function GestorCursos() {
                     </div>
 
                     {/* Precios */}
-                    <div className="text-right text-xs text-gray-700">
+                    <div className="text-left sm:text-right text-xs text-gray-700 sm:ml-2">
                       {c.precio_curso != null && (
                         <p>
                           <span className="font-semibold">Cuota mensual:</span>{" "}
@@ -1317,8 +1317,24 @@ export default function GestorCursos() {
                   </div>
 
                   {/* Estado + Acciones */}
-                  <div className="flex items-center justify-between mt-2">
-                    <label className="inline-flex items-center gap-1 text-xs cursor-pointer">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-3 gap-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <button
+                        onClick={() => abrirModalEdicion(c)}
+                        className="text-blue-600 hover:text-blue-800 hover:bg-white"
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        onClick={() => duplicarCurso(c)}
+                        className="text-gray-600 hover:text-gray-800 hover:bg-white"
+                      >
+                        Duplicar
+                      </button>
+                    </div>
+
+                    <label className="inline-flex items-center gap-1 text-xs cursor-pointer sm:justify-end">
                       <input
                         type="checkbox"
                         checked={c.activo}
@@ -1326,33 +1342,16 @@ export default function GestorCursos() {
                       />
                       <span>{c.activo ? "Habilitado" : "Deshabilitado"}</span>
                     </label>
-
-                      <div className="flex items-center gap-2 text-xs">
-                            <button
-                            onClick={() => abrirModalEdicion(c)}
-                            className="text-blue-600 hover:text-blue-800 hover:bg-white"
-                            >
-                            Editar
-                            </button>
-
-                            <button
-                            onClick={() => duplicarCurso(c)}
-                            className="text-gray-600 hover:text-gray-800 hover:bg-white"
-                            >
-                            Duplicar
-                            </button>
-
-                            <button
-                            onClick={() => handleEliminarCurso(c)}
-                            className="text-red-600 hover:text-red-800 hover:bg-white"
-                            >
-                            Eliminar
-                            </button>
-                        </div>
-
+                    <button
+                      onClick={() => handleEliminarCurso(c)}
+                      className="text-red-600 hover:text-red-800 hover:bg-white text-xs"
+                    >
+                      Eliminar
+                    </button>
                   </div>
+
                 </div>
-              </div>
+               </div>
             ))}
           </div>
         )}
