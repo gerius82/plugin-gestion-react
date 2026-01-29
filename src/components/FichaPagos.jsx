@@ -42,6 +42,7 @@ export default function FichaPagos() {
   const [grupoIntegrantes, setGrupoIntegrantes] = useState([]);
   const [grupoDescuento, setGrupoDescuento] = useState(null);
   const [pagarGrupo, setPagarGrupo] = useState(false);
+  const [descuentoExtraPct, setDescuentoExtraPct] = useState("");
   const [cargando, setCargando] = useState(true);
 
   const matriculaSel = matriculas.find((m) => String(m.id) === String(matriculaId));
@@ -90,6 +91,7 @@ export default function FichaPagos() {
     setPagaInscripcion(false);
     setMedioPago("transferencia");
     setPagarGrupo(false);
+    setDescuentoExtraPct("");
   }, [matriculaId]);
 
   useEffect(() => {
@@ -161,7 +163,11 @@ export default function FichaPagos() {
     let monto = 0;
     if (pagaMes) monto += Number(curso.precio_curso || 0) * factorPromo;
     if (pagaInscripcion) monto += Number(curso.precio_inscripcion || 0) * factorPromo;
-    return monto * cantidad;
+    const subtotal = monto * cantidad;
+    const descPct = Number.isFinite(Number(descuentoExtraPct))
+      ? Math.min(100, Math.max(0, Number(descuentoExtraPct)))
+      : 0;
+    return Math.max(0, subtotal * (1 - descPct / 100));
   };
 
   const handleSubmit = async (e) => {
@@ -214,6 +220,7 @@ export default function FichaPagos() {
       setPagaInscripcion(false);
       setMes("");
       setMedioPago("efectivo");
+      setDescuentoExtraPct("");
     }, 2000);
   };
 
@@ -331,6 +338,19 @@ export default function FichaPagos() {
                   />
                   <span className="font-medium text-gray-800">Paga inscripción</span>
                 </label>
+
+                <div>
+                  <label className="block font-medium mb-1">Descuento extra (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="w-full border border-gray-300 rounded p-2"
+                    value={descuentoExtraPct}
+                    onChange={(e) => setDescuentoExtraPct(e.target.value)}
+                    placeholder="Ej: 5"
+                  />
+                </div>
 
                 <div>
                   <label className="block font-medium mb-1">Medio de pago:</label>

@@ -286,7 +286,7 @@ export default function FichaCumplesPadres() {
       mensaje: "",
       cumpleanero_nombre: "",
       cumpleanero_edad: "",
-      invitados: Array.from({ length: 11 }, () => ""),
+      invitados: [],
       menu_especial: false,
       menu_especial_cantidad: "",
     });
@@ -324,7 +324,7 @@ export default function FichaCumplesPadres() {
           </div>
           <div>
             <div className="font-semibold">👧🧒 Cantidad de niños</div>
-            <div>Máximo 12 chicos en total: el cumpleañero/a + 11 invitados.</div>
+            <div>Máximo 15 chicos en total: el cumpleañero/a + 14 invitados.</div>
           </div>
           <div>
             <div className="font-semibold">🎈 Edad del cumpleañero</div>
@@ -340,9 +340,7 @@ export default function FichaCumplesPadres() {
             <div>El menú se elige previamente por los padres y puede incluir:</div>
             <ul className="list-disc list-inside">
               <li>Patitas de pollo</li>
-              <li>Pizzetines</li>
-              <li>Sanguchitos de miga</li>
-              <li>Empanadas</li>
+              <li>Panchos</li>
               <li>Snacks</li>
             </ul>
             <div>👉 Opción para celíacos disponible, avisando con anticipación.</div>
@@ -358,8 +356,8 @@ export default function FichaCumplesPadres() {
           </div>
           <div>
             <div className="font-semibold">🎁 Piñata</div>
-            <div>El relleno de la piñata es opcional.</div>
-            <div>Puede traerlo el cumpleañero/a o bien no incluirse.</div>
+            <div>El relleno es entregado por el salón (bolsa de caramelos).</div>
+            <div>La familia puede agregar contenido si así lo desea.</div>
           </div>
           <div>
             <div className="font-semibold">🚑 Seguridad</div>
@@ -521,7 +519,7 @@ export default function FichaCumplesPadres() {
               {addMinutes(slotSeleccionado.hora, 150)}hs
             </div>
             <div className="text-xs text-gray-500 mb-3">
-              Completa los datos de contacto y del cumpleanero para enviar la solicitud.
+              Completa los datos de contacto y del cumpleañero para enviar la solicitud.
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -541,7 +539,7 @@ export default function FichaCumplesPadres() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium">Telefono (madre/padre)</label>
+                <label className="text-xs font-medium">Teléfono de contacto (revisar que sea correcto)</label>
                 <input
                   className="w-full border rounded px-3 py-2 text-sm"
                   value={reservaForm.telefono}
@@ -549,7 +547,7 @@ export default function FichaCumplesPadres() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium">Nombre del cumpleanero</label>
+                <label className="text-xs font-medium">Nombre del cumpleañero</label>
                 <input
                   className="w-full border rounded px-3 py-2 text-sm"
                   value={reservaForm.cumpleanero_nombre}
@@ -569,26 +567,6 @@ export default function FichaCumplesPadres() {
                     setReservaForm((p) => ({ ...p, cumpleanero_edad: e.target.value }))
                   }
                 />
-              </div>
-              <div className="md:col-span-2">
-                  <label className="text-xs font-medium">Nombres de invitados (11)</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                  {reservaForm.invitados.map((inv, idx) => (
-                    <input
-                      key={`inv-${idx}`}
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      placeholder={`Invitado ${idx + 1}`}
-                      value={inv}
-                      onChange={(e) =>
-                        setReservaForm((p) => {
-                          const nuevos = [...p.invitados];
-                          nuevos[idx] = e.target.value;
-                          return { ...p, invitados: nuevos };
-                        })
-                      }
-                    />
-                  ))}
-                </div>
               </div>
               <div className="md:col-span-2 flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-[11px] sm:text-xs font-medium whitespace-nowrap leading-none">
