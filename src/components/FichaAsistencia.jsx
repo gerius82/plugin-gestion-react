@@ -177,13 +177,22 @@ const FichaAsistencia = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto mt-8 p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-3xl font-bold text-center mb-6">Registro de Asistencia</h2>
-
-      {cargando ? (
-        <p className="text-center">Cargando datos...</p>
-      ) : (
-        <>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="max-w-4xl mx-auto flex items-center justify-between mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-center flex-1">Registro de Asistencia</h2>
+        <button
+          onClick={() => navigate(from)}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
+      </div>
+      <div className="bg-white rounded-xl shadow-lg p-6 max-w-4xl mx-auto">
+        {cargando ? (
+          <p className="text-center">Cargando datos...</p>
+        ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {/* Selector de ciclo / tipo de inscripción */}
             <div>
@@ -237,7 +246,6 @@ const FichaAsistencia = () => {
 
           <div className="flex gap-4 justify-center mb-6">
             <button onClick={handleBuscar} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Buscar alumnos</button>
-            <button onClick={() => navigate(from)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition">← Volver</button>
           </div>
 
           {mensaje && (
@@ -327,6 +335,7 @@ const FichaAsistencia = () => {
           )}
         </>
       )}
+      </div>
     </div>
   );
 };

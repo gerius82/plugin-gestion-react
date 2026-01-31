@@ -1062,12 +1062,23 @@ function PanelGastos() {
       <div className="flex flex-col md:flex-row items-stretch md:items-end gap-3">
         <div className="flex-1">
           <label className="block text-sm font-semibold mb-1">Mes</label>
-          <input
-            type="month"
+          <select
+            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-300 outline-none"
             value={mes}
             onChange={(e) => setMes(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-300 outline-none"
-          />
+          >
+            {Array.from({ length: 12 }).map((_, idx) => {
+              const d = new Date();
+              d.setMonth(d.getMonth() - idx);
+              const value = d.toISOString().slice(0, 7);
+              const label = `${monthNameEs(value)} ${value.slice(0, 4)}`;
+              return (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
         </div>
       </div>
 
@@ -1092,12 +1103,82 @@ function PanelGastos() {
         </div>
       </div>
 
+      <div className="border rounded-xl p-3 bg-white">
+        <div className="text-xs text-gray-600">Pagos realizados</div>
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-semibold">
+            {Number(
+              ingresos.hipotetico > 0 ? (ingresos.real / ingresos.hipotetico) * 100 : 0
+            ).toFixed(1)}%
+          </div>
+          <div className="text-xs text-gray-500">
+            ${Number(ingresos.real || 0).toLocaleString("es-AR")} / ${Number(ingresos.hipotetico || 0).toLocaleString("es-AR")}
+          </div>
+        </div>
+        <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600"
+            style={{
+              width: `${Math.min(
+                100,
+                Math.max(0, ingresos.hipotetico > 0 ? (ingresos.real / ingresos.hipotetico) * 100 : 0)
+              )}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="border rounded-xl p-3 bg-white">
+        <div className="text-xs text-gray-600">Punto de equilibrio</div>
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-semibold">
+            {ingresos.cuotaBase > 0 ? Math.ceil((totales.total || 0) / ingresos.cuotaBase) : 0} alumnos
+          </div>
+          <div className="text-xs text-gray-500">
+            Cuota normal ${Number(ingresos.cuotaBase || 0).toLocaleString("es-AR")}
+          </div>
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          Gastos ${Number(totales.total || 0).toLocaleString("es-AR")}
+        </div>
+        <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-blue-400 to-blue-600"
+            style={{
+              width: `${Math.min(
+                100,
+                Math.max(
+                  0,
+                  ingresos.hipotetico > 0
+                    ? ((totales.total || 0) / ingresos.hipotetico) * 100
+                    : 0
+                )
+              )}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="border rounded-xl p-3 bg-white">
+        <label className="block text-xs font-semibold mb-1">Ciclo para sueldos</label>
+        <select
+          className="w-full border rounded px-3 py-2 text-sm"
+          value={cicloSel}
+          onChange={(e) => setCicloSel(e.target.value)}
+        >
+          <option value="">Seleccionar</option>
+          {ciclos.map((c) => (
+            <option key={c.codigo} value={c.codigo}>{c.nombre_publico || c.codigo}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="border rounded-xl p-4 space-y-3">
         <div className="text-sm font-semibold">Detalle del mes</div>
         {errorGastos && <div className="text-sm text-red-600">{errorGastos}</div>}
         {cargando ? (
           <div className="text-sm text-gray-500">Cargando...</div>
-        ) : gastos.length === 0 ? (
+        ) : gastos.length === 0 && detalleSueldos.length === 0 && gastosFijos.length === 0 ? (
           <div className="text-sm text-gray-500">Sin gastos cargados.</div>
         ) : (
           <div className="space-y-2">

@@ -1317,24 +1317,8 @@ export default function GestorCursos() {
                   </div>
 
                   {/* Estado + Acciones */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-3 gap-2">
-                    <div className="flex items-center gap-2 text-xs">
-                      <button
-                        onClick={() => abrirModalEdicion(c)}
-                        className="text-blue-600 hover:text-blue-800 hover:bg-white"
-                      >
-                        Editar
-                      </button>
-
-                      <button
-                        onClick={() => duplicarCurso(c)}
-                        className="text-gray-600 hover:text-gray-800 hover:bg-white"
-                      >
-                        Duplicar
-                      </button>
-                    </div>
-
-                    <label className="inline-flex items-center gap-1 text-xs cursor-pointer sm:justify-end">
+                  <div className="flex items-center justify-end mt-3 gap-3 text-xs">
+                    <label className="inline-flex items-center gap-1 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={c.activo}
@@ -1342,9 +1326,24 @@ export default function GestorCursos() {
                       />
                       <span>{c.activo ? "Habilitado" : "Deshabilitado"}</span>
                     </label>
+
+                    <button
+                      onClick={() => abrirModalEdicion(c)}
+                      className="text-blue-600 hover:text-blue-800 hover:bg-white"
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      onClick={() => duplicarCurso(c)}
+                      className="text-gray-600 hover:text-gray-800 hover:bg-white"
+                    >
+                      Duplicar
+                    </button>
+
                     <button
                       onClick={() => handleEliminarCurso(c)}
-                      className="text-red-600 hover:text-red-800 hover:bg-white text-xs"
+                      className="text-red-600 hover:text-red-800 hover:bg-white"
                     >
                       Eliminar
                     </button>

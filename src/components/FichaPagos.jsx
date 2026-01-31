@@ -35,6 +35,7 @@ export default function FichaPagos() {
   const [matriculaId, setMatriculaId] = useState("");
   const [pagaMes, setPagaMes] = useState(false);
   const [pagaInscripcion, setPagaInscripcion] = useState(false);
+  const [pagaProporcional, setPagaProporcional] = useState(false);
   const [mes, setMes] = useState("");
   const [medioPago, setMedioPago] = useState("efectivo");
   const [mensaje, setMensaje] = useState("");
@@ -62,7 +63,7 @@ export default function FichaPagos() {
             headers: toHeaders(cfg),
           }),
           fetch(
-            `${cfg.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,curso_id,estado,inscripciones(nombre,apellido,telefono,tiene_promo)&estado=eq.activa`,
+            `${cfg.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,curso_id,estado,dia,hora,creado_en,inscripciones(nombre,apellido,telefono,tiene_promo)&estado=eq.activa`,
             { headers: toHeaders(cfg) }
           ),
         ]);
@@ -91,8 +92,42 @@ export default function FichaPagos() {
     setPagaInscripcion(false);
     setMedioPago("transferencia");
     setPagarGrupo(false);
+    setPagaProporcional(false);
     setDescuentoExtraPct("");
   }, [matriculaId]);
+
+  const normalizarDia = (v) =>
+    String(v || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const weekdayIndex = (dia) => {
+    const map = {
+      domingo: 0,
+      lunes: 1,
+      martes: 2,
+      miercoles: 3,
+      jueves: 4,
+      viernes: 5,
+      sabado: 6,
+    };
+    return map[normalizarDia(dia)] ?? null;
+  };
+
+  const contarClasesEnMes = (anio, mesIndex, diaIndex, desdeFecha) => {
+    if (diaIndex == null) return { total: 0, restantes: 0 };
+    const totalDias = new Date(anio, mesIndex + 1, 0).getDate();
+    let total = 0;
+    let restantes = 0;
+    for (let d = 1; d <= totalDias; d += 1) {
+      const fecha = new Date(anio, mesIndex, d);
+      if (fecha.getDay() !== diaIndex) continue;
+      total += 1;
+      if (desdeFecha && fecha > desdeFecha) restantes += 1;
+    }
+    return { total, restantes };
+  };
 
   useEffect(() => {
     const cargarGrupo = async () => {
@@ -161,7 +196,23 @@ export default function FichaPagos() {
         : 1;
     const cantidad = grupoIntegrantes.length >= 2 && pagarGrupo ? grupoIntegrantes.length : 1;
     let monto = 0;
-    if (pagaMes) monto += Number(curso.precio_curso || 0) * factorPromo;
+    if (pagaMes) {
+      let baseMes = Number(curso.precio_curso || 0) * factorPromo;
+      if (pagaProporcional && matriculaSel?.creado_en && matriculaSel?.dia) {
+        const fechaAlta = new Date(matriculaSel.creado_en);
+        const diaIdx = weekdayIndex(matriculaSel.dia);
+        const { total, restantes } = contarClasesEnMes(
+          fechaAlta.getFullYear(),
+          fechaAlta.getMonth(),
+          diaIdx,
+          fechaAlta
+        );
+        if (total > 0) {
+          baseMes = baseMes * (restantes / total);
+        }
+      }
+      monto += baseMes;
+    }
     if (pagaInscripcion) monto += Number(curso.precio_inscripcion || 0) * factorPromo;
     const subtotal = monto * cantidad;
     const descPct = Number.isFinite(Number(descuentoExtraPct))
@@ -169,6 +220,23 @@ export default function FichaPagos() {
       : 0;
     return Math.max(0, subtotal * (1 - descPct / 100));
   };
+
+  const detalleProporcional = useMemo(() => {
+    if (!matriculaSel?.creado_en || !matriculaSel?.dia || !pagaMes || !mes) return null;
+    const fechaAlta = new Date(matriculaSel.creado_en);
+    const mesAlta = fechaAlta.getMonth();
+    const mesSeleccionado = MESES.findIndex((m) => m === mes);
+    if (mesSeleccionado < 0 || mesSeleccionado !== mesAlta) return null;
+    const diaIdx = weekdayIndex(matriculaSel.dia);
+    const { total, restantes } = contarClasesEnMes(
+      fechaAlta.getFullYear(),
+      fechaAlta.getMonth(),
+      diaIdx,
+      fechaAlta
+    );
+    if (!total) return null;
+    return { total, restantes };
+  }, [matriculaSel?.creado_en, matriculaSel?.dia, pagaMes, mes]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -225,13 +293,23 @@ export default function FichaPagos() {
   };
 
   return (
-    <div className="max-w-xl mx-auto mt-10 p-6 bg-white rounded-xl shadow-md">
-      <h2 className="text-3xl font-bold text-center mb-6">Ficha de Pagos</h2>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="max-w-xl mx-auto flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-center flex-1">Ficha de Pagos</h2>
+        <button
+          onClick={() => navigate(from)}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
+      </div>
 
-      {cargando ? (
-        <p className="text-center text-gray-600">Cargando...</p>
-      ) : (
-        <>
+      <div className="bg-white rounded-xl shadow-md p-6 max-w-xl mx-auto">
+        {cargando ? (
+          <p className="text-center text-gray-600">Cargando...</p>
+        ) : (
+          <>
           <div className="mb-4">
             <label className="block font-semibold mb-1">Seleccionar alumno / curso:</label>
             <select
@@ -329,6 +407,24 @@ export default function FichaPagos() {
                   </select>
                 )}
 
+                {pagaMes && (
+                  <label className="flex items-center gap-3 p-2 bg-gray-50 rounded shadow-sm border hover:bg-gray-100 transition cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                      checked={pagaProporcional}
+                      onChange={(e) => setPagaProporcional(e.target.checked)}
+                      disabled={!matriculaSel?.dia || !matriculaSel?.creado_en || !detalleProporcional}
+                    />
+                    <span className="font-medium text-gray-800">Paga proporcional</span>
+                  </label>
+                )}
+                {pagaMes && detalleProporcional && (
+                  <div className="text-xs text-gray-500">
+                    Clases restantes: {detalleProporcional.restantes} de {detalleProporcional.total}
+                  </div>
+                )}
+
                 <label className="flex items-center gap-3 p-3 bg-gray-50 rounded shadow-sm border border-gray-200 hover:bg-gray-100 transition cursor-pointer">
                   <input
                     type="checkbox"
@@ -398,16 +494,10 @@ export default function FichaPagos() {
             </>
           )}
         </>
-      )}
-
-      <div className="text-center mt-6">
-        <button
-          onClick={() => navigate(from)}
-          className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-6 rounded shadow-md transition hover:scale-105"
-        >
-          ← Volver al menú
-        </button>
+        )}
       </div>
     </div>
   );
 }
+
+
