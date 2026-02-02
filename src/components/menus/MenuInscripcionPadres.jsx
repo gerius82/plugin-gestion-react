@@ -31,7 +31,7 @@ function getRutaFormulario(codigo) {
     return "/formulario-verano?origen=padres";
   }
   // Cualquier otro ciclo va al formulario regular
-  return `/formulario-inscripcion?origen=padres&ciclo=${encodeURIComponent(
+  return `/formulario?origen=padres&ciclo=${encodeURIComponent(
     codigo
   )}`;
 }
@@ -74,8 +74,12 @@ export default function MenuInscripcionPadres() {
         const data = await resCiclos.json();
         const lista = Array.isArray(data) ? data : [];
 
-        // Orden: primero por "orden", luego por fecha_inicio
+        // Orden: primero CICLO_2026, luego por "orden", luego por fecha_inicio
         lista.sort((a, b) => {
+          const prefA = a.codigo === "CICLO_2026" ? 0 : 1;
+          const prefB = b.codigo === "CICLO_2026" ? 0 : 1;
+          if (prefA !== prefB) return prefA - prefB;
+
           const ordA = a.orden ?? 9999;
           const ordB = b.orden ?? 9999;
           if (ordA !== ordB) return ordA - ordB;

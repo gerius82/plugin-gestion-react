@@ -13,6 +13,7 @@ const FormularioInscripcion = () => {
   const [searchParams] = useSearchParams();
   const origen = searchParams.get("origen");
   const from = searchParams.get("from");
+  const cicloParam = searchParams.get("ciclo");
 
   const rutaSalida =
     origen === "gestion"
@@ -182,10 +183,13 @@ const FormularioInscripcion = () => {
       const dataCiclos = await resCiclos.json();
       const lista = Array.isArray(dataCiclos) ? dataCiclos : [];
       setCiclos(lista);
-      const activo = lista.find((c) => c.activo) || lista[0];
-      setCicloSel(activo?.codigo || "");
+      const preferParam = cicloParam && lista.some((c) => c.codigo === cicloParam) ? cicloParam : "";
+      const prefer2026 = lista.find((c) => c.codigo === "CICLO_2026")?.codigo;
+      const activo = lista.find((c) => c.activo)?.codigo;
+      const elegido = preferParam || prefer2026 || activo || lista[0]?.codigo || "";
+      if (!cicloSel) setCicloSel(elegido);
     })();
-  }, [config]);
+  }, [config, cicloParam, cicloSel]);
 
   useEffect(() => {
     if (!config || !cicloSel) {
@@ -199,11 +203,33 @@ const FormularioInscripcion = () => {
       const resCursos = await fetch(
         `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,ciclo,turnos_config,imagen_url&ciclo=eq.${encodeURIComponent(
           cicloSel
-        )}&activo=eq.true&order=nombre.asc`,
+        )}&activo=eq.true`,
         { headers: supaHeaders(config) }
       );
       const dataCursos = await resCursos.json();
       const lista = Array.isArray(dataCursos) ? dataCursos : [];
+      const normalizeNombre = (valor = "") =>
+        String(valor || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+      const ordenPreferido = [
+        "robotica basica",
+        "robotica avanzada",
+        "programacion",
+        "arduino",
+      ];
+      const rankCurso = (nombre = "") => {
+        const base = normalizeNombre(nombre);
+        const idx = ordenPreferido.findIndex((key) => base.includes(key));
+        return idx === -1 ? 99 : idx;
+      };
+      lista.sort((a, b) => {
+        const ra = rankCurso(a.nombre);
+        const rb = rankCurso(b.nombre);
+        if (ra !== rb) return ra - rb;
+        return String(a.nombre || "").localeCompare(String(b.nombre || ""));
+      });
       setCursos(lista);
 
       if (lista.length >= 1) {
