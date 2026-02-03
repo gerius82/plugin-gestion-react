@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 const TZ = "America/Argentina/Buenos_Aires";
 
@@ -94,6 +94,7 @@ const normalizeText = (txt = "") =>
 
 export default function FichaAlumno() {
   const { id } = useParams();
+  const navigate = useNavigate();
 
   const [config, setConfig] = useState(null);
   const headers = useMemo(() => headersFrom(config), [config]);
@@ -1475,8 +1476,17 @@ const renderEditorMatricula = () => (
       
   // Render
   return (
-    <div className="max-w-5xl mx-auto px-4 pb-10">
-      <h2 className="text-3xl font-bold text-center mb-6">Ficha de Alumnos</h2>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4 pb-10">
+      <div className="max-w-5xl mx-auto flex items-center justify-between mb-6 gap-4">
+        <h2 className="text-3xl font-bold text-center flex-1">Ficha de Alumnos</h2>
+        <button
+          onClick={() => navigate("/alumnos-menu")}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
+      </div>
 
       <Card title="Seleccionar alumno">
         <div className="flex items-center justify-between gap-3 mb-3">

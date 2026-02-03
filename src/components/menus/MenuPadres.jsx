@@ -18,8 +18,8 @@ export default function MenuPadres() {
 
           {/* ACA CAMBIAMOS SOLO EL SPAN SEGÚN LA OPCIÓN */}
           {/* ... */}
-          <span className="mx-auto text-xs font-bold px-3 py-1 rounded-full bg-yellow-400 text-yellow-900 shadow-md animate-blink glow-badge">
-            🌞 Nuevo: Taller de Verano 🌞
+          <span className="mx-auto text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-md animate-blink glow-badge">
+            Abierta la inscripción al Ciclo 2026!!
           </span>
         </Link>
       </div>

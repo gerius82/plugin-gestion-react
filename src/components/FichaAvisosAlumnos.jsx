@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 
 export default function FichaAvisosAlumnos() {
+  const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState("activos"); // activos | inactivos | todos
@@ -198,8 +200,18 @@ export default function FichaAvisosAlumnos() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 p-6 bg-white rounded-xl shadow">
-      <h2 className="text-2xl font-bold text-center mb-6">Avisos por WhatsApp</h2>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="max-w-5xl mx-auto flex items-center justify-between mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-center flex-1">Avisos por WhatsApp</h2>
+        <button
+          onClick={() => navigate("/alumnos-menu")}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
+      </div>
+      <div className="bg-white rounded-xl shadow p-6 max-w-5xl mx-auto">
 
       {/* Filtros */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -425,6 +437,7 @@ export default function FichaAvisosAlumnos() {
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }

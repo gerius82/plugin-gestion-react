@@ -14,18 +14,13 @@ const FormularioInscripcion = () => {
   const origen = searchParams.get("origen");
   const from = searchParams.get("from");
   const cicloParam = searchParams.get("ciclo");
+  const cursoParam = searchParams.get("curso_id");
 
-  const rutaSalida =
-    origen === "gestion"
-      ? "/menu-gestion"
-      : from === "menu-intermedio"
-      ? "/menu-inscripcion-padres"
-      : "/menu-padres";
 
   const [formulario, setFormulario] = useState({
     nombre: "",
     apellido: "",
-    edad: "",
+    fecha_nacimiento: "",
     escuela: "",
     responsable: "",
     telefono: "",
@@ -41,6 +36,15 @@ const FormularioInscripcion = () => {
   const [cursos, setCursos] = useState([]);
   const [cursoSelId, setCursoSelId] = useState(null);
   const [turnosConfig, setTurnosConfig] = useState(null);
+  const cicloParaVolver = cicloSel || cicloParam || "";
+  const rutaSalida =
+    origen === "gestion"
+      ? "/menu-gestion"
+      : from === "menu-inscripcion-cursos"
+      ? `/menu-inscripcion-cursos?ciclo=${encodeURIComponent(cicloParaVolver)}`
+      : origen === "padres" || from === "menu-intermedio"
+      ? "/menu-inscripcion-padres"
+      : "/menu-padres";
 
   const [sedes, setSedes] = useState([]);
   const [diaSel, setDiaSel] = useState("");
@@ -129,7 +133,7 @@ const FormularioInscripcion = () => {
     setFormulario({
       nombre: "",
       apellido: "",
-      edad: "",
+      fecha_nacimiento: "",
       escuela: "",
       responsable: "",
       telefono: "",
@@ -159,6 +163,19 @@ const FormularioInscripcion = () => {
   };
 
   const [mostrarResumen, setMostrarResumen] = useState(false);
+  const calcularEdad = (fechaIso) => {
+    if (!fechaIso) return "";
+    const fecha = new Date(`${fechaIso}T00:00:00`);
+    if (Number.isNaN(fecha.getTime())) return "";
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - fecha.getFullYear();
+    const m = hoy.getMonth() - fecha.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < fecha.getDate())) {
+      edad -= 1;
+    }
+    return edad;
+  };
+  const edadCalculada = calcularEdad(formulario.fecha_nacimiento);
 
   const direcciones = {
     Fisherton: "Eva Peron 8128",
@@ -230,10 +247,16 @@ const FormularioInscripcion = () => {
         if (ra !== rb) return ra - rb;
         return String(a.nombre || "").localeCompare(String(b.nombre || ""));
       });
-      setCursos(lista);
+      const cursoIdSel = cursoParam ? Number(cursoParam) : null;
+      const cursoForzado =
+        Number.isFinite(cursoIdSel) && lista.find((c) => c.id === cursoIdSel)
+          ? lista.find((c) => c.id === cursoIdSel)
+          : null;
+      const listaFinal = cursoForzado ? [cursoForzado] : lista;
+      setCursos(listaFinal);
 
-      if (lista.length >= 1) {
-        const curso = lista[0];
+      if (listaFinal.length >= 1) {
+        const curso = listaFinal[0];
         setCursoSelId(curso.id);
         setTurnosConfig(parseTurnosConfig(curso.turnos_config));
         setFormulario((prev) => ({ ...prev, curso: curso.nombre || "" }));
@@ -243,7 +266,7 @@ const FormularioInscripcion = () => {
         setFormulario((prev) => ({ ...prev, curso: "" }));
       }
     })();
-  }, [config, cicloSel]);
+  }, [config, cicloSel, cursoParam]);
 
   useEffect(() => {
     const s = Object.keys(turnosConfig || {});
@@ -491,7 +514,8 @@ const FormularioInscripcion = () => {
     const personaId = await buscarPersonaId();
     const payloadBase = {
       ...formulario,
-      edad: parseInt(formulario.edad),
+      edad: edadCalculada === "" ? null : edadCalculada,
+      fecha_nacimiento: formulario.fecha_nacimiento || null,
       tipo_inscripcion: cicloSel,
       curso: cursoNombre,
       turno_1: `${diaSel} ${horaSel}`,
@@ -586,7 +610,8 @@ const FormularioInscripcion = () => {
       await emailjs.send("service_efu6ess", "template_92ev0wo", {
         nombre: formulario.nombre,
         apellido: formulario.apellido,
-        edad: formulario.edad,
+        edad: edadCalculada,
+        fecha_nacimiento: formulario.fecha_nacimiento,
         responsable: formulario.responsable,
         telefono: formulario.telefono,
         email: formulario.email,
@@ -609,7 +634,7 @@ const FormularioInscripcion = () => {
     <div className="max-w-[700px] w-full mx-auto p-8 bg-white rounded-xl shadow-lg mt-8">
       {mensajeExito ? (
         <div className="mt-6 p-4 border-l-4 border-green-400 bg-green-50 text-green-800 rounded animate-fadeIn">
-          <h4 className="text-lg font-semibold mb-1">Inscripcion completada con exito</h4>
+          <h4 className="text-lg font-semibold mb-1">Inscripción completada con exito</h4>
           <p className="text-sm leading-relaxed">{mensajeExito}</p>
           <div className="mt-4 flex justify-center gap-4">
             <button
@@ -640,7 +665,42 @@ const FormularioInscripcion = () => {
         </div>
       ) : !mostrarResumen ? (
         <form onSubmit={handleSubmit} className="space-y-6">
-          <h2 className="text-2xl font-bold text-center mb-6">Formulario de Inscripcion</h2>
+          <h2 className="text-2xl font-bold text-center mb-6">Formulario de Inscripción</h2>
+
+          <div className="mb-6 p-4 bg-emerald-50 border-l-4 border-emerald-400 rounded-lg shadow-sm animate-fadeIn">
+            <h3 className="text-xl font-semibold text-emerald-700 mb-2">
+              🤖🚀 ¡Ciclo 2026 de Robótica y Programación en Plugin! ⚙️
+            </h3>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              Una propuesta pensada para chicos y chicas de 5 a 12 años que quieran explorar, construir y aprender jugando.
+              A lo largo del año, los acompañamos en un recorrido donde la creatividad, la tecnología y el juego se combinan
+              para potenciar el pensamiento lógico, el trabajo en equipo y la curiosidad.
+              No hace falta experiencia previa: solo ganas de experimentar y divertirse 😄
+            </p>
+
+            <p className="text-sm text-gray-700 mt-4 font-semibold">📍 Sedes disponibles:</p>
+            <ul className="text-sm text-gray-800 space-y-1 mt-1">
+              <li>• 🏫 Mendoza 3024 – Rosario (Macrocentro)</li>
+              <li>• 🏫 Eva Perón 8128 – Rosario (Fisherton)</li>
+            </ul>
+
+            <ul className="mt-4 space-y-1 text-sm text-gray-800">
+              <li>📅 <strong>Duración:</strong> de marzo a diciembre</li>
+              <li>🗓️ <strong>Inicio:</strong> Lunes 2 de marzo de 2026</li>
+              <li>🧩 <strong>Modalidad:</strong> 1 clase semanal de 90 minutos</li>
+            </ul>
+
+            <p className="text-sm text-gray-700 mt-4 font-semibold">💳 Formas de pago</p>
+            <ul className="mt-1 text-sm text-gray-800 space-y-1">
+              <li>• 🔒 <strong>Inscripción:</strong> $20.000</li>
+              <li>• 🎉 <strong>Primera clase de prueba:</strong> el taller se abona recién después de la primera clase, cuando el alumno ya vivió la experiencia y decide continuar.</li>
+              <li>• 💰 <strong>Cuota mensual:</strong> $48.000</li>
+            </ul>
+
+            <p className="text-sm text-gray-700 mt-3">
+              Queremos que cada familia pueda decidir con tranquilidad, priorizando siempre la experiencia, el aprendizaje y el bienestar de los chicos 🤍
+            </p>
+          </div>
 
           <div className="mb-3 w-full p-4 rounded-lg bg-gray-50 shadow-sm">
             <h3 className="text-lg sm:text-xl font-semibold text-gray-800 leading-snug">Datos del alumno</h3>
@@ -677,15 +737,19 @@ const FormularioInscripcion = () => {
           </div>
 
           <div>
-            <label htmlFor="edad" className="block font-medium mb-1">Edad:</label>
+            <label htmlFor="fecha_nacimiento" className="block font-medium mb-1">Fecha de nacimiento:</label>
             <input
-              id="edad"
-              type="number"
-              value={formulario.edad}
+              id="fecha_nacimiento"
+              type="date"
+              value={formulario.fecha_nacimiento}
               onChange={handleChange}
               className="w-full max-w-sm mx-auto border border-gray-300 rounded-lg p-2 sm:p-3 placeholder-gray-400 placeholder:italic text-sm sm:text-base text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-100 transition"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">Formato: dd-mm-aaaa</p>
+            {edadCalculada !== "" && (
+              <p className="text-xs text-gray-600 mt-1">Edad calculada: {edadCalculada} años</p>
+            )}
           </div>
 
           <div>
@@ -938,7 +1002,8 @@ const FormularioInscripcion = () => {
             <div className="p-4 rounded-lg bg-white shadow-sm">
               <h4 className="font-semibold text-gray-700 mb-2">Datos del alumno</h4>
               <p><span className="font-semibold">Nombre:</span> {formulario.nombre} {formulario.apellido}</p>
-              <p><span className="font-semibold">Edad:</span> {formulario.edad}</p>
+              <p><span className="font-semibold">Fecha de nacimiento:</span> {formulario.fecha_nacimiento}</p>
+              <p><span className="font-semibold">Edad:</span> {edadCalculada !== "" ? `${edadCalculada} años` : "-"}</p>
               <p><span className="font-semibold">Escuela:</span> {formulario.escuela || "No especificada"}</p>
             </div>
 

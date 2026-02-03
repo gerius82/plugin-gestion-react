@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function FichaResumenAlumnos() {
+  const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
   const [todosAlumnosMap, setTodosAlumnosMap] = useState({});
@@ -141,8 +142,18 @@ export default function FichaResumenAlumnos() {
   const iconoOrden = () => "";
 
   return (
-    <div className="max-w-full mx-auto mt-10 p-6 bg-white rounded-xl shadow">
-      <h2 className="text-2xl font-bold text-center mb-6">Resumen de Alumnos</h2>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="max-w-full mx-auto flex items-center justify-between mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-center flex-1">Resumen de Alumnos</h2>
+        <button
+          onClick={() => navigate("/alumnos-menu")}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
+      </div>
+      <div className="bg-white rounded-xl shadow p-6 max-w-full mx-auto">
 
       {error && (
         <p className="text-sm text-red-600 mb-4 text-center">{error}</p>
@@ -323,14 +334,6 @@ export default function FichaResumenAlumnos() {
         </table>
       </div>
 
-      <div className="mt-6 w-fit mx-auto">
-        <Link
-          to="/alumnos-menu"
-          className="bg-white rounded-lg border-l-4 border-gray-400 px-4 py-2 shadow hover:shadow-md hover:scale-105 transition flex items-center gap-2"
-        >
-          <span className="text-gray-500 text-lg">←</span>
-          <span className="font-medium text-gray-700">Volver al menú</span>
-        </Link>
       </div>
     </div>
   );

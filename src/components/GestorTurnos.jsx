@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const ORDEN_DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const ordenarDias = (a, b) => ORDEN_DIAS.indexOf(a) - ORDEN_DIAS.indexOf(b);
@@ -10,6 +11,7 @@ const supaHeaders = (cfg, extra = {}) => ({
 });
 
 export default function GestorTurnos() {
+  const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [mensaje, setMensaje] = useState("");
 
@@ -240,14 +242,21 @@ const activoActual = (turno) =>
 
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h2 className="text-2xl font-bold">Gestor de Turnos</h2>
           <p className="text-sm text-gray-600">
             Cupo físico por turno compartido (sede + día + horario) dentro de cada ciclo.
           </p>
         </div>
+        <button
+          onClick={() => navigate("/menu-gestion")}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
 
         <div className="flex gap-2 items-center flex-wrap">
           <label className="text-sm font-medium">Ciclo:</label>

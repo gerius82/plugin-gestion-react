@@ -30,8 +30,8 @@ function getRutaFormulario(codigo) {
     // Taller de Verano
     return "/formulario-verano?origen=padres";
   }
-  // Cualquier otro ciclo va al formulario regular
-  return `/formulario?origen=padres&ciclo=${encodeURIComponent(
+  // Cualquier otro ciclo va al menu de cursos
+  return `/menu-inscripcion-cursos?origen=padres&ciclo=${encodeURIComponent(
     codigo
   )}`;
 }

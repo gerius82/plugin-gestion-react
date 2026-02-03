@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { FaThLarge } from "react-icons/fa";
 
 const ORDEN_DIAS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
@@ -50,6 +50,7 @@ const agruparTurnosPorDiaHora = (lista) => {
 };
 
 export default function FichaGrillaTurnos() {
+  const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [tipoInscripcion, setTipoInscripcion] = useState("CICLO_2025");
@@ -206,10 +207,19 @@ export default function FichaGrillaTurnos() {
   }, [turnosFiltrados, matriculas, inscripcionesMap, sede, tipoInscripcion]);
 
   return (
-    <div className="w-full px-4 md:px-6">
-      <div className="flex items-center justify-center gap-3 mb-3">
-        <FaThLarge className="text-emerald-600 text-3xl" />
-        <h2 className="text-2xl font-bold text-center">Grilla por Turno</h2>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="max-w-screen-2xl mx-auto flex items-center justify-between mb-4 gap-4">
+        <div className="flex items-center justify-center gap-3 flex-1">
+          <FaThLarge className="text-emerald-600 text-3xl" />
+          <h2 className="text-2xl font-bold text-center">Grilla por Turno</h2>
+        </div>
+        <button
+          onClick={() => navigate("/menu-gestion")}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
       </div>
 
       <div className="max-w-screen-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
@@ -315,15 +325,6 @@ export default function FichaGrillaTurnos() {
         </div>
       )}
 
-      <div className="mt-6 w-fit mx-auto">
-        <Link
-          to="/menu-gestion"
-          className="bg-white rounded-lg border-l-4 border-gray-400 px-4 py-2 shadow hover:shadow-md hover:scale-105 transition flex items-center gap-2"
-        >
-          <span className="text-gray-500 text-lg">←</span>
-          <span className="font-medium text-gray-700">Volver al menu</span>
-        </Link>
-      </div>
     </div>
   );
 }

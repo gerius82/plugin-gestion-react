@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaCalendarDay, FaCalendarAlt, FaChartPie,FaCheckCircle, FaExclamationCircle, FaUserPlus, FaUsers,FaFileSignature, FaUserMinus, FaDollarSign, FaInfoCircle } from "react-icons/fa";
 
 
 export default function FichaResumenes() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState("diario");
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-6">
-      <h1 className="text-2xl md:text-3xl font-bold text-center mb-6">Resumenes & Control</h1>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="max-w-5xl mx-auto flex items-center justify-between mb-6 gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold text-center flex-1">Resumenes & Control</h1>
+        <button
+          onClick={() => navigate("/menu-gestion")}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
         <TabButton

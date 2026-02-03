@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function FichaRecuperar() {
   // Ruta de regreso: por defecto /menu-padres; si viene con ?from=alumnos-menu => /alumnos-menu
+  const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const from = params.get("from");
@@ -375,8 +376,18 @@ export default function FichaRecuperar() {
   }, [turnos, diaSeleccionado]);
 
   return (
-    <div className="max-w-xl mx-auto mt-10 bg-white p-6 rounded-2xl shadow">
-      <h2 className="text-2xl font-bold text-center mb-2">Recuperar una clase</h2>
+    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
+      <div className="max-w-xl mx-auto flex items-center justify-between mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-center flex-1">Recuperar una clase</h2>
+        <button
+          onClick={() => navigate(rutaVolver)}
+          className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+          style={{ border: "1px solid #d1d5db" }}
+        >
+          Volver
+        </button>
+      </div>
+      <div className="bg-white p-6 rounded-2xl shadow max-w-xl mx-auto">
       <p className="text-sm text-gray-600 text-center mb-4">
         En esta sección podés consultar las clases para recuperar, ver tus ausencias y elegir un turno disponible.
       </p>
@@ -531,15 +542,6 @@ export default function FichaRecuperar() {
           </div>
         </div>
       )}
-      {/* Botón volver */}
-      <div className="mt-2 w-fit mx-auto">
-        <Link
-          to={rutaVolver}
-          className="bg-white rounded-lg border-l-4 border-gray-400 px-4 py-2 shadow hover:shadow-md hover:scale-105 transition flex items-center gap-2"
-        >
-          <span className="text-gray-500 text-lg">←</span>
-          <span className="font-medium text-gray-700">Volver al menú</span>
-        </Link>
       </div>
     </div>
   );
