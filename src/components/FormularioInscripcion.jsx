@@ -187,6 +187,7 @@ const FormularioInscripcion = () => {
       .then((res) => res.json())
       .then((data) => setConfig(data));
     emailjs.init("Vkl0XSUcG-KApScqq");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   useEffect(() => {
@@ -672,10 +673,7 @@ const FormularioInscripcion = () => {
               🤖🚀 ¡Ciclo 2026 de Robótica y Programación en Plugin! ⚙️
             </h3>
             <p className="text-sm text-gray-700 leading-relaxed">
-              Una propuesta pensada para chicos y chicas de 5 a 12 años que quieran explorar, construir y aprender jugando.
-              A lo largo del año, los acompañamos en un recorrido donde la creatividad, la tecnología y el juego se combinan
-              para potenciar el pensamiento lógico, el trabajo en equipo y la curiosidad.
-              No hace falta experiencia previa: solo ganas de experimentar y divertirse 😄
+              No hace falta experiencia previa: solo ganas de aprender y disfrutar.
             </p>
 
             <p className="text-sm text-gray-700 mt-4 font-semibold">📍 Sedes disponibles:</p>
@@ -693,8 +691,10 @@ const FormularioInscripcion = () => {
             <p className="text-sm text-gray-700 mt-4 font-semibold">💳 Formas de pago</p>
             <ul className="mt-1 text-sm text-gray-800 space-y-1">
               <li>• 🔒 <strong>Inscripción:</strong> $20.000</li>
-              <li>• 🎉 <strong>Primera clase de prueba:</strong> el taller se abona recién después de la primera clase, cuando el alumno ya vivió la experiencia y decide continuar.</li>
-              <li>• 💰 <strong>Cuota mensual:</strong> $48.000</li>
+              {!formulario.curso.toLowerCase().includes("arduino") && (
+                <li>• 🎉 <strong>Primera clase de prueba:</strong> el taller se abona recién después de la primera clase, cuando el alumno ya vivió la experiencia y decide continuar.</li>
+              )}
+              <li>• 💰 <strong>Cuota mensual:</strong> {formulario.curso.toLowerCase().includes("arduino") ? "$50.000" : "$48.000"}</li>
             </ul>
 
             <p className="text-sm text-gray-700 mt-3">
