@@ -244,24 +244,7 @@ export default function MenuInscripcionCursos() {
 
                   <div className="text-sm text-gray-700">
                     <p className="font-semibold mb-1">Horarios:</p>
-                    {Object.keys(curso.turnos || {}).length === 0 ? (
-                      <p className="text-gray-500">Sin horarios configurados.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {Object.entries(curso.turnos).map(([sede, dias]) => (
-                          <div key={sede}>
-                            <p className="font-semibold text-gray-800">{sede}</p>
-                            <ul className="text-sm text-gray-600 space-y-1">
-                              {Object.entries(dias).map(([dia, horas]) => (
-                                <li key={`${sede}-${dia}`}>
-                                  {dia}: {Array.isArray(horas) ? horas.join(" / ") : horas}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <p className="text-gray-500">Se muestran al avanzar con la inscripción.</p>
                   </div>
                   <div className="pt-2">
                     <button
