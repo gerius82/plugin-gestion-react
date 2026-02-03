@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FaUserEdit,FaExchangeAlt, FaClipboardList, FaUserCheck, FaMoneyBillWave, FaHistory, FaUserTimes } from "react-icons/fa";
+import { FaBirthdayCake, FaExchangeAlt, FaHistory, FaUserEdit, FaUserTimes } from "react-icons/fa";
 
 export default function MenuPadres() {
   return (
@@ -47,6 +47,14 @@ export default function MenuPadres() {
         <FaUserTimes className="text-red-500 text-3xl" />
         <span className="font-semibold">Dar de baja</span>
       </Link>
+
+      <div className="bg-gray-100 border-l-8 border-gray-300 text-gray-500 rounded-xl p-5 shadow-sm text-left flex items-center gap-4 cursor-not-allowed">
+        <FaBirthdayCake className="text-pink-500 text-3xl" />
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold">Festeja tu cumple</span>
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-gray-200 text-gray-600 w-fit">Próximamente</span>
+        </div>
+      </div>
 
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const IMG_CUMPLES =
   "https://cvogoablzgymmodegfft.supabase.co/storage/v1/object/sign/cumples/cumples%20info.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWJmYzhjNy0wZGU5LTRkMGQtODc2YS0zODEyNjZmMjRmOWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjdW1wbGVzL2N1bXBsZXMgaW5mby5wbmciLCJpYXQiOjE3Njg4NzYwODMsImV4cCI6MjA4NDIzNjA4M30.fViNIiMR5BubUrqEqem3H6VQ6bV28MhsIkhy2KsvjGQ";
@@ -57,6 +58,11 @@ const addMinutes = (hora, minutos) => {
 };
 
 export default function FichaCumplesPadres() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const from = params.get("from");
+  const rutaVolver = from === "cumples-menu" ? "/cumples-menu" : "/menu-padres";
   const [config, setConfig] = useState(null);
   const [mesSeleccionado, setMesSeleccionado] = useState(() => {
     const now = new Date();
@@ -76,7 +82,6 @@ export default function FichaCumplesPadres() {
     mensaje: "",
     cumpleanero_nombre: "",
     cumpleanero_edad: "",
-    invitados: Array.from({ length: 11 }, () => ""),
     menu_especial: false,
     menu_especial_cantidad: "",
   });
@@ -234,7 +239,6 @@ export default function FichaCumplesPadres() {
         mensaje: reservaForm.mensaje || "",
         cumpleanero_nombre: reservaForm.cumpleanero_nombre || "",
         cumpleanero_edad: reservaForm.cumpleanero_edad || null,
-        invitados: reservaForm.invitados || [],
         menu_especial: !!reservaForm.menu_especial,
         menu_especial_cantidad: reservaForm.menu_especial
           ? reservaForm.menu_especial_cantidad || null
@@ -245,7 +249,6 @@ export default function FichaCumplesPadres() {
     });
 
     if (res.ok) {
-      const invitadosTxt = (reservaForm.invitados || []).filter(Boolean).join(", ");
       const menuEspecial = reservaForm.menu_especial ? "Si" : "No";
       const menuCantidad = reservaForm.menu_especial
         ? ` (${reservaForm.menu_especial_cantidad || 0})`
@@ -265,9 +268,6 @@ export default function FichaCumplesPadres() {
         `• Nombre: ${reservaForm.cumpleanero_nombre || "-"}`,
         `• Edad: ${reservaForm.cumpleanero_edad || "-"}`,
         "",
-        "👫 *Invitados*",
-        `• Cantidad: ${invitadosTxt || "-"}`,
-        "",
         "🍔 *Menú especial*",
         `• ${menuEspecial}${menuCantidad}`,
         "",
@@ -286,7 +286,6 @@ export default function FichaCumplesPadres() {
       mensaje: "",
       cumpleanero_nombre: "",
       cumpleanero_edad: "",
-      invitados: [],
       menu_especial: false,
       menu_especial_cantidad: "",
     });
@@ -300,7 +299,16 @@ export default function FichaCumplesPadres() {
     <div className="w-full mt-6 px-2 sm:px-6">
       <div className="w-full">
         <div className="w-full px-3 sm:px-6 py-4">
-        <h2 className="text-2xl font-bold mb-2 text-center">Festeja tu cumple</h2>
+        <div className="max-w-5xl mx-auto flex items-center justify-between mb-4 gap-4">
+          <h2 className="text-2xl font-bold text-center flex-1">Festeja tu cumple</h2>
+          <button
+            onClick={() => navigate(rutaVolver)}
+            className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
+            style={{ border: "1px solid #d1d5db" }}
+          >
+            Volver
+          </button>
+        </div>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
           nos encargamos del resto.
@@ -324,7 +332,7 @@ export default function FichaCumplesPadres() {
           </div>
           <div>
             <div className="font-semibold">👧🧒 Cantidad de niños</div>
-            <div>Máximo 15 chicos en total: el cumpleañero/a + 14 invitados.</div>
+            <div>Máximo 15 chicos en total.</div>
           </div>
           <div>
             <div className="font-semibold">🎈 Edad del cumpleañero</div>
@@ -332,16 +340,16 @@ export default function FichaCumplesPadres() {
           </div>
           <div>
             <div className="font-semibold">👨‍👩‍👦 Presencia de adultos</div>
-            <div>Participan solo los chicos invitados.</div>
+            <div>Participan solo los chicos.</div>
             <div>Los únicos adultos que pueden permanecer durante el cumpleaños son los padres del cumpleañero.</div>
           </div>
           <div>
             <div className="font-semibold">🍽️ Menú para los chicos</div>
             <div>El menú se elige previamente por los padres y puede incluir:</div>
             <ul className="list-disc list-inside">
-              <li>Patitas de pollo</li>
-              <li>Panchos</li>
-              <li>Snacks</li>
+              <li>Patitas de pollo + Snacks</li>
+              <li>Panchos + Snacks</li>
+              
             </ul>
             <div>👉 Opción para celíacos disponible, avisando con anticipación.</div>
           </div>
@@ -376,7 +384,7 @@ export default function FichaCumplesPadres() {
           <div>1) Elegí el mes y toca el día que desees realizar el cumple.</div>
           <div>2) Selecciona uno de los horario disponibles.</div>
           <div>3) Completa los datos de contacto y del cumpleañero.</div>
-          <div>4) Envía la solicitud para que nos contactemos.</div>
+          <div>4) Envía la solicitud para que nos contactemos y hablemos de precios.</div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
           <span className="text-sm font-medium">Mes:</span>

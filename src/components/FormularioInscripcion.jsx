@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import emailjs from "@emailjs/browser";
 import "../assets/formulario.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -53,6 +53,15 @@ const FormularioInscripcion = () => {
   const [anotadosTurno, setAnotadosTurno] = useState(0);
   const [turnosCards, setTurnosCards] = useState([]);
   const [cargandoTurnos, setCargandoTurnos] = useState(false);
+  const formatCurrency = useMemo(
+    () =>
+      new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+        maximumFractionDigits: 0,
+      }),
+    []
+  );
 
   const supaHeaders = (cfg) => ({
     apikey: cfg.supabaseKey,
@@ -219,7 +228,7 @@ const FormularioInscripcion = () => {
 
     (async () => {
       const resCursos = await fetch(
-        `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,ciclo,turnos_config,imagen_url&ciclo=eq.${encodeURIComponent(
+        `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,ciclo,turnos_config,imagen_url,precio_curso,precio_inscripcion&ciclo=eq.${encodeURIComponent(
           cicloSel
         )}&activo=eq.true`,
         { headers: supaHeaders(config) }
@@ -248,10 +257,10 @@ const FormularioInscripcion = () => {
         if (ra !== rb) return ra - rb;
         return String(a.nombre || "").localeCompare(String(b.nombre || ""));
       });
-      const cursoIdSel = cursoParam ? Number(cursoParam) : null;
+      const cursoIdSel = cursoParam ? String(cursoParam) : null;
       const cursoForzado =
-        Number.isFinite(cursoIdSel) && lista.find((c) => c.id === cursoIdSel)
-          ? lista.find((c) => c.id === cursoIdSel)
+        cursoIdSel && lista.find((c) => String(c.id) === cursoIdSel)
+          ? lista.find((c) => String(c.id) === cursoIdSel)
           : null;
       const listaFinal = cursoForzado ? [cursoForzado] : lista;
       setCursos(listaFinal);
@@ -494,6 +503,20 @@ const FormularioInscripcion = () => {
     if (n.includes("arduino")) return "/img/arduino.jpg";
     return "/Logo_Plugin_2025.png";
   };
+  const cursoSeleccionado = useMemo(
+    () => cursos.find((c) => String(c.id) === String(cursoSelId)),
+    [cursos, cursoSelId]
+  );
+  const precioInscripcion =
+    cursoSeleccionado?.precio_inscripcion != null
+      ? formatCurrency.format(Number(cursoSeleccionado.precio_inscripcion))
+      : "$20.000";
+  const precioCuota =
+    cursoSeleccionado?.precio_curso != null
+      ? formatCurrency.format(Number(cursoSeleccionado.precio_curso))
+      : formulario.curso.toLowerCase().includes("arduino")
+      ? "$50.000"
+      : "$48.000";
 
   const confirmarEnvio = async () => {
     setMostrarResumen(false);
@@ -509,7 +532,7 @@ const FormularioInscripcion = () => {
 
     const { listaEspera } = await calcularDisponibilidadTurno();
 
-    const cursoObj = cursos.find((c) => c.id === Number(cursoSelId));
+    const cursoObj = cursos.find((c) => String(c.id) === String(cursoSelId));
     const cursoNombre = cursoObj?.nombre || formulario.curso || "";
 
     const personaId = await buscarPersonaId();
@@ -571,7 +594,7 @@ const FormularioInscripcion = () => {
       const matriculaPayload = {
         alumno_id: personaFinal,
         ciclo_codigo: cicloSel,
-        curso_id: Number(cursoSelId),
+        curso_id: cursoSelId,
         curso_nombre: cursoNombre,
         sede: formulario.sede,
         dia: diaSel,
@@ -583,7 +606,7 @@ const FormularioInscripcion = () => {
       const resMat = await fetch(
         `${config.supabaseUrl}/rest/v1/matriculas?select=id&alumno_id=eq.${personaFinal}` +
           `&ciclo_codigo=eq.${encodeURIComponent(cicloSel)}` +
-          `&curso_id=eq.${Number(cursoSelId)}&order=creado_en.desc&limit=1`,
+          `&curso_id=eq.${encodeURIComponent(cursoSelId)}&order=creado_en.desc&limit=1`,
         { headers: supaHeaders(config) }
       );
       const dataMat = await resMat.json();
@@ -690,11 +713,11 @@ const FormularioInscripcion = () => {
 
             <p className="text-sm text-gray-700 mt-4 font-semibold">💳 Formas de pago</p>
             <ul className="mt-1 text-sm text-gray-800 space-y-1">
-              <li>• 🔒 <strong>Inscripción:</strong> $20.000</li>
+              <li>• 🔒 <strong>Inscripción:</strong> {precioInscripcion}</li>
               {!formulario.curso.toLowerCase().includes("arduino") && (
                 <li>• 🎉 <strong>Primera clase de prueba:</strong> el taller se abona recién después de la primera clase, cuando el alumno ya vivió la experiencia y decide continuar.</li>
               )}
-              <li>• 💰 <strong>Cuota mensual:</strong> {formulario.curso.toLowerCase().includes("arduino") ? "$50.000" : "$48.000"}</li>
+              <li>• 💰 <strong>Cuota mensual:</strong> {precioCuota}</li>
             </ul>
 
             <p className="text-sm text-gray-700 mt-3">
@@ -839,7 +862,7 @@ const FormularioInscripcion = () => {
           <div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {cursos.map((c) => {
-                const seleccionado = cursoSelId === c.id;
+                const seleccionado = String(cursoSelId) === String(c.id);
                 return (
                   <button
                     key={c.id}

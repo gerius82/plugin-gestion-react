@@ -67,7 +67,6 @@ export default function FichaCumples() {
     mensaje: "",
     cumpleanero_nombre: "",
     cumpleanero_edad: "",
-    invitados: Array.from({ length: 12 }, () => ""),
     menu_especial: false,
     menu_especial_cantidad: "",
   });
@@ -127,7 +126,7 @@ export default function FichaCumples() {
 
     const urlReservas =
       `${config.supabaseUrl}/rest/v1/cumple_reservas` +
-      `?select=id,fecha,hora,nombre,apellido,telefono,mensaje,estado,creado_en,cumpleanero_nombre,cumpleanero_edad,invitados,menu_especial,menu_especial_cantidad` +
+      `?select=id,fecha,hora,nombre,apellido,telefono,mensaje,estado,creado_en,cumpleanero_nombre,cumpleanero_edad,menu_especial,menu_especial_cantidad` +
       `&order=fecha.asc&order=hora.asc`;
 
     const [resSlots, resReservas] = await Promise.all([
@@ -251,7 +250,6 @@ export default function FichaCumples() {
         mensaje: reservaForm.mensaje || "",
         cumpleanero_nombre: reservaForm.cumpleanero_nombre || "",
         cumpleanero_edad: reservaForm.cumpleanero_edad || null,
-        invitados: reservaForm.invitados || [],
         menu_especial: !!reservaForm.menu_especial,
         menu_especial_cantidad: reservaForm.menu_especial ? reservaForm.menu_especial_cantidad || null : null,
         estado: "pendiente",
@@ -260,7 +258,6 @@ export default function FichaCumples() {
     });
 
     if (res.ok) {
-      const invitadosTxt = (reservaForm.invitados || []).filter(Boolean).join(", ");
       const menuEspecial = reservaForm.menu_especial ? "Si" : "No";
       const menuCantidad = reservaForm.menu_especial
         ? ` (${reservaForm.menu_especial_cantidad || 0})`
@@ -273,7 +270,6 @@ export default function FichaCumples() {
         `Telefono: ${reservaForm.telefono}`,
         `Cumpleanero: ${reservaForm.cumpleanero_nombre || "-"}`,
         `Edad: ${reservaForm.cumpleanero_edad || "-"}`,
-        `Invitados: ${invitadosTxt || "-"}`,
         `Menu especial: ${menuEspecial}${menuCantidad}`,
         `Mensaje: ${reservaForm.mensaje || "-"}`,
       ].join("\n");
@@ -288,7 +284,6 @@ export default function FichaCumples() {
       mensaje: "",
       cumpleanero_nombre: "",
       cumpleanero_edad: "",
-      invitados: Array.from({ length: 12 }, () => ""),
       menu_especial: false,
       menu_especial_cantidad: "",
     });
@@ -323,9 +318,6 @@ export default function FichaCumples() {
       mensaje: reserva?.mensaje || "",
       cumpleanero_nombre: reserva?.cumpleanero_nombre || "",
       cumpleanero_edad: reserva?.cumpleanero_edad ?? "",
-      invitados: Array.isArray(reserva?.invitados)
-        ? reserva.invitados
-        : Array.from({ length: 12 }, () => ""),
       menu_especial: !!reserva?.menu_especial,
       menu_especial_cantidad: reserva?.menu_especial_cantidad ?? "",
       estado: reserva?.estado || "pendiente",
@@ -346,7 +338,6 @@ export default function FichaCumples() {
       mensaje: detalleForm?.mensaje || "",
       cumpleanero_nombre: detalleForm?.cumpleanero_nombre || "",
       cumpleanero_edad: detalleForm?.cumpleanero_edad || null,
-      invitados: detalleForm?.invitados || [],
       menu_especial: !!detalleForm?.menu_especial,
       menu_especial_cantidad: detalleForm?.menu_especial
         ? detalleForm?.menu_especial_cantidad || null
@@ -734,27 +725,6 @@ export default function FichaCumples() {
                     }
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs font-medium">Invitados</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                    {(detalleForm?.invitados || Array.from({ length: 12 }, () => "")).map((inv, idx) => (
-                      <input
-                        key={`det-inv-${idx}`}
-                        className="w-full border rounded px-3 py-2 text-sm"
-                        placeholder={`Invitado ${idx + 1}`}
-                        value={inv}
-                        onChange={(e) =>
-                          setDetalleForm((p) => {
-                            const nuevos = [...(p?.invitados || [])];
-                            while (nuevos.length < 12) nuevos.push("");
-                            nuevos[idx] = e.target.value;
-                            return { ...p, invitados: nuevos };
-                          })
-                        }
-                      />
-                    ))}
-                  </div>
-                </div>
                 <div className="md:col-span-2 flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-2 text-xs font-medium">
                     <input
@@ -814,9 +784,6 @@ export default function FichaCumples() {
                         mensaje: reservaDetalle?.mensaje || "",
                         cumpleanero_nombre: reservaDetalle?.cumpleanero_nombre || "",
                         cumpleanero_edad: reservaDetalle?.cumpleanero_edad ?? "",
-                        invitados: Array.isArray(reservaDetalle?.invitados)
-                          ? reservaDetalle.invitados
-                          : Array.from({ length: 12 }, () => ""),
                         menu_especial: !!reservaDetalle?.menu_especial,
                         menu_especial_cantidad: reservaDetalle?.menu_especial_cantidad ?? "",
                         estado: reservaDetalle?.estado || "pendiente",
@@ -846,14 +813,6 @@ export default function FichaCumples() {
                     {reservaDetalle.menu_especial
                       ? ` (${reservaDetalle.menu_especial_cantidad || 0})`
                       : ""}
-                  </div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-gray-500 text-xs">Invitados</div>
-                  <div className="text-sm">
-                    {Array.isArray(reservaDetalle.invitados) && reservaDetalle.invitados.filter(Boolean).length
-                      ? reservaDetalle.invitados.filter(Boolean).join(", ")
-                      : "-"}
                   </div>
                 </div>
                 <div className="md:col-span-2">
