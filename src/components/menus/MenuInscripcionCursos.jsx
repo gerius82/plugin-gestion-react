@@ -90,7 +90,7 @@ export default function MenuInscripcionCursos() {
             { headers }
           ),
           fetch(
-            `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,descripcion,turnos_config,imagen_url,precio_curso,precio_inscripcion&ciclo=eq.${encodeURIComponent(
+            `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,descripcion,turnos_config,imagen_url,precio_curso,precio_inscripcion,edad_min,edad_max&ciclo=eq.${encodeURIComponent(
               ciclo
             )}&activo=eq.true&order=nombre.asc`,
             { headers }
@@ -221,6 +221,15 @@ export default function MenuInscripcionCursos() {
                   <h3 className="text-lg font-semibold text-gray-900">{curso.nombre}</h3>
                   {curso.descripcion && (
                     <p className="text-sm text-gray-600">{curso.descripcion}</p>
+                  )}
+
+                  {(curso.edad_min != null || curso.edad_max != null) && (
+                    <div className="text-sm text-gray-700">
+                      Edad:{" "}
+                      <span className="font-semibold">
+                        {curso.edad_min ?? "?"} a {curso.edad_max ?? "?"} años
+                      </span>
+                    </div>
                   )}
 
                   <div className="text-sm text-gray-700 space-y-1">
