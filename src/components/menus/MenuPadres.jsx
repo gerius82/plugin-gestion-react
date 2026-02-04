@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FaBirthdayCake, FaExchangeAlt, FaHistory, FaUserEdit, FaUserTimes } from "react-icons/fa";
+import { FaBirthdayCake, FaExchangeAlt, FaHistory, FaTag, FaUserEdit, FaUserTimes } from "react-icons/fa";
 
 export default function MenuPadres() {
   return (
@@ -25,27 +25,14 @@ export default function MenuPadres() {
       </div>
 
       <Link
-        to="/recuperar?from=menu-padres"
-        className="bg-white border-l-8 border-yellow-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
+        to="/promos"
+        className="bg-white border-l-8 border-teal-400 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
       >
-        <FaHistory className="text-yellow-500 text-3xl" />
-        <span className="font-semibold">Recuperar clases</span>
-      </Link>
-
-      <Link
-        to="/cambio-turno?from=menu-padres"
-        className="bg-white border-l-8 border-purple-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
-      >
-        <FaExchangeAlt className="text-purple-500 text-3xl" />
-        <span className="font-semibold">Cambiar turnos</span>
-      </Link>
-
-      <Link
-        to="/dar-de-baja?from=menu-padres"
-        className="bg-white border-l-8 border-red-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
-      >
-        <FaUserTimes className="text-red-500 text-3xl" />
-        <span className="font-semibold">Dar de baja</span>
+        <FaTag className="text-teal-500 text-3xl" />
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold">Promos</span>
+          <span className="text-xs text-gray-500">Descuentos y beneficios vigentes</span>
+        </div>
       </Link>
 
       <div className="bg-gray-100 border-l-8 border-gray-300 text-gray-500 rounded-xl p-5 shadow-sm text-left flex items-center gap-4 cursor-not-allowed">
@@ -55,6 +42,43 @@ export default function MenuPadres() {
           <span className="text-xs font-bold px-3 py-1 rounded-full bg-gray-200 text-gray-600 w-fit">Próximamente</span>
         </div>
       </div>
+
+      <Link
+        to="/recuperar?from=menu-padres"
+        className="bg-white border-l-8 border-yellow-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
+      >
+        <FaHistory className="text-yellow-500 text-3xl" />
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold">Recuperar clases</span>
+          <span className="text-xs text-gray-500">Elegi una fecha disponible para recuperar</span>
+        </div>
+      </Link>
+
+      <Link
+        to="/cambio-turno?from=menu-padres"
+        className="bg-white border-l-8 border-purple-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
+      >
+        <FaExchangeAlt className="text-purple-500 text-3xl" />
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold">Cambiar turnos</span>
+          <span className="text-xs text-gray-500">Solicita el cambio de día / horario</span>
+        </div>
+      </Link>
+
+      <Link
+        to="/dar-de-baja?from=menu-padres"
+        className="bg-white border-l-8 border-red-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
+      >
+        <FaUserTimes className="text-red-500 text-3xl" />
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold">Dar de baja</span>
+          <span className="text-xs text-gray-500">Gestiona la baja de la matricula</span>
+        </div>
+      </Link>
+
+      
+
+      
 
     </div>
   );

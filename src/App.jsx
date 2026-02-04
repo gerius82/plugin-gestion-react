@@ -3,6 +3,7 @@ import FormularioInscripcion from "./components/FormularioInscripcion";
 import logo from "./assets/Logo_Plugin_2025.png";
 import MenuGestion from "./components/menus/MenuGestion";
 import MenuPadres from "./components/menus/MenuPadres";
+import PromosMenu from "./components/menus/PromosMenu";
 import MenuInscripcionPadres from "./components/menus/MenuInscripcionPadres";
 import MenuInscripcionCursos from "./components/menus/MenuInscripcionCursos";
 import MenuProfes from "./components/menus/MenuProfes";
@@ -49,6 +50,7 @@ function App() {
           <Route path="/ficha-alumno/:id" element={<FichaAlumno />} />
           <Route path="/menu-gestion" element={<MenuGestion />} />
           <Route path="/menu-padres" element={<MenuPadres />} />
+          <Route path="/promos" element={<PromosMenu />} />
           <Route path="/menu-profes" element={<MenuProfes />} />
           <Route path="/asistencias" element={<FichaAsistencia />} />
           <Route path="/pagos" element={<FichaPagos />} />
