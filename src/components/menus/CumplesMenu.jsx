@@ -16,7 +16,7 @@ export default function CumplesMenu() {
         </Link>
 
         <Link
-          to="/cumples-reservas"
+          to="/cumples-info?from=cumples-menu"
           className="bg-white rounded-xl border-l-8 border-pink-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
         >
           <FaBirthdayCake className="text-pink-500 text-3xl" />

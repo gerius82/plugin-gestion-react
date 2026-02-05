@@ -29,6 +29,7 @@ import FichaAvisosAlumnos from "./components/FichaAvisosAlumnos";
 import GestorTurnos from "./components/GestorTurnos";
 import FichaCumples from "./components/FichaCumples";
 import FichaCumplesPadres from "./components/FichaCumplesPadres";
+import InfoCumples from "./components/InfoCumples";
 import CumplesMenu from "./components/menus/CumplesMenu";
 
 
@@ -75,6 +76,7 @@ function App() {
           <Route path="/cumples" element={<FichaCumples />} />
           <Route path="/cumples-menu" element={<CumplesMenu />} />
           <Route path="/cumples-gestion" element={<FichaCumples />} />
+          <Route path="/cumples-info" element={<InfoCumples />} />
           <Route path="/cumples-reservas" element={<FichaCumplesPadres />} />
 
           

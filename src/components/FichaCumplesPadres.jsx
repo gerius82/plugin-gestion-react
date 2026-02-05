@@ -62,7 +62,11 @@ export default function FichaCumplesPadres() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const from = params.get("from");
-  const rutaVolver = from === "cumples-menu" ? "/cumples-menu" : "/menu-padres";
+  const origin = params.get("origin");
+  const rutaVolver =
+    from === "info-cumples" || from === "cumples-menu"
+      ? `/cumples-info${origin ? `?from=${encodeURIComponent(origin)}` : ""}`
+      : "/menu-padres";
   const [config, setConfig] = useState(null);
   const [mesSeleccionado, setMesSeleccionado] = useState(() => {
     const now = new Date();
@@ -84,6 +88,7 @@ export default function FichaCumplesPadres() {
     cumpleanero_edad: "",
     menu_especial: false,
     menu_especial_cantidad: "",
+    menu_opcion: "",
   });
 
   const formatFecha = (fecha) => {
@@ -212,11 +217,16 @@ export default function FichaCumplesPadres() {
       return !reservasPorSlot.has(key);
     });
   }, [diaSeleccionado, slotsPorDia, reservasPorSlot]);
+  const pasoReserva = slotSeleccionado ? 3 : diaSeleccionado ? 2 : 1;
 
   const handleReserva = async () => {
     if (!config || !slotSeleccionado) return;
     if (!reservaForm.nombre || !reservaForm.apellido || !reservaForm.telefono) {
       setMensaje("Completa nombre, apellido y telefono.");
+      return;
+    }
+    if (!reservaForm.menu_opcion) {
+      setMensaje("Selecciona el menu.");
       return;
     }
 
@@ -243,6 +253,7 @@ export default function FichaCumplesPadres() {
         menu_especial_cantidad: reservaForm.menu_especial
           ? reservaForm.menu_especial_cantidad || null
           : null,
+        menu_opcion: reservaForm.menu_opcion || "",
         estado: "pendiente",
         creado_en: new Date().toISOString(),
       }),
@@ -254,27 +265,27 @@ export default function FichaCumplesPadres() {
         ? ` (${reservaForm.menu_especial_cantidad || 0})`
         : "";
       const detalleMsg = [
-        "🎉 *Solicitud de fecha para Cumple Robótico* 🤖",
+        "Solicitud de fecha para Cumple Robótico",
         "",
-        "📅 *Datos del evento*",
-        `• Fecha: ${formatFecha(slotSeleccionado.fecha)}`,
-        `• Hora: ${slotSeleccionado.hora}`,
+        "Datos del evento",
+        `- Fecha: ${formatFecha(slotSeleccionado.fecha)}`,
+        `- Hora: ${slotSeleccionado.hora}`,
         "",
-        "👤 *Datos de contacto*",
-        `• Nombre: ${reservaForm.nombre} ${reservaForm.apellido}`,
-        `• Teléfono: ${reservaForm.telefono}`,
+        "Datos de contacto",
+        `- Nombre: ${reservaForm.nombre} ${reservaForm.apellido}`,
+        `- Teléfono: ${reservaForm.telefono}`,
         "",
-        "🎂 *Cumpleañero/a*",
-        `• Nombre: ${reservaForm.cumpleanero_nombre || "-"}`,
-        `• Edad: ${reservaForm.cumpleanero_edad || "-"}`,
+        "Cumpleañero/a",
+        `- Nombre: ${reservaForm.cumpleanero_nombre || "-"}`,
+        `- Edad: ${reservaForm.cumpleanero_edad || "-"}`,
         "",
-        "🍔 *Menú especial*",
-        `• ${menuEspecial}${menuCantidad}`,
+        "Menú y comida especial",
+        `- Menú: ${reservaForm.menu_opcion || "-"}`,
+        `- Comida especial: ${menuEspecial}${menuCantidad}`,
         "",
-        "💬 *Mensaje adicional*",
+        "Mensaje adicional",
         `${reservaForm.mensaje || "-"}`,
       ].join("\n");
-
       const waUrl = `https://wa.me/5493415064891?text=${encodeURIComponent(detalleMsg)}`;
       window.open(waUrl, "_blank");
     }
@@ -288,6 +299,7 @@ export default function FichaCumplesPadres() {
       cumpleanero_edad: "",
       menu_especial: false,
       menu_especial_cantidad: "",
+      menu_opcion: "",
     });
     setSlotSeleccionado(null);
     await cargarDatosMes();
@@ -310,68 +322,12 @@ export default function FichaCumplesPadres() {
           </button>
         </div>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
-          Robotica, juegos, baile y una fiesta pensada para chicos. Elegi el dia y horario y nosotros
+          Robótica, juegos, baile y una fiesta pensada para chicos. Elegí el día y horario y nosotros
           nos encargamos del resto.
         </p>
       </div>
       <div className="mt-4 overflow-hidden">
         <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
-      </div>
-      <div className="mt-6 px-2 sm:px-4 text-sm text-gray-700 space-y-4">
-        <div className="text-lg font-semibold text-gray-900">
-          🎉 Cumpleaños en Plugin – Información para familias 🤖🎂
-        </div>
-        <p>
-          En Plugin celebramos cumpleaños distintos, llenos de juego, robótica y diversión. A
-          continuación te contamos todos los detalles para que tengas claridad antes de contratar:
-        </p>
-        <div className="space-y-3">
-          <div>
-            <div className="font-semibold">⏱️ Duración</div>
-            <div>2 horas y media de actividades guiadas, juegos y festejo.</div>
-          </div>
-          <div>
-            <div className="font-semibold">👧🧒 Cantidad de niños</div>
-            <div>Máximo 15 chicos en total.</div>
-          </div>
-          <div>
-            <div className="font-semibold">🎈 Edad del cumpleañero</div>
-            <div>Cumpleaños pensados para niños y niñas de 7 a 12 años.</div>
-          </div>
-          <div>
-            <div className="font-semibold">👨‍👩‍👦 Presencia de adultos</div>
-            <div>Participan solo los chicos.</div>
-            <div>Los únicos adultos que pueden permanecer durante el cumpleaños son los padres del cumpleañero.</div>
-          </div>
-          <div>
-            <div className="font-semibold">🍽️ Menú para los chicos</div>
-            <div>El menú se elige previamente por los padres y puede incluir:</div>
-            <ul className="list-disc list-inside">
-              <li>Patitas de pollo + Snacks</li>
-              <li>Panchos + Snacks</li>
-              
-            </ul>
-            <div>👉 Opción para celíacos disponible, avisando con anticipación.</div>
-          </div>
-          <div>
-            <div className="font-semibold">🥤 Bebidas</div>
-            <div>Bebida libre durante todo el cumple, provista por el local:</div>
-            <div>Coca-Cola · Sprite · Fanta</div>
-          </div>
-          <div>
-            <div className="font-semibold">🎂 Torta</div>
-            <div>La torta la trae el cumpleañero/a.</div>
-          </div>
-          <div>
-            <div className="font-semibold">🎁 Piñata</div>
-            <div>El relleno es entregado por el salón (bolsa de caramelos).</div>
-            <div>La familia puede agregar contenido si así lo desea.</div>
-          </div>
-          <div>
-            <div className="font-semibold">🚑 Seguridad</div>
-            <div>El espacio cuenta con seguro médico de Urgencias para mayor tranquilidad de las familias.</div>
-          </div>
-        </div>
       </div>
       {mensaje && (
         <div className="text-center text-sm text-emerald-700 mt-4 px-2 sm:px-4">{mensaje}</div>
@@ -379,14 +335,20 @@ export default function FichaCumplesPadres() {
 
       <div className="mt-6">
         <h3 className="text-lg font-semibold mb-4">Solicitud de reserva</h3>
-        <div className="text-xs sm:text-sm text-gray-600 mb-4">
-          <div className="font-medium text-gray-700 mb-1">Cómo reservar...</div>
-          <div>1) Elegí el mes y toca el día que desees realizar el cumple.</div>
-          <div>2) Selecciona uno de los horario disponibles.</div>
-          <div>3) Completa los datos de contacto y del cumpleañero.</div>
-          <div>4) Envía la solicitud para que nos contactemos y hablemos de precios.</div>
+        <div className="text-xs sm:text-sm text-gray-600 mb-4 space-y-2">
+          <div className="font-semibold text-gray-800">Cómo realizar la reserva del cumpleaños en Plugin</div>
+          <div className="font-semibold text-gray-700">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mr-2">
+              Paso 1
+            </span>
+            Elegí la fecha
+          </div>
+          <div>
+            Selecciona la fecha disponible que mejor se adapte a tu familia. Recomendamos elegir con
+            tiempo para asegurar lugar.
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
+<div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
           <span className="text-sm font-medium">Mes:</span>
           <div className="flex items-center gap-2">
             <button
@@ -397,9 +359,7 @@ export default function FichaCumplesPadres() {
                 if (idx > 0) setMesSeleccionado(mesesDisponibles[idx - 1].value);
               }}
               aria-label="Mes anterior"
-            >
-              ‹
-            </button>
+            >{"<"}</button>
             <div className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-800 min-w-[160px] text-center">
               {mesesDisponibles.find((m) => m.value === mesSeleccionado)?.label || "Mes"}
             </div>
@@ -413,9 +373,7 @@ export default function FichaCumplesPadres() {
                 }
               }}
               aria-label="Mes siguiente"
-            >
-              ›
-            </button>
+            >{">"}</button>
           </div>
         </div>
 
@@ -482,7 +440,17 @@ export default function FichaCumplesPadres() {
 
         {diaSeleccionado && (
           <div className="border rounded-xl p-3 mb-4">
-            <div className="text-sm font-semibold mb-2">
+                                                <div className="text-xs sm:text-sm text-gray-600 mb-2">
+              <div className="font-semibold text-gray-700">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mr-2">
+                  Paso 2
+                </span>
+                Elegi el horario
+              </div>
+              <div>Ahora selecciona uno de los horarios disponibles para el día elegido.</div>
+            </div>
+
+<div className="text-sm font-semibold mb-2">
               Horarios disponibles para {formatFecha(diaSeleccionado)}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -505,7 +473,7 @@ export default function FichaCumplesPadres() {
                       Turno {idx + 1}
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-lg font-semibold">
-                      <span>🕒</span>
+                      <span>Hora</span>
                       <span>
                         {s.hora} a {horaFin}hs
                       </span>
@@ -522,13 +490,24 @@ export default function FichaCumplesPadres() {
 
         {slotSeleccionado && (
           <div className="border rounded-xl p-4">
-            <div className="text-sm font-semibold mb-2">
+                        <div className="text-xs sm:text-sm text-gray-600 mb-2">
+              <div className="font-semibold text-gray-700">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mr-2">
+                  Paso 3
+                </span>
+                Completa los datos
+              </div>
+              <div>
+                Carga los datos del cumpleañero/a y del adulto responsable para avanzar con la
+                solicitud.
+              </div>
+            </div>
+
+<div className="text-sm font-semibold mb-2">
               Reserva para {formatFecha(slotSeleccionado.fecha)} de {slotSeleccionado.hora} a{" "}
               {addMinutes(slotSeleccionado.hora, 150)}hs
             </div>
-            <div className="text-xs text-gray-500 mb-3">
-              Completa los datos de contacto y del cumpleañero para enviar la solicitud.
-            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium">Nombre (madre/padre)</label>
@@ -576,6 +555,41 @@ export default function FichaCumplesPadres() {
                   }
                 />
               </div>
+              <div className="md:col-span-2 text-sm text-gray-600">
+                <span className="font-semibold text-gray-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mr-2">
+                    Paso 4
+                  </span>
+                  Elegí el menú
+                </span>
+                <div>
+                Si hay algun niño celíaco, indicalo para preparar una opción especial. 
+              </div>
+                
+              </div>
+              <div className="md:col-span-2">
+                
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {["Patitas de pollo + snacks", "Panchos + snacks"].map((opcion) => {
+                    const isActive = reservaForm.menu_opcion === opcion;
+                    const cls = isActive
+                      ? "bg-emerald-100 border-emerald-500 text-emerald-800 ring-2 ring-emerald-200 hover:bg-emerald-100"
+                      : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50";
+                    return (
+                      <button
+                        key={opcion}
+                        type="button"
+                        className={`w-full rounded-lg border px-3 py-3 text-sm font-medium text-left transition ${cls}`}
+                        onClick={() =>
+                          setReservaForm((p) => ({ ...p, menu_opcion: opcion }))
+                        }
+                      >
+                        {opcion}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="md:col-span-2 flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-[11px] sm:text-xs font-medium whitespace-nowrap leading-none">
                   <input
@@ -590,7 +604,7 @@ export default function FichaCumplesPadres() {
                       }))
                     }
                   />
-                  Requiere comida especial para celiacos
+                  Requiere comida especial para celíacos
                 </label>
                 <input
                   type="number"
@@ -605,7 +619,7 @@ export default function FichaCumplesPadres() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="text-xs font-medium">Mensaje</label>
+                <label className="text-xs font-medium">Observaciones</label>
                 <textarea
                   className="w-full border rounded px-3 py-2 text-sm min-h-[80px]"
                   value={reservaForm.mensaje}
@@ -613,17 +627,66 @@ export default function FichaCumplesPadres() {
                 />
               </div>
             </div>
-            <div className="flex justify-end mt-3">
-              <div className="flex flex-col items-end gap-2">
+            <div className="flex justify-start mt-3">
+              <div className="flex flex-col items-start gap-2">
+                <div className="text-sm text-gray-500 text-left">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold mr-2">
+                    Paso 5
+                  </span>
+                  Listo, nosotros nos ocupamos del resto. Te mostramos el resumen:
+                </div>
+                <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  <div className="font-semibold text-gray-700 mb-1">Resumen de la reserva</div>
+                  <div>
+                    <span className="font-medium text-gray-500">Fecha:</span>{" "}
+                    {formatFecha(slotSeleccionado?.fecha) || "-"}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Horario:</span>{" "}
+                    {slotSeleccionado?.hora || "-"}
+                    {slotSeleccionado?.hora ? ` a ${addMinutes(slotSeleccionado.hora, 150)}hs` : ""}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Contacto:</span>{" "}
+                    {reservaForm.nombre || "-"} {reservaForm.apellido || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Telefono:</span>{" "}
+                    {reservaForm.telefono || "-"}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Cumpleanero:</span>{" "}
+                    {reservaForm.cumpleanero_nombre || "-"}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Edad:</span>{" "}
+                    {reservaForm.cumpleanero_edad || "-"}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Menu:</span>{" "}
+                    {reservaForm.menu_opcion || "-"}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Comida especial:</span>{" "}
+                    {reservaForm.menu_especial ? "Si" : "No"}
+                    {reservaForm.menu_especial
+                      ? ` (${reservaForm.menu_especial_cantidad || 0})`
+                      : ""}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-500">Observaciones:</span>{" "}
+                    {reservaForm.mensaje || "-"}
+                  </div>
+                </div>
+                <span className="text-sm text-gray-500 text-left">
+                  El mensaje de WhatsApp es para continuar conversando y coordinar el pago la reserva.
+                </span>
                 <button
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded transition"
                   onClick={handleReserva}
                 >
-                  Enviar solicitud
+                  Enviar solicitud por Whatsapp
                 </button>
-                <span className="text-[11px] text-gray-500">
-                  Se enviara la solicitud por WhatsApp.
-                </span>
               </div>
             </div>
           </div>
@@ -631,5 +694,6 @@ export default function FichaCumplesPadres() {
       </div>
     </div>
     </div>
+    
   );
 }
