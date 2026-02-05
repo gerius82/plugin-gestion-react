@@ -249,7 +249,6 @@ const FormularioInscripcionVerano = () => {
         viernes: 4,
         sabado: 5,
         sábado: 5,
-        sábado: 5,
         domingo: 6,
       };
 

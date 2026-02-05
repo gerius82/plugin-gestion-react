@@ -37,6 +37,16 @@ export default function FichaAvisosAlumnos() {
         "Alias: plugin.robotica (a nombre de German Iusto).\n" +
         "Gracias! 🙌",
     },
+    {
+      id: "ciclo2026",
+      label: "Inscripcion Ciclo 2026",
+      text:
+        "Hola {nombre} {apellido}!\n" +
+        "Queremos invitarte al Ciclo 2026 de Robótica y Programación.\n" +
+        "Si tu hijo participó del Taller de Verano, la inscripción es gratuita.\n" +
+        "Link para inscribirse: https://gestionplugin2.netlify.app/menu-padres\n" +
+        "Cualquier duda, escribinos.",
+    },
   ];
   useEffect(() => {
     fetch("/config.json")

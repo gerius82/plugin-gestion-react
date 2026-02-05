@@ -63,7 +63,7 @@ export default function InfoCumples() {
           <div>
             <div className="font-semibold">🥤 Bebidas</div>
             <div>Bebida libre durante todo el cumple, provista por el local:</div>
-            <div>Coca-Cola · Sprite · Fanta</div>
+            <div>Coca-Cola · Sprite · Fanta · Agua</div>
           </div>
           <div>
             <div className="font-semibold">🎂 Torta</div>
