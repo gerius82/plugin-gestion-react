@@ -25,6 +25,7 @@ export default function FichaAvisosAlumnos() {
   const plantillasBase = [
     {
       id: "bienvenida",
+      orden: 1,
       label: "Bienvenida",
       text:
         "Hola {nombre} {apellido}! 🎉\n" +
@@ -34,6 +35,7 @@ export default function FichaAvisosAlumnos() {
     },
     {
       id: "transferencia",
+      orden: 2,
       label: "Datos de transferencia",
       text:
         "Hola {nombre} {apellido}! 💳\n" +
@@ -43,6 +45,7 @@ export default function FichaAvisosAlumnos() {
     },
     {
       id: "ciclo2026",
+      orden: 3,
       label: "Inscripcion Ciclo 2026",
       text:
         "Hola {nombre} {apellido}!\n" +
@@ -80,21 +83,9 @@ export default function FichaAvisosAlumnos() {
     })();
   }, [config]);
   useEffect(() => {
-    try {
-      const rawAll = localStorage.getItem("plantillasAvisos");
-      if (rawAll) {
-        const data = JSON.parse(rawAll);
-        setPlantillasEditables(Array.isArray(data) ? data : []);
-        return;
-      }
-      const rawCustom = localStorage.getItem("plantillasAvisosCustom");
-      const custom = rawCustom ? JSON.parse(rawCustom) : [];
-      const lista = [...plantillasBase, ...(Array.isArray(custom) ? custom : [])];
-      setPlantillasEditables(lista);
-    } catch {
-      setPlantillasEditables(plantillasBase);
-    }
-  }, []);
+    if (!config) return;
+    cargarPlantillas();
+  }, [config]);
   useEffect(() => {
     if (!mostrarPlantillas) return;
     const previous = document.body.style.overflow;
@@ -104,10 +95,78 @@ export default function FichaAvisosAlumnos() {
     };
   }, [mostrarPlantillas]);
 
-  const headers = () => ({
+  const headers = (extra = {}) => ({
     apikey: config?.supabaseKey,
     Authorization: `Bearer ${config?.supabaseKey}`,
+    ...extra,
   });
+
+  const cargarPlantillas = async () => {
+    try {
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/avisos_plantillas?select=id,label,text,orden,activo&order=orden.asc`,
+        { headers: headers() }
+      );
+      if (!res.ok) throw new Error("No pude cargar las plantillas.");
+      const data = await res.json();
+      const activas = (Array.isArray(data) ? data : []).filter((p) => p.activo !== false);
+      if (activas.length > 0) {
+        setPlantillasEditables(activas);
+        return;
+      }
+      await sembrarPlantillasBase();
+    } catch {
+      setPlantillasEditables(plantillasBase);
+    }
+  };
+
+  const sembrarPlantillasBase = async () => {
+    try {
+      const res = await fetch(`${config.supabaseUrl}/rest/v1/avisos_plantillas`, {
+        method: "POST",
+        headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
+        body: JSON.stringify(plantillasBase),
+      });
+      if (!res.ok) throw new Error("No pude guardar las plantillas base.");
+      const data = await res.json();
+      setPlantillasEditables(Array.isArray(data) ? data : plantillasBase);
+    } catch {
+      setPlantillasEditables(plantillasBase);
+    }
+  };
+
+  const crearPlantilla = async (payload) => {
+    const res = await fetch(`${config.supabaseUrl}/rest/v1/avisos_plantillas`, {
+      method: "POST",
+      headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("No pude crear la plantilla.");
+    const data = await res.json();
+    return Array.isArray(data) ? data[0] : data;
+  };
+
+  const actualizarPlantilla = async (id, payload) => {
+    const res = await fetch(
+      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!res.ok) throw new Error("No pude actualizar la plantilla.");
+    const data = await res.json();
+    return Array.isArray(data) ? data[0] : data;
+  };
+
+  const eliminarPlantilla = async (id) => {
+    const res = await fetch(
+      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}`,
+      { method: "DELETE", headers: headers({ Prefer: "return=minimal" }) }
+    );
+    if (!res.ok) throw new Error("No pude eliminar la plantilla.");
+  };
 
   const cargarAlumnos = async () => {
     setCargando(true);
@@ -223,10 +282,6 @@ export default function FichaAvisosAlumnos() {
     if (!limpio) return null;
     const personalizado = interpolarMensaje(mensajePlano, alumno);
     return `https://wa.me/54${limpio}?text=${encodeURIComponent(personalizado)}`;
-  };
-  const guardarPlantillasEditables = (lista) => {
-    setPlantillasEditables(lista);
-    localStorage.setItem("plantillasAvisos", JSON.stringify(lista));
   };
   const resetPlantillaForm = () => {
     setPlantillaEditId("");
@@ -530,22 +585,36 @@ export default function FichaAvisosAlumnos() {
                 <button
                   type="button"
                   className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
-                  onClick={() => {
+                  onClick={async () => {
                     if (!plantillaForm.label || !plantillaForm.text) return;
-                    if (plantillaEditId) {
-                      const updated = plantillasEditables.map((p) =>
-                        p.id === plantillaEditId ? { ...p, ...plantillaForm } : p
-                      );
-                      guardarPlantillasEditables(updated);
-                    } else {
-                      const nueva = {
-                        id: `custom-${Date.now()}`,
-                        label: plantillaForm.label,
-                        text: plantillaForm.text,
-                      };
-                      guardarPlantillasEditables([...plantillasEditables, nueva]);
+                    try {
+                      if (plantillaEditId) {
+                        const actualizada = await actualizarPlantilla(plantillaEditId, {
+                          label: plantillaForm.label,
+                          text: plantillaForm.text,
+                        });
+                        const updated = plantillasEditables.map((p) =>
+                          p.id === plantillaEditId ? { ...p, ...actualizada } : p
+                        );
+                        setPlantillasEditables(updated);
+                      } else {
+                        const ordenMax = plantillasEditables.reduce(
+                          (max, p) => Math.max(max, p.orden || 0),
+                          0
+                        );
+                        const nueva = await crearPlantilla({
+                          id: `custom-${Date.now()}`,
+                          label: plantillaForm.label,
+                          text: plantillaForm.text,
+                          orden: ordenMax + 1,
+                          activo: true,
+                        });
+                        setPlantillasEditables([...plantillasEditables, nueva]);
+                      }
+                      resetPlantillaForm();
+                    } catch {
+                      setError("No pude guardar la plantilla.");
                     }
-                    resetPlantillaForm();
                   }}
                 >
                   Guardar
@@ -590,15 +659,20 @@ export default function FichaAvisosAlumnos() {
                         <button
                           type="button"
                           className="text-xs px-2 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
-                          onClick={() => {
-                            const updated = plantillasEditables.filter((item) => item.id !== p.id);
-                            guardarPlantillasEditables(updated);
-                            if (plantillaEditId === p.id) {
-                              resetPlantillaForm();
-                            }
-                            if (plantillaActiva === p.id) {
-                              setPlantillaActiva("");
-                              setMensaje("");
+                          onClick={async () => {
+                            try {
+                              await eliminarPlantilla(p.id);
+                              const updated = plantillasEditables.filter((item) => item.id !== p.id);
+                              setPlantillasEditables(updated);
+                              if (plantillaEditId === p.id) {
+                                resetPlantillaForm();
+                              }
+                              if (plantillaActiva === p.id) {
+                                setPlantillaActiva("");
+                                setMensaje("");
+                              }
+                            } catch {
+                              setError("No pude eliminar la plantilla.");
                             }
                           }}
                         >
