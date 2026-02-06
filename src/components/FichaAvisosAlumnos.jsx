@@ -404,7 +404,7 @@ export default function FichaAvisosAlumnos() {
         </label>
         <div className="mb-2">
           <div className="text-xs text-gray-600 mb-2">
-            Mensajes predisenados (marcar para cargar en el texto):
+            Mensajes prediseñados (marcar para cargar en el texto):
           </div>
           <div className="mb-2">
             <button

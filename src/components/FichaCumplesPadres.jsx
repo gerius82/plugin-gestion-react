@@ -651,11 +651,11 @@ export default function FichaCumplesPadres() {
                     {reservaForm.nombre || "-"} {reservaForm.apellido || ""}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-500">Telefono:</span>{" "}
+                    <span className="font-medium text-gray-500">Teléfono:</span>{" "}
                     {reservaForm.telefono || "-"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-500">Cumpleanero:</span>{" "}
+                    <span className="font-medium text-gray-500">Cumpleañero:</span>{" "}
                     {reservaForm.cumpleanero_nombre || "-"}
                   </div>
                   <div>
@@ -679,7 +679,7 @@ export default function FichaCumplesPadres() {
                   </div>
                 </div>
                 <span className="text-sm text-gray-500 text-left">
-                  El mensaje de WhatsApp es para continuar conversando y coordinar el pago la reserva.
+                  El mensaje de WhatsApp es para continuar conversando y coordinar el pago de la reserva.
                 </span>
                 <button
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded transition"

@@ -40,6 +40,15 @@ function normalizeSedeToConfig(sede, turnosConfig) {
 
 const ORDEN_DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
+const formatFecha = (valor) => {
+  const raw = String(valor || "").trim();
+  if (!raw) return "-";
+  const base = raw.includes("T") ? raw.split("T")[0] : raw.split(" ")[0];
+  const [yyyy, mm, dd] = base.split("-");
+  if (!yyyy || !mm || !dd) return raw;
+  return `${dd}-${mm}-${yyyy}`;
+};
+
 
 const MESES_ORDEN = [
   "enero",
@@ -151,7 +160,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     if (!config) return [];
     setCargandoAlumnos(true);
     try {
-      const baseSelect = "select=id,persona_id,nombre,apellido,edad,escuela,responsable,telefono,email,curso,sede,turno_1,tiene_promo,beneficiario_id,creado_en,actualizado_en";
+      const baseSelect = "select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,curso,sede,turno_1,tiene_promo,beneficiario_id,creado_en,actualizado_en";
       const filtroActivo = incluirInactivos ? "" : "activo=eq.true&";
 
       const resMat = await fetch(
@@ -253,7 +262,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     if (!config || !personaId) return [];
 
     const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/inscripciones?persona_id=eq.${personaId}&select=id,persona_id,nombre,apellido,edad,escuela,responsable,telefono,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion&order=creado_en.desc`,
+      `${config.supabaseUrl}/rest/v1/inscripciones?persona_id=eq.${personaId}&select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion&order=creado_en.desc`,
       { headers }
     );
     const data = await res.json();
@@ -1576,6 +1585,10 @@ const renderEditorMatricula = () => (
                 </div>
                 <div>
                   <span className="font-medium">Edad:</span> {alumnoSeleccionado.edad ?? "-"}
+                </div>
+                <div>
+                  <span className="font-medium">Fecha de nacimiento:</span>{" "}
+                  {formatFecha(alumnoSeleccionado.fecha_nacimiento)}
                 </div>
                 <div>
                   <span className="font-medium">Escuela:</span> {alumnoSeleccionado.escuela || "-"}

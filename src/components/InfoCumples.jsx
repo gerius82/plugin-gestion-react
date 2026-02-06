@@ -40,7 +40,7 @@ export default function InfoCumples() {
           </div>
           <div>
             <div className="font-semibold">👧🧒 Cantidad de niños</div>
-            <div>Máximo 15 chicos en total.</div>
+            <div>Máximo 15 chicos en total, incluído el cumpleañero.</div>
           </div>
           <div>
             <div className="font-semibold">🎈 Edad del cumpleañero</div>
@@ -75,8 +75,38 @@ export default function InfoCumples() {
             <div>La familia puede agregar contenido si así lo desea.</div>
           </div>
           <div>
+            <div className="font-semibold">🎁 Regalo sorpresa para el cumpleañero</div>
+            <div>El cumpleañero se lleva un regalito sorpresa de Plugin como recuerdo del día.</div>
+          </div>
+          <div>
+            <div className="font-semibold">👩‍🏫 Profes a cargo</div>
+            <div>Siempre habrá dos profes encargados de coordinar actividades, juegos y acompañar a cada chico.</div>
+          </div>
+          <div>
+            <div className="font-semibold">📆 Políticas de cancelación</div>
+            <div>
+              Hasta 14 días previos al día del evento se puede reintegrar la reserva. Luego se
+              cobrará un 50% de la misma.
+            </div>
+          </div>
+          <div>
             <div className="font-semibold">🚑 Seguridad</div>
             <div>El espacio cuenta con seguro médico de Urgencias para mayor tranquilidad de las familias.</div>
+          </div>
+          <div>
+            <div className="font-semibold">📍 Ubicación</div>
+            <div>
+              El cumpleaños se realiza en nuestra sucursal de Fisherton, Eva Perón 8128, un espacio preparado
+              especialmente para celebrar y disfrutar con comodidad.
+            </div>
+            <div className="mt-2">
+              <iframe
+                title="Mapa de Fisherton"
+                className="w-full h-56 rounded-lg border"
+                loading="lazy"
+                src="https://www.google.com/maps?q=Eva%20Per%C3%B3n%208128%20Rosario&output=embed"
+              />
+            </div>
           </div>
         </div>
 
