@@ -16,9 +16,13 @@ export default function FichaAvisosAlumnos() {
   const [horasDisponibles, setHorasDisponibles] = useState([]);
   const [mensaje, setMensaje] = useState("");
   const [plantillaActiva, setPlantillaActiva] = useState("");
+  const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
+  const [plantillasEditables, setPlantillasEditables] = useState([]);
+  const [plantillaEditId, setPlantillaEditId] = useState("");
+  const [plantillaForm, setPlantillaForm] = useState({ label: "", text: "" });
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
-  const plantillas = [
+  const plantillasBase = [
     {
       id: "bienvenida",
       label: "Bienvenida",
@@ -75,6 +79,30 @@ export default function FichaAvisosAlumnos() {
       }
     })();
   }, [config]);
+  useEffect(() => {
+    try {
+      const rawAll = localStorage.getItem("plantillasAvisos");
+      if (rawAll) {
+        const data = JSON.parse(rawAll);
+        setPlantillasEditables(Array.isArray(data) ? data : []);
+        return;
+      }
+      const rawCustom = localStorage.getItem("plantillasAvisosCustom");
+      const custom = rawCustom ? JSON.parse(rawCustom) : [];
+      const lista = [...plantillasBase, ...(Array.isArray(custom) ? custom : [])];
+      setPlantillasEditables(lista);
+    } catch {
+      setPlantillasEditables(plantillasBase);
+    }
+  }, []);
+  useEffect(() => {
+    if (!mostrarPlantillas) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mostrarPlantillas]);
 
   const headers = () => ({
     apikey: config?.supabaseKey,
@@ -196,6 +224,14 @@ export default function FichaAvisosAlumnos() {
     const personalizado = interpolarMensaje(mensajePlano, alumno);
     return `https://wa.me/54${limpio}?text=${encodeURIComponent(personalizado)}`;
   };
+  const guardarPlantillasEditables = (lista) => {
+    setPlantillasEditables(lista);
+    localStorage.setItem("plantillasAvisos", JSON.stringify(lista));
+  };
+  const resetPlantillaForm = () => {
+    setPlantillaEditId("");
+    setPlantillaForm({ label: "", text: "" });
+  };
 
   const alumnosConTelefono = alumnos.filter((a) => a.telefono);
   const total = alumnos.length;
@@ -315,8 +351,17 @@ export default function FichaAvisosAlumnos() {
           <div className="text-xs text-gray-600 mb-2">
             Mensajes predisenados (marcar para cargar en el texto):
           </div>
+          <div className="mb-2">
+            <button
+              type="button"
+              className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+              onClick={() => setMostrarPlantillas(true)}
+            >
+              Crear / editar mensajes
+            </button>
+          </div>
           <div className="flex flex-wrap gap-3">
-            {plantillas.map((p) => (
+            {plantillasEditables.map((p) => (
               <label
                 key={p.id}
                 className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-full border border-gray-200 bg-gray-50"
@@ -349,7 +394,7 @@ export default function FichaAvisosAlumnos() {
           onChange={(e) => {
             const valor = e.target.value;
             setMensaje(valor);
-            const activa = plantillas.find((p) => p.id === plantillaActiva);
+            const activa = plantillasEditables.find((p) => p.id === plantillaActiva);
             if (activa && valor !== activa.text) {
               setPlantillaActiva("");
             }
@@ -448,6 +493,126 @@ export default function FichaAvisosAlumnos() {
         </div>
       )}
       </div>
+      {mostrarPlantillas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Mensajes predisenados</h3>
+              <button
+                type="button"
+                className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                onClick={() => {
+                  setMostrarPlantillas(false);
+                  resetPlantillaForm();
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="mb-4">
+              <div className="text-sm font-medium mb-1">Nombre del mensaje</div>
+              <input
+                className="w-full border rounded px-3 py-2 text-sm"
+                value={plantillaForm.label}
+                onChange={(e) =>
+                  setPlantillaForm((p) => ({ ...p, label: e.target.value }))
+                }
+              />
+              <div className="text-sm font-medium mt-3 mb-1">Texto del mensaje</div>
+              <textarea
+                className="w-full border rounded px-3 py-2 text-sm min-h-[120px]"
+                value={plantillaForm.text}
+                onChange={(e) =>
+                  setPlantillaForm((p) => ({ ...p, text: e.target.value }))
+                }
+              />
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                  onClick={() => {
+                    if (!plantillaForm.label || !plantillaForm.text) return;
+                    if (plantillaEditId) {
+                      const updated = plantillasEditables.map((p) =>
+                        p.id === plantillaEditId ? { ...p, ...plantillaForm } : p
+                      );
+                      guardarPlantillasEditables(updated);
+                    } else {
+                      const nueva = {
+                        id: `custom-${Date.now()}`,
+                        label: plantillaForm.label,
+                        text: plantillaForm.text,
+                      };
+                      guardarPlantillasEditables([...plantillasEditables, nueva]);
+                    }
+                    resetPlantillaForm();
+                  }}
+                >
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                  onClick={resetPlantillaForm}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold mb-2">Mensajes</div>
+              {plantillasEditables.length === 0 ? (
+                <div className="text-sm text-gray-500">No hay mensajes.</div>
+              ) : (
+                <div className="space-y-2">
+                  {plantillasEditables.map((p) => (
+                    <div
+                      key={p.id}
+                      className="border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                    >
+                      <div>
+                        <div className="text-sm font-medium">{p.label}</div>
+                        <div className="text-xs text-gray-500 whitespace-pre-line">
+                          {p.text}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          onClick={() => {
+                            setPlantillaEditId(p.id);
+                            setPlantillaForm({ label: p.label, text: p.text });
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          onClick={() => {
+                            const updated = plantillasEditables.filter((item) => item.id !== p.id);
+                            guardarPlantillasEditables(updated);
+                            if (plantillaEditId === p.id) {
+                              resetPlantillaForm();
+                            }
+                            if (plantillaActiva === p.id) {
+                              setPlantillaActiva("");
+                              setMensaje("");
+                            }
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
