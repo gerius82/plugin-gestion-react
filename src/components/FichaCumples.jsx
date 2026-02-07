@@ -49,6 +49,8 @@ const buildMonthDays = (ym) => {
 
 export default function FichaCumples() {
   const [config, setConfig] = useState(null);
+  const [cumplesHabilitado, setCumplesHabilitado] = useState(false);
+  const [guardandoHabilitado, setGuardandoHabilitado] = useState(false);
   const [mesSeleccionado, setMesSeleccionado] = useState(() => {
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -94,6 +96,40 @@ export default function FichaCumples() {
       Authorization: `Bearer ${config.supabaseKey}`,
     };
   }, [config]);
+
+  const cargarCumplesConfig = async () => {
+    if (!config) return;
+    try {
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/cumples_config?select=habilitado&id=eq.global`,
+        { headers }
+      );
+      const data = await res.json();
+      const row = Array.isArray(data) ? data[0] : null;
+      setCumplesHabilitado(Boolean(row?.habilitado));
+    } catch {
+      setCumplesHabilitado(false);
+    }
+  };
+
+  const guardarCumplesConfig = async (valor) => {
+    if (!config) return;
+    setGuardandoHabilitado(true);
+    try {
+      await fetch(`${config.supabaseUrl}/rest/v1/cumples_config`, {
+        method: "POST",
+        headers: {
+          ...headers,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({ id: "global", habilitado: valor }),
+      });
+      setCumplesHabilitado(valor);
+    } finally {
+      setGuardandoHabilitado(false);
+    }
+  };
 
   const daysInMonth = useMemo(() => buildMonthDays(mesSeleccionado), [mesSeleccionado]);
   const mesesDisponibles = useMemo(() => {
@@ -144,6 +180,12 @@ export default function FichaCumples() {
     cargarDatosMes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, mesSeleccionado]);
+
+  useEffect(() => {
+    if (!config) return;
+    cargarCumplesConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config]);
 
   useEffect(() => {
     const draft = {};
@@ -416,7 +458,23 @@ export default function FichaCumples() {
 
         <div className="mt-6 w-full">
           <div className="p-3 sm:p-4 w-full">
-            <h3 className="text-lg font-semibold mb-4">Gestion de agenda</h3>
+            <h3 className="text-lg font-semibold mb-2">Gestion de agenda</h3>
+            <div className="flex items-center gap-3 mb-4">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={cumplesHabilitado}
+                  onChange={(e) => guardarCumplesConfig(e.target.checked)}
+                  disabled={guardandoHabilitado}
+                />
+                <span className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 transition-colors" />
+                <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+              </label>
+              <span className="text-sm font-medium">
+                Habilitar Ficha de cumples en Menú Padres
+              </span>
+            </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
               <label className="text-sm font-medium">Mes:</label>
               <select
