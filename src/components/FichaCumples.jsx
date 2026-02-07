@@ -51,6 +51,13 @@ export default function FichaCumples() {
   const [config, setConfig] = useState(null);
   const [cumplesHabilitado, setCumplesHabilitado] = useState(false);
   const [guardandoHabilitado, setGuardandoHabilitado] = useState(false);
+  const [precioCumple, setPrecioCumple] = useState("");
+  const [promoCumple, setPromoCumple] = useState("");
+  const [guardandoPrecio, setGuardandoPrecio] = useState(false);
+  const [editPrecio, setEditPrecio] = useState(false);
+  const [editPromo, setEditPromo] = useState(false);
+  const [precioDraft, setPrecioDraft] = useState("");
+  const [promoDraft, setPromoDraft] = useState("");
   const [mesSeleccionado, setMesSeleccionado] = useState(() => {
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -83,6 +90,23 @@ export default function FichaCumples() {
     return `${d}-${m}-${y}`;
   };
 
+  const formatPrecioInput = (valor) => {
+    const digits = String(valor || "").replace(/\D/g, "");
+    if (!digits) return "";
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const formatPrecioLabel = (valor) => {
+    const num = Number(String(valor || "").replace(/\./g, "").replace(/,/g, "."));
+    if (!Number.isFinite(num)) return "";
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(num);
+  };
+
   useEffect(() => {
     fetch("/config.json")
       .then((res) => res.json())
@@ -101,12 +125,18 @@ export default function FichaCumples() {
     if (!config) return;
     try {
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/cumples_config?select=habilitado&id=eq.global`,
+        `${config.supabaseUrl}/rest/v1/cumples_config?select=habilitado,precio,promo&id=eq.global`,
         { headers }
       );
       const data = await res.json();
       const row = Array.isArray(data) ? data[0] : null;
       setCumplesHabilitado(Boolean(row?.habilitado));
+      const precioTxt = row?.precio != null ? String(row.precio) : "";
+      const promoTxt = row?.promo || "";
+      setPrecioCumple(precioTxt);
+      setPromoCumple(promoTxt);
+      setPrecioDraft(precioTxt);
+      setPromoDraft(promoTxt);
     } catch {
       setCumplesHabilitado(false);
     }
@@ -128,6 +158,34 @@ export default function FichaCumples() {
       setCumplesHabilitado(valor);
     } finally {
       setGuardandoHabilitado(false);
+    }
+  };
+
+  const guardarPrecioPromo = async (opts = {}) => {
+    if (!config) return;
+    setGuardandoPrecio(true);
+    try {
+      const precioNum =
+        opts.precio === "" ? null : Number(String(opts.precio || "").replace(/\./g, "").replace(/,/g, "."));
+      await fetch(`${config.supabaseUrl}/rest/v1/cumples_config`, {
+        method: "POST",
+        headers: {
+          ...headers,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({
+          id: "global",
+          precio: Number.isFinite(precioNum) ? precioNum : null,
+          promo: opts.promo || null,
+        }),
+      });
+      setPrecioCumple(opts.precio || "");
+      setPromoCumple(opts.promo || "");
+      setMensaje("Precio actualizado.");
+      setTimeout(() => setMensaje(""), 1500);
+    } finally {
+      setGuardandoPrecio(false);
     }
   };
 
@@ -475,6 +533,135 @@ export default function FichaCumples() {
                 Habilitar Ficha de cumples en Menú Padres
               </span>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div className="border rounded-lg p-3 bg-white/70">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">Precio del cumple</div>
+                  {!editPrecio && (
+                    <div className="flex gap-2 text-xs">
+                      <button
+                        className="text-emerald-700 hover:bg-emerald-50 rounded px-2 py-1 transition"
+                        onClick={() => {
+                          setEditPrecio(true);
+                          setPrecioDraft(precioCumple);
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="text-gray-600 hover:bg-gray-100 rounded px-2 py-1 transition"
+                        onClick={async () => {
+                          await guardarPrecioPromo({ precio: "", promo: promoCumple });
+                          setPrecioDraft("");
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {!editPrecio ? (
+                  <div className="text-xs text-gray-600 mt-2">
+                    {precioCumple ? `Precio actual: ${formatPrecioLabel(precioCumple)}` : "Sin precio"}
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      className="border rounded px-3 py-2 text-sm w-full"
+                      value={precioDraft}
+                      onChange={(e) => setPrecioDraft(formatPrecioInput(e.target.value))}
+                      placeholder="Ej: 570000"
+                    />
+                    <div className="flex gap-2 mt-2 text-xs">
+                      <button
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded transition"
+                        onClick={async () => {
+                          await guardarPrecioPromo({ precio: precioDraft, promo: promoCumple });
+                          setEditPrecio(false);
+                        }}
+                        disabled={guardandoPrecio}
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded transition"
+                        onClick={() => {
+                          setEditPrecio(false);
+                          setPrecioDraft(precioCumple);
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="border rounded-lg p-3 bg-white/70">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">Promo (texto)</div>
+                  {!editPromo && (
+                    <div className="flex gap-2 text-xs">
+                      <button
+                        className="text-emerald-700 hover:bg-emerald-50 rounded px-2 py-1 transition"
+                        onClick={() => {
+                          setEditPromo(true);
+                          setPromoDraft(promoCumple);
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="text-gray-600 hover:bg-gray-100 rounded px-2 py-1 transition"
+                        onClick={async () => {
+                          await guardarPrecioPromo({ precio: precioCumple, promo: "" });
+                          setPromoDraft("");
+                        }}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {!editPromo ? (
+                  <div className="text-xs text-gray-600 mt-2">
+                    {promoCumple ? `Promo actual: ${promoCumple}` : "Sin promo"}
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      className="border rounded px-3 py-2 text-sm w-full"
+                      value={promoDraft}
+                      onChange={(e) => setPromoDraft(e.target.value)}
+                      placeholder="Ej: Promo lanzamiento reservando en febrero 20% off: $450.000."
+                    />
+                    <div className="flex gap-2 mt-2 text-xs">
+                      <button
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded transition"
+                        onClick={async () => {
+                          await guardarPrecioPromo({ precio: precioCumple, promo: promoDraft });
+                          setEditPromo(false);
+                        }}
+                        disabled={guardandoPrecio}
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded transition"
+                        onClick={() => {
+                          setEditPromo(false);
+                          setPromoDraft(promoCumple);
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="border-t border-gray-200 my-4" />
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
               <label className="text-sm font-medium">Mes:</label>
               <select

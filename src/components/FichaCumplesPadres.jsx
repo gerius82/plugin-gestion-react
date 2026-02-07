@@ -570,7 +570,7 @@ export default function FichaCumplesPadres() {
               <div className="md:col-span-2">
                 
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {["Patitas de pollo + snacks", "Panchos + snacks"].map((opcion) => {
+                  {["Fingers de pollo + papas Noisette + Snacks", "Super Pancho + snacks"].map((opcion) => {
                     const isActive = reservaForm.menu_opcion === opcion;
                     const cls = isActive
                       ? "bg-emerald-100 border-emerald-500 text-emerald-800 ring-2 ring-emerald-200 hover:bg-emerald-100"
