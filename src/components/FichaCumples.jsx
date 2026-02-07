@@ -629,9 +629,8 @@ export default function FichaCumples() {
                   </div>
                 ) : (
                   <div className="mt-2">
-                    <input
-                      type="text"
-                      className="border rounded px-3 py-2 text-sm w-full"
+                    <textarea
+                      className="border rounded px-3 py-2 text-sm w-full min-h-[72px]"
                       value={promoDraft}
                       onChange={(e) => setPromoDraft(e.target.value)}
                       placeholder="Ej: Promo lanzamiento reservando en febrero 20% off: $450.000."

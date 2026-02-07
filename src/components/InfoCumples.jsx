@@ -59,7 +59,7 @@ export default function InfoCumples() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto mt-8 px-2 sm:px-4">
+    <div className="w-full max-w-5xl mx-auto mt-8 px-1 sm:px-4">
       <div className="max-w-4xl mx-auto flex items-center justify-between mb-6 gap-4">
         <h1 className="text-2xl md:text-3xl font-bold text-center flex-1">Festeja tu cumple</h1>
         <button
@@ -71,7 +71,7 @@ export default function InfoCumples() {
         </button>
       </div>
 
-      <div className="bg-gradient-to-br from-emerald-50 via-white to-sky-50 rounded-2xl shadow p-4 sm:p-6 max-w-4xl mx-auto text-sm text-gray-700 space-y-6 border border-emerald-100">
+      <div className="bg-gradient-to-br from-emerald-50 via-white to-sky-50 rounded-2xl shadow p-3 sm:p-6 max-w-4xl mx-auto text-sm text-gray-700 space-y-6 border border-emerald-100">
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
             Experiencia Plugin
@@ -177,7 +177,7 @@ export default function InfoCumples() {
             <div>
               <div className="font-semibold">Precio</div>
               <div>Valor del cumple: {formatPrecio(precioCumple)}.</div>
-              <div>{promoCumple || promoDefault}</div>
+              <div className="whitespace-pre-line">{promoCumple || promoDefault}</div>
               <div>Reserva con el 50%.</div>
             </div>
           </div>
