@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+const calcularEdadDesdeFecha = (fechaIso) => {
+  const raw = String(fechaIso || "").trim();
+  if (!raw) return null;
+  const base = raw.includes("T") ? raw.split("T")[0] : raw.split(" ")[0];
+  const fecha = new Date(`${base}T00:00:00`);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - fecha.getFullYear();
+  const m = hoy.getMonth() - fecha.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < fecha.getDate())) edad -= 1;
+  return edad >= 0 ? edad : null;
+};
+
 export default function FichaResumenAlumnos() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
@@ -58,7 +71,7 @@ export default function FichaResumenAlumnos() {
     if (filtroHora) filtros.push(`hora=eq.${encodeURIComponent(filtroHora)}`);
     const filtro = filtros.length ? `&${filtros.join("&")}` : "";
     const alumnosRes = await fetch(
-      `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,lista_espera,creado_en,inscripciones(id,nombre,apellido,edad,escuela,responsable,telefono,email,creado_en,tiene_promo,beneficiario_id,curso)${filtro}`,
+      `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,lista_espera,creado_en,inscripciones(id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,creado_en,tiene_promo,beneficiario_id,curso)${filtro}`,
       { headers }
     );
     if (!alumnosRes.ok) {
@@ -79,7 +92,10 @@ export default function FichaResumenAlumnos() {
       turno_1: `${a.dia} ${a.hora}`,
       nombre: a.inscripciones?.nombre || "",
       apellido: a.inscripciones?.apellido || "",
-      edad: a.inscripciones?.edad,
+      edad:
+        calcularEdadDesdeFecha(a.inscripciones?.fecha_nacimiento) ??
+        a.inscripciones?.edad ??
+        null,
       escuela: a.inscripciones?.escuela || "",
       responsable: a.inscripciones?.responsable || "",
       telefono: a.inscripciones?.telefono || "",

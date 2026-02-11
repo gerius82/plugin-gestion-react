@@ -76,16 +76,17 @@ const FormularioInscripcion = () => {
     const telefono = telefonoRaw.replace(/\D/g, "");
     const email = (formulario.email || "").trim().toLowerCase();
     const filtrosOr = [];
-    if (telefono) {
-      filtrosOr.push(`telefono.ilike.${encodeURIComponent(`%${telefono}%`)}`);
-    }
-    if (email) {
-      filtrosOr.push(`email.ilike.${encodeURIComponent(email)}`);
-    }
     if (nombre && apellido) {
       filtrosOr.push(
         `and(nombre.ilike.${encodeURIComponent(nombre)},apellido.ilike.${encodeURIComponent(apellido)})`
       );
+    } else {
+      if (telefono) {
+        filtrosOr.push(`telefono.ilike.${encodeURIComponent(`%${telefono}%`)}`);
+      }
+      if (email) {
+        filtrosOr.push(`email.ilike.${encodeURIComponent(email)}`);
+      }
     }
     if (filtrosOr.length === 0) return null;
     const url =

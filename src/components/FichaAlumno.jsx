@@ -49,6 +49,19 @@ const formatFecha = (valor) => {
   return `${dd}-${mm}-${yyyy}`;
 };
 
+const calcularEdadDesdeFecha = (fechaIso) => {
+  const raw = String(fechaIso || "").trim();
+  if (!raw) return null;
+  const base = raw.includes("T") ? raw.split("T")[0] : raw.split(" ")[0];
+  const fecha = new Date(`${base}T00:00:00`);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - fecha.getFullYear();
+  const m = hoy.getMonth() - fecha.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < fecha.getDate())) edad -= 1;
+  return edad >= 0 ? edad : null;
+};
+
 
 const MESES_ORDEN = [
   "enero",
@@ -504,7 +517,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     setFormAlumno({
       nombre: alumnoSeleccionado.nombre || "",
       apellido: alumnoSeleccionado.apellido || "",
-      edad: alumnoSeleccionado.edad ?? "",
+      fecha_nacimiento: alumnoSeleccionado.fecha_nacimiento || "",
       escuela: alumnoSeleccionado.escuela || "",
       responsable: alumnoSeleccionado.responsable || "",
       telefono: alumnoSeleccionado.telefono || "",
@@ -550,7 +563,8 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     const payloadAlumno = {
       nombre: formAlumno.nombre,
       apellido: formAlumno.apellido,
-      edad: formAlumno.edad,
+      edad: calcularEdadDesdeFecha(formAlumno.fecha_nacimiento),
+      fecha_nacimiento: formAlumno.fecha_nacimiento || null,
       escuela: formAlumno.escuela,
       responsable: formAlumno.responsable,
       telefono: formAlumno.telefono,
@@ -809,7 +823,8 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     const payloadAlumno = {
       nombre: formAlumno.nombre,
       apellido: formAlumno.apellido,
-      edad: formAlumno.edad,
+      edad: calcularEdadDesdeFecha(formAlumno.fecha_nacimiento),
+      fecha_nacimiento: formAlumno.fecha_nacimiento || null,
       escuela: formAlumno.escuela,
       responsable: formAlumno.responsable,
       telefono: formAlumno.telefono,
@@ -1583,9 +1598,12 @@ const renderEditorMatricula = () => (
                   <span className="font-medium">Nombre y apellido:</span> {alumnoSeleccionado.nombre}{" "}
                   {alumnoSeleccionado.apellido}
                 </div>
-                <div>
-                  <span className="font-medium">Edad:</span> {alumnoSeleccionado.edad ?? "-"}
-                </div>
+                  <div>
+                    <span className="font-medium">Edad:</span>{" "}
+                    {calcularEdadDesdeFecha(alumnoSeleccionado.fecha_nacimiento) ??
+                      alumnoSeleccionado.edad ??
+                      "-"}
+                  </div>
                 <div>
                   <span className="font-medium">Fecha de nacimiento:</span>{" "}
                   {formatFecha(alumnoSeleccionado.fecha_nacimiento)}
@@ -1626,12 +1644,12 @@ const renderEditorMatricula = () => (
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-3 mt-4">
-                {[
-                  { label: "Nombre", key: "nombre", type: "text" },
-                  { label: "Apellido", key: "apellido", type: "text" },
-                  { label: "Edad", key: "edad", type: "number" },
-                  { label: "Escuela", key: "escuela", type: "text" },
-                  { label: "Responsable", key: "responsable", type: "text" },
+                  {[
+                    { label: "Nombre", key: "nombre", type: "text" },
+                    { label: "Apellido", key: "apellido", type: "text" },
+                    { label: "Fecha de nacimiento", key: "fecha_nacimiento", type: "date" },
+                    { label: "Escuela", key: "escuela", type: "text" },
+                    { label: "Responsable", key: "responsable", type: "text" },
                   { label: "Teléfono", key: "telefono", type: "text" },
                   { label: "Mail", key: "email", type: "email" },
                 ].map((f) => (
