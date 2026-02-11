@@ -6,7 +6,7 @@ export default function FichaAvisosAlumnos() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
-  const [filtroEstado, setFiltroEstado] = useState("activos"); // activos | inactivos | todos
+  const [filtroEstado, setFiltroEstado] = useState("activos"); // activos | inactivos | todos | sin_matricula
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroDia, setFiltroDia] = useState("");
   const [filtroHora, setFiltroHora] = useState("");
@@ -173,7 +173,7 @@ export default function FichaAvisosAlumnos() {
     setError("");
 
     try {
-      let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,inscripciones(nombre,apellido,telefono)`;
+      let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,inscripciones(id,persona_id,nombre,apellido,telefono)`;
 
       const filtros = [];
 
@@ -201,11 +201,11 @@ export default function FichaAvisosAlumnos() {
           c.nombre_publico || c.codigo,
         ])
       );
-      const listaBase = (Array.isArray(data) ? data : []).map((m) => {
+      let listaBase = (Array.isArray(data) ? data : []).map((m) => {
         const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
         const estadoNormalizado = String(m.estado || "").toLowerCase();
         return {
-          id: m.id,
+          id: `mat-${m.id}`,
           alumno_id: m.alumno_id,
           nombre: (alumno.nombre || "").trimEnd(),
           apellido: (alumno.apellido || "").trimEnd(),
@@ -218,6 +218,58 @@ export default function FichaAvisosAlumnos() {
           ciclo_nombre: ciclosMap.get(m.ciclo_codigo) || m.ciclo_codigo || "",
         };
       });
+
+      if (filtroEstado === "todos" || filtroEstado === "sin_matricula") {
+        const idsConMatricula = new Set();
+        (Array.isArray(data) ? data : []).forEach((m) => {
+          const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
+          if (m?.alumno_id) idsConMatricula.add(String(m.alumno_id));
+          if (alumno?.id) idsConMatricula.add(String(alumno.id));
+          if (alumno?.persona_id) idsConMatricula.add(String(alumno.persona_id));
+        });
+
+        const resInsc = await fetch(
+          `${config.supabaseUrl}/rest/v1/inscripciones?select=id,persona_id,nombre,apellido,telefono,sede,turno_1,tipo_inscripcion`,
+          { headers: headers() }
+        );
+        const dataInsc = await resInsc.json();
+        const filasInsc = Array.isArray(dataInsc) ? dataInsc : [];
+
+        const extras = filasInsc
+          .filter((i) => {
+            const id = i?.id ? String(i.id) : "";
+            const personaId = i?.persona_id ? String(i.persona_id) : "";
+            if (idsConMatricula.has(id) || (personaId && idsConMatricula.has(personaId))) return false;
+            if (filtroCiclo && (i.tipo_inscripcion || "") !== filtroCiclo) return false;
+            if (filtroSede && (i.sede || "") !== filtroSede) return false;
+            return true;
+          })
+          .map((i) => {
+            const turno = String(i.turno_1 || "").trim();
+            const partes = turno.split(" ");
+            const dia = partes.length > 1 ? partes[0] : "";
+            const hora = partes.length > 1 ? partes.slice(1).join(" ") : "";
+            return {
+              id: `insc-${i.id}`,
+              alumno_id: i.persona_id || i.id,
+              nombre: (i.nombre || "").trimEnd(),
+              apellido: (i.apellido || "").trimEnd(),
+              telefono: i.telefono || "",
+              sede: i.sede || "",
+              dia,
+              hora,
+              estado_normalizado: "sin_matricula",
+              ciclo_codigo: i.tipo_inscripcion || "",
+              ciclo_nombre: ciclosMap.get(i.tipo_inscripcion) || i.tipo_inscripcion || "",
+            };
+          });
+
+        listaBase = [...listaBase, ...extras];
+      }
+
+      if (filtroEstado === "sin_matricula") {
+        listaBase = listaBase.filter((a) => a.estado_normalizado === "sin_matricula");
+      }
 
       // ordenar por nombre y apellido
       const listaFiltrada = [...listaBase].sort((a, b) => {
@@ -297,6 +349,7 @@ export default function FichaAvisosAlumnos() {
     if (e === "baja") return { cls: "bg-red-100 text-red-800", label: "Inactiva" };
     if (e === "pausada") return { cls: "bg-red-100 text-red-800", label: "Inactiva" };
     if (e === "finalizada") return { cls: "bg-gray-100 text-gray-800", label: "Finalizada" };
+    if (e === "sin_matricula") return { cls: "bg-slate-100 text-slate-700", label: "Sin matrícula" };
     return { cls: "bg-gray-100 text-gray-800", label: estado || "-" };
   };
 
@@ -315,7 +368,7 @@ export default function FichaAvisosAlumnos() {
       <div className="bg-white rounded-xl shadow p-6 max-w-5xl mx-auto">
 
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         {/* Estado */}
         <div>
           <label className="block font-medium mb-1 text-sm">Estado:</label>
@@ -327,6 +380,7 @@ export default function FichaAvisosAlumnos() {
             <option value="activos">Activos</option>
             <option value="inactivos">Inactivos</option>
             <option value="todos">Todos</option>
+            <option value="sin_matricula">Solo sin matrícula</option>
           </select>
         </div>
 
@@ -395,6 +449,7 @@ export default function FichaAvisosAlumnos() {
             ))}
           </select>
         </div>
+        <div />
       </div>
 
       {/* Editor de mensaje */}
