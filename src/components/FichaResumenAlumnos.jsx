@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 const calcularEdadDesdeFecha = (fechaIso) => {
@@ -62,6 +62,19 @@ export default function FichaResumenAlumnos() {
     const cicloData = await cicloRes.json();
     setCiclosDisponibles(Array.isArray(cicloData) ? cicloData : []);
 
+    const anioActual = new Date().getFullYear();
+    const desde = `${anioActual}-01-01T00:00:00.000Z`;
+    const hasta = `${anioActual + 1}-01-01T00:00:00.000Z`;
+    const pagosRes = await fetch(
+      `${config.supabaseUrl}/rest/v1/pagos?select=alumno_id,pago_inscripcion&creado_en=gte.${encodeURIComponent(desde)}&creado_en=lt.${encodeURIComponent(hasta)}`,
+      { headers }
+    );
+    const pagosData = pagosRes.ok ? await pagosRes.json() : [];
+    const inscripcionesPagasSet = new Set(
+      (Array.isArray(pagosData) ? pagosData : [])
+        .filter((p) => p?.pago_inscripcion)
+        .map((p) => String(p.alumno_id))
+    );
     const filtros = [];
     if (filtroEstado === "activos") filtros.push("estado=eq.activa");
     if (filtroEstado === "inactivos") filtros.push("estado=in.(baja,finalizada)");
@@ -105,6 +118,7 @@ export default function FichaResumenAlumnos() {
       tiene_promo: a.inscripciones?.tiene_promo,
       lista_espera: a.lista_espera,
       curso: a.inscripciones?.curso || "",
+      inscripcion_paga: inscripcionesPagasSet.has(String(a.alumno_id)),
       beneficiario_nombre:
         a.inscripciones?.beneficiario_id && map[a.inscripciones?.beneficiario_id]
           ? map[a.inscripciones?.beneficiario_id]
@@ -287,20 +301,21 @@ export default function FichaResumenAlumnos() {
         <thead className="bg-gray-100 sticky top-0 z-20">
             <tr>
                 {[
-                ["creado_en", "Inscripción"],
+                ["creado_en", "InscripciÃ³n"],
                 ["nombre", "Nombre"],
                 ["fecha_nacimiento", "Fecha nacimiento"],
                 ["edad", "Edad"],
                 ["sede", "Sede"],
                 ["turno_1", "Turno"],
                 ["curso", "Curso"],
+                ["inscripcion_paga", "Inscripción paga"],
                 ["tiene_promo", "Promo"],
                 ["beneficiario_nombre", "Beneficiario"],
                 ["lista_espera", "Espera"],
                 ["ficha", "Ficha"],
                 ["escuela", "Escuela"],
                 ["responsable", "Responsable"],
-                ["telefono", "Teléfono"],
+                ["telefono", "TelÃ©fono"],
                 ["email", "Email"],
                 ].map(([key, label]) => (
                 <th
@@ -308,7 +323,7 @@ export default function FichaResumenAlumnos() {
                     onClick={() => key !== "ficha" && handleOrden(key)}
                     style={{ cursor: key !== "ficha" ? "pointer" : "default" }}
                     className={`px-3 py-2 ${
-                    ["tiene_promo", "lista_espera", "ficha"].includes(key)
+                    ["inscripcion_paga", "tiene_promo", "lista_espera", "ficha"].includes(key)
                         ? "text-center"
                         : "text-left"
                     }`}
@@ -333,6 +348,7 @@ export default function FichaResumenAlumnos() {
                 <td className="px-3 py-2 whitespace-nowrap">{a.sede}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.turno_1}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.curso}</td>
+                <td className="px-3 py-2 text-center">{a.inscripcion_paga ? "✅" : ""}</td>
                 <td className="px-3 py-2 text-center">{a.tiene_promo ? "✅" : ""}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                     {a.beneficiario_nombre}
@@ -347,7 +363,7 @@ export default function FichaResumenAlumnos() {
                 </td>
                 <td className="px-3 py-2 text-center">
                     <Link to={`/ficha-alumno/${a.alumno_id}`} title="Ver ficha individual">
-                    📄
+                    ðŸ“„
                     </Link>
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.escuela}</td>
@@ -365,4 +381,5 @@ export default function FichaResumenAlumnos() {
     </div>
   );
 }
+
 
