@@ -50,6 +50,7 @@ const buildMonthDays = (ym) => {
 export default function FichaCumples() {
   const [config, setConfig] = useState(null);
   const [cumplesHabilitado, setCumplesHabilitado] = useState(false);
+  const [mostrarPrecioInfo, setMostrarPrecioInfo] = useState(true);
   const [guardandoHabilitado, setGuardandoHabilitado] = useState(false);
   const [precioCumple, setPrecioCumple] = useState("");
   const [promoCumple, setPromoCumple] = useState("");
@@ -125,12 +126,13 @@ export default function FichaCumples() {
     if (!config) return;
     try {
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/cumples_config?select=habilitado,precio,promo&id=eq.global`,
+        `${config.supabaseUrl}/rest/v1/cumples_config?select=*&id=eq.global`,
         { headers }
       );
       const data = await res.json();
       const row = Array.isArray(data) ? data[0] : null;
       setCumplesHabilitado(Boolean(row?.habilitado));
+      setMostrarPrecioInfo(row?.mostrar_precio !== false);
       const precioTxt = row?.precio != null ? String(row.precio) : "";
       const promoTxt = row?.promo || "";
       setPrecioCumple(precioTxt);
@@ -156,6 +158,25 @@ export default function FichaCumples() {
         body: JSON.stringify({ id: "global", habilitado: valor }),
       });
       setCumplesHabilitado(valor);
+    } finally {
+      setGuardandoHabilitado(false);
+    }
+  };
+
+  const guardarMostrarPrecioInfo = async (valor) => {
+    if (!config) return;
+    setGuardandoHabilitado(true);
+    try {
+      await fetch(`${config.supabaseUrl}/rest/v1/cumples_config`, {
+        method: "POST",
+        headers: {
+          ...headers,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify({ id: "global", mostrar_precio: valor }),
+      });
+      setMostrarPrecioInfo(valor);
     } finally {
       setGuardandoHabilitado(false);
     }
@@ -532,6 +553,20 @@ export default function FichaCumples() {
               <span className="text-sm font-medium">
                 Habilitar Ficha de cumples en Menú Padres
               </span>
+            </div>
+            <div className="flex items-center gap-3 mb-4">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={mostrarPrecioInfo}
+                  onChange={(e) => guardarMostrarPrecioInfo(e.target.checked)}
+                  disabled={guardandoHabilitado}
+                />
+                <span className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 transition-colors" />
+                <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+              </label>
+              <span className="text-sm font-medium">Mostrar precio en InfoCumples</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <div className="border rounded-lg p-3 bg-white/70">

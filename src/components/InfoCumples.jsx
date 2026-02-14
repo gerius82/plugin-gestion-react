@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaMoneyBillWave } from "react-icons/fa";
+import { FaMoneyBillWave, FaWhatsapp } from "react-icons/fa";
 
 export default function InfoCumples() {
   const navigate = useNavigate();
@@ -11,6 +11,7 @@ export default function InfoCumples() {
   const [config, setConfig] = useState(null);
   const [precioCumple, setPrecioCumple] = useState(null);
   const [promoCumple, setPromoCumple] = useState("");
+  const [mostrarPrecioInfo, setMostrarPrecioInfo] = useState(true);
   const promoDefault = "Promo lanzamiento reservando en febrero 20% off: $450.000.";
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export default function InfoCumples() {
     (async () => {
       try {
         const res = await fetch(
-          `${config.supabaseUrl}/rest/v1/cumples_config?select=precio,promo&id=eq.global`,
+          `${config.supabaseUrl}/rest/v1/cumples_config?select=*&id=eq.global`,
           {
             headers: {
               apikey: config.supabaseKey,
@@ -37,9 +38,11 @@ export default function InfoCumples() {
         const row = Array.isArray(data) ? data[0] : null;
         setPrecioCumple(row?.precio ?? null);
         setPromoCumple(row?.promo || "");
+        setMostrarPrecioInfo(row?.mostrar_precio !== false);
       } catch {
         setPrecioCumple(null);
         setPromoCumple("");
+        setMostrarPrecioInfo(true);
       }
     })();
   }, [config]);
@@ -53,10 +56,9 @@ export default function InfoCumples() {
     return `$${formatted}`;
   };
 
-  const continuar = () => {
-    const origin = from ? `&origin=${encodeURIComponent(from)}` : "";
-    navigate(`/cumples-reservas?from=info-cumples${origin}`);
-  };
+  const telefonoWhatsapp = String(config?.whatsappCumples || "5493415064891").replace(/\D/g, "");
+  const textoWhatsapp = encodeURIComponent("Hola! Quiero consultar por los cumpleaños en Plugin.");
+  const whatsappHref = `https://wa.me/${telefonoWhatsapp}?text=${textoWhatsapp}`;
 
   return (
     <div className="w-full max-w-5xl mx-auto mt-8 px-1 sm:px-4">
@@ -176,8 +178,14 @@ export default function InfoCumples() {
             </span>
             <div>
               <div className="font-semibold">Precio</div>
-              <div>Valor del cumple: {formatPrecio(precioCumple)}.</div>
-              <div className="whitespace-pre-line">{promoCumple || promoDefault}</div>
+              {mostrarPrecioInfo ? (
+                <>
+                  <div>Valor del cumple: {formatPrecio(precioCumple)}.</div>
+                  <div className="whitespace-pre-line">{promoCumple || promoDefault}</div>
+                </>
+              ) : (
+                <div className="font-bold italic">Consultar precio por whatsapp</div>
+              )}
               <div>Reserva con el 50%.</div>
             </div>
           </div>
@@ -211,15 +219,16 @@ export default function InfoCumples() {
           </div>
         </div>
 
-        <div className="pt-2 flex justify-center">
-          <button
-            onClick={continuar}
-            className="px-6 py-3 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition"
-          >
-            Continuar a reservas
-          </button>
-        </div>
       </div>
+      <a
+        href={whatsappHref}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Consultar por WhatsApp"
+        className="fixed bottom-5 right-5 z-[9999] h-14 w-14 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg border border-green-600 flex items-center justify-center"
+      >
+        <FaWhatsapp className="text-3xl" />
+      </a>
     </div>
   );
 }
