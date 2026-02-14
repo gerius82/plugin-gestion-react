@@ -1226,6 +1226,30 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     setTimeout(() => setMensaje(""), 1200);
   };
 
+  const buildWhatsappPagoInscripcionLink = (alumno) => {
+    const telefono = String(alumno?.telefono || "").replace(/\D/g, "");
+    if (!telefono) return "";
+    const nombreCompleto = `${String(alumno?.nombre || "").trim()} ${String(alumno?.apellido || "").trim()}`.trim();
+    const texto = [
+      `Hola ${nombreCompleto || ""}!`,
+      "Te paso los datos para abonar la inscripcion.",
+      "Alias: plugin.robotica (a nombre de German Iusto).",
+      "Gracias.",
+    ]
+      .join("\n")
+      .trim();
+    return `https://wa.me/54${telefono}?text=${encodeURIComponent(texto)}`;
+  };
+  const inscripcionPaga = !!(
+    alumnoSeleccionado &&
+    Array.isArray(pagosAlumno) &&
+    pagosAlumno.some(
+      (p) =>
+        String(p?.alumno_id) === String(personaIdFrom(alumnoSeleccionado)) &&
+        p?.pago_inscripcion === true
+    )
+  );
+
   const guardarCambiosMatricula = async (matriculaId) => {
   if (!config || !alumnoSeleccionado || !matriculaForm) return;
 
@@ -1988,6 +2012,17 @@ const renderEditorMatricula = () => (
 
           
         </>
+      )}
+      {alumnoSeleccionado && alumnoSeleccionado.telefono && !inscripcionPaga && (
+        <a
+          href={buildWhatsappPagoInscripcionLink(alumnoSeleccionado)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Enviar datos de pago por WhatsApp"
+          className="fixed bottom-5 right-5 z-[9999] rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg border border-green-600 px-4 py-2 text-sm font-semibold"
+        >
+          Inscripción
+        </a>
       )}
     </div>
   );
