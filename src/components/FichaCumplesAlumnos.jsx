@@ -16,8 +16,6 @@ const MESES = [
   "Diciembre",
 ];
 
-const WEEK_DAYS = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
-
 const parseFecha = (valor) => {
   const raw = String(valor || "").trim();
   if (!raw) return null;
@@ -86,14 +84,6 @@ export default function FichaCumplesAlumnos() {
     })();
   }, [config]);
 
-  const diasMes = useMemo(() => {
-    const year = new Date().getFullYear();
-    const total = new Date(year, mesSeleccionado, 0).getDate();
-    const firstDowJs = new Date(year, mesSeleccionado - 1, 1).getDay(); // 0 dom
-    const firstDow = firstDowJs === 0 ? 7 : firstDowJs; // 1 lun ... 7 dom
-    return { total, firstDow };
-  }, [mesSeleccionado]);
-
   const cumplePorDia = useMemo(() => {
     const map = new Map();
     alumnos
@@ -113,6 +103,15 @@ export default function FichaCumplesAlumnos() {
     );
   }, [cumplePorDia, diaSeleccionado]);
 
+  const diasConCumples = useMemo(
+    () =>
+      [...cumplePorDia.keys()]
+        .map((d) => Number(d))
+        .filter((d) => Number.isFinite(d))
+        .sort((a, b) => a - b),
+    [cumplePorDia]
+  );
+
   const buildWhatsappFelicitacion = (alumno) => {
     const tel = String(alumno?.telefono || "").replace(/\D/g, "");
     if (!tel) return "";
@@ -125,10 +124,6 @@ export default function FichaCumplesAlumnos() {
     ].join("\n");
     return `https://wa.me/54${tel}?text=${encodeURIComponent(texto)}`;
   };
-
-  const celdas = [];
-  for (let i = 1; i < diasMes.firstDow; i += 1) celdas.push(null);
-  for (let d = 1; d <= diasMes.total; d += 1) celdas.push(d);
 
   return (
     <div className="w-full max-w-6xl mx-auto mt-8 px-4 pb-8">
@@ -164,17 +159,12 @@ export default function FichaCumplesAlumnos() {
 
         {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
 
-        <div className="grid grid-cols-7 gap-2 mb-2">
-          {WEEK_DAYS.map((d) => (
-            <div key={d} className="text-center text-xs font-semibold text-gray-600 py-1">
-              {d}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-2">
-          {celdas.map((dia, idx) =>
-            dia ? (
+        <div className="mb-2 text-sm text-gray-700 font-medium">Dias con cumpleaños</div>
+        {diasConCumples.length === 0 ? (
+          <p className="text-sm text-gray-500">No hay cumpleaños en este mes.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {diasConCumples.map((dia) => (
               <button
                 key={`d-${dia}`}
                 type="button"
@@ -182,21 +172,25 @@ export default function FichaCumplesAlumnos() {
                 className={`h-16 rounded-lg border text-sm transition ${
                   diaSeleccionado === dia
                     ? "border-emerald-500 bg-emerald-50 hover:bg-emerald-100"
-                    : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                    : "border-emerald-400 bg-gray-50 hover:bg-gray-100"
                 }`}
               >
-                <div className="font-semibold">{dia}</div>
-                <div className="text-xs text-gray-600">{(cumplePorDia.get(String(dia)) || []).length} cumple(s)</div>
+                <div className="font-semibold">{String(dia).padStart(2, "0")}</div>
+                <div className="text-xs text-gray-600">
+                  {cumplePorDia.get(String(dia))?.length || 0} alumno(s)
+                </div>
               </button>
-            ) : (
-              <div key={`e-${idx}`} />
-            )
-          )}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="mt-6">
           <h3 className="text-base font-semibold mb-2">
-            {diaSeleccionado ? `Cumples del ${String(diaSeleccionado).padStart(2, "0")}-${String(mesSeleccionado).padStart(2, "0")}` : "Selecciona un dia"}
+            {diaSeleccionado
+              ? `Cumples del ${String(diaSeleccionado).padStart(2, "0")}-${String(
+                  mesSeleccionado
+                ).padStart(2, "0")}`
+              : "Selecciona un día con cumpleaños"}
           </h3>
           {diaSeleccionado && alumnosDia.length === 0 && (
             <p className="text-sm text-gray-500">No hay cumpleaños ese dia.</p>
