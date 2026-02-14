@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 
 const IMG_CUMPLES =
   "https://cvogoablzgymmodegfft.supabase.co/storage/v1/object/sign/cumples/cumples%20info.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWJmYzhjNy0wZGU5LTRkMGQtODc2YS0zODEyNjZmMjRmOWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjdW1wbGVzL2N1bXBsZXMgaW5mby5wbmciLCJpYXQiOjE3Njg4NzYwODMsImV4cCI6MjA4NDIzNjA4M30.fViNIiMR5BubUrqEqem3H6VQ6bV28MhsIkhy2KsvjGQ";
@@ -58,15 +57,6 @@ const addMinutes = (hora, minutos) => {
 };
 
 export default function FichaCumplesPadres() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  const from = params.get("from");
-  const origin = params.get("origin");
-  const rutaVolver =
-    from === "info-cumples" || from === "cumples-menu"
-      ? `/cumples-info${origin ? `?from=${encodeURIComponent(origin)}` : ""}`
-      : "/menu-padres";
   const [config, setConfig] = useState(null);
   const [mesSeleccionado, setMesSeleccionado] = useState(() => {
     const now = new Date();
@@ -313,13 +303,6 @@ export default function FichaCumplesPadres() {
         <div className="w-full px-3 sm:px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between mb-4 gap-4">
           <h2 className="text-2xl font-bold text-center flex-1">Festeja tu cumple</h2>
-          <button
-            onClick={() => navigate(rutaVolver)}
-            className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
-            style={{ border: "1px solid #d1d5db" }}
-          >
-            Volver
-          </button>
         </div>
         <p className="text-sm text-gray-600 text-center max-w-2xl mx-auto">
           Robótica, juegos, baile y una fiesta pensada para chicos. Elegí el día y horario y nosotros

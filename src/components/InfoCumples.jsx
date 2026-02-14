@@ -57,8 +57,17 @@ export default function InfoCumples() {
   };
 
   const telefonoWhatsapp = String(config?.whatsappCumples || "5493415064891").replace(/\D/g, "");
-  const textoWhatsapp = encodeURIComponent("Hola! Quiero consultar por los cumpleaños en Plugin.");
-  const whatsappHref = `https://wa.me/${telefonoWhatsapp}?text=${textoWhatsapp}`;
+  const mensajeWhatsapp = [
+    "🎈✨ ¡Hola Plugin!",
+    "Estamos pensando en festejar un cumpleaños con ustedes 🤖🎂",
+    "",
+    "¿Podrían enviarme información sobre precios, fechas disponibles y cómo hacer la reserva?",
+    "",
+    "¡Muchas gracias! 😊",
+  ].join("\n");
+  const whatsappHref = `https://wa.me/${telefonoWhatsapp}?text=${encodeURIComponent(
+    mensajeWhatsapp
+  )}`;
 
   return (
     <div className="w-full max-w-5xl mx-auto mt-8 px-1 sm:px-4">

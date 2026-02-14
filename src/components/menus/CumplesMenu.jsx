@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
-import { FaBirthdayCake, FaClipboardList } from "react-icons/fa";
+import { FaBirthdayCake, FaClipboardList, FaCalendarCheck } from "react-icons/fa";
 
 export default function CumplesMenu() {
   return (
     <div className="max-w-4xl mx-auto mt-8">
       <h1 className="text-2xl font-bold mb-6 text-center">Festeja tu cumple</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link
           to="/cumples-gestion"
           className="bg-white rounded-xl border-l-8 border-emerald-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
@@ -20,6 +20,14 @@ export default function CumplesMenu() {
           className="bg-white rounded-xl border-l-8 border-pink-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
         >
           <FaBirthdayCake className="text-pink-500 text-3xl" />
+          <span className="font-semibold text-lg">Info Cumples</span>
+        </Link>
+
+        <Link
+          to="/cumples-reservas?from=cumples-menu&origin=cumples-menu"
+          className="bg-white rounded-xl border-l-8 border-sky-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaCalendarCheck className="text-sky-500 text-3xl" />
           <span className="font-semibold text-lg">Reservas (padres)</span>
         </Link>
       </div>
