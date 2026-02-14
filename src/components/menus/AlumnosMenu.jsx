@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FaClipboardList, FaTable, FaUserSlash, FaHistory, FaExchangeAlt, FaUserTimes, FaBullhorn } from "react-icons/fa";
+import { FaClipboardList, FaTable, FaUserSlash, FaHistory, FaExchangeAlt, FaUserTimes, FaBullhorn, FaBirthdayCake } from "react-icons/fa";
 
 export default function AlumnosMenu() {
   return (
@@ -61,6 +61,14 @@ export default function AlumnosMenu() {
             >
             <FaBullhorn className="text-green-500 text-3xl" />
             <span className="font-semibold text-lg">Avisos</span>
+        </Link>
+
+        <Link
+            to="/cumples-alumnos"
+            className="bg-white rounded-xl border-l-8 border-pink-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+            >
+            <FaBirthdayCake className="text-pink-500 text-3xl" />
+            <span className="font-semibold text-lg">Cumples alumnos</span>
         </Link>
 
 

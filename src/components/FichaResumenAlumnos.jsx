@@ -92,6 +92,7 @@ export default function FichaResumenAlumnos() {
       turno_1: `${a.dia} ${a.hora}`,
       nombre: a.inscripciones?.nombre || "",
       apellido: a.inscripciones?.apellido || "",
+      fecha_nacimiento: a.inscripciones?.fecha_nacimiento || "",
       edad:
         calcularEdadDesdeFecha(a.inscripciones?.fecha_nacimiento) ??
         a.inscripciones?.edad ??
@@ -156,6 +157,14 @@ export default function FichaResumenAlumnos() {
   };
 
   const iconoOrden = () => "";
+  const formatFecha = (valor) => {
+    const raw = String(valor || "").trim();
+    if (!raw) return "-";
+    const base = raw.includes("T") ? raw.split("T")[0] : raw.split(" ")[0];
+    const [yyyy, mm, dd] = base.split("-");
+    if (!yyyy || !mm || !dd) return raw;
+    return `${dd}-${mm}-${yyyy}`;
+  };
 
   return (
     <div className="w-full max-w-6xl mx-auto mt-8 px-4">
@@ -280,6 +289,7 @@ export default function FichaResumenAlumnos() {
                 {[
                 ["creado_en", "Inscripción"],
                 ["nombre", "Nombre"],
+                ["fecha_nacimiento", "Fecha nacimiento"],
                 ["edad", "Edad"],
                 ["sede", "Sede"],
                 ["turno_1", "Turno"],
@@ -318,6 +328,7 @@ export default function FichaResumenAlumnos() {
                 <td className="px-3 py-2 whitespace-nowrap">
                     {a.nombre} {a.apellido}
                 </td>
+                <td className="px-3 py-2 whitespace-nowrap">{formatFecha(a.fecha_nacimiento)}</td>
                 <td className="px-3 py-2">{a.edad}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.sede}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.turno_1}</td>
