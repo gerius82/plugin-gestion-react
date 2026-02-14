@@ -363,7 +363,7 @@ export default function FichaResumenAlumnos() {
                 </td>
                 <td className="px-3 py-2 text-center">
                     <Link to={`/ficha-alumno/${a.alumno_id}`} title="Ver ficha individual">
-                    ðŸ“„
+                    {"\u{1F4C4}"}
                     </Link>
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.escuela}</td>
