@@ -7,6 +7,13 @@ import emailjs from "@emailjs/browser";
 import "../assets/formulario.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+const normalizarTextoComparacion = (valor = "") =>
+  String(valor || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 const FormularioInscripcionVerano = () => {
   const navigate = useNavigate();
   const [mensajeExito, setMensajeExito] = useState("");
@@ -96,28 +103,42 @@ const FormularioInscripcionVerano = () => {
     const telefonoRaw = (formulario.telefono || "").trim();
     const telefono = telefonoRaw.replace(/\D/g, "");
     const email = (formulario.email || "").trim().toLowerCase();
+    const nombreNorm = normalizarTextoComparacion(nombre);
+    const apellidoNorm = normalizarTextoComparacion(apellido);
     const filtrosOr = [];
-    if (nombre && apellido) {
-      filtrosOr.push(
-        `and(nombre.ilike.${encodeURIComponent(nombre)},apellido.ilike.${encodeURIComponent(apellido)})`
-      );
-    } else {
-      if (telefono) {
-        filtrosOr.push(`telefono.ilike.${encodeURIComponent(`%${telefono}%`)}`);
-      }
-      if (email) {
-        filtrosOr.push(`email.ilike.${encodeURIComponent(email)}`);
-      }
+
+    if (apellido) {
+      const prefApellido = `${apellido.slice(0, 4)}*`;
+      filtrosOr.push(`apellido.ilike.${encodeURIComponent(prefApellido)}`);
+    }
+    if (telefono) {
+      filtrosOr.push(`telefono.ilike.${encodeURIComponent(`*${telefono}*`)}`);
+    }
+    if (email) {
+      filtrosOr.push(`email.ilike.${encodeURIComponent(email)}`);
     }
     if (filtrosOr.length === 0) return null;
     const url =
       `${config.supabaseUrl}/rest/v1/inscripciones` +
-      `?select=id,persona_id&order=creado_en.asc&limit=1&or=(${filtrosOr.join(",")})`;
+      `?select=id,persona_id,nombre,apellido,telefono,email,creado_en&order=creado_en.desc&limit=50&or=(${filtrosOr.join(",")})`;
     try {
       const res = await fetch(url, { headers: supaHeaders(config) });
       if (!res.ok) return null;
       const data = await res.json();
-      const persona = Array.isArray(data) ? data[0] : null;
+      const lista = Array.isArray(data) ? data : [];
+
+      const persona = lista.find((p) => {
+        const n = normalizarTextoComparacion(p?.nombre);
+        const a = normalizarTextoComparacion(p?.apellido);
+        return nombreNorm && apellidoNorm && n === nombreNorm && a === apellidoNorm;
+      }) ||
+      lista.find((p) => {
+        const tel = String(p?.telefono || "").replace(/\D/g, "");
+        return telefono && tel.includes(telefono);
+      }) ||
+      lista.find((p) => String(p?.email || "").trim().toLowerCase() === email) ||
+      null;
+
       return persona?.persona_id || persona?.id || null;
     } catch {
       return null;

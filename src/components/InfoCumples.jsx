@@ -171,7 +171,7 @@ export default function InfoCumples() {
             <span className="mt-0.5 h-7 w-7 min-h-[1.75rem] min-w-[1.75rem] flex-none rounded-full bg-indigo-100 border border-indigo-200" />
             <div>
               <div className="font-semibold">Profes a cargo</div>
-              <div>Siempre habrá dos profes encargados de coordinar actividades, juegos y acompañar a cada chico.</div>
+              <div>Siempre habrá profes especializados en actividades infantiles y robótica, encargados de coordinar actividades, juegos y acompañar a cada chico.</div>
             </div>
           </div>
           <div className="rounded-xl bg-white/80 border border-gray-100 p-4 shadow-sm flex gap-3">

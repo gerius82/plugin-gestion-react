@@ -61,6 +61,14 @@ export default function FichaResumenAlumnos() {
     );
     const cicloData = await cicloRes.json();
     setCiclosDisponibles(Array.isArray(cicloData) ? cicloData : []);
+    const ciclosVeranoSet = new Set(
+      (Array.isArray(cicloData) ? cicloData : [])
+        .filter((c) =>
+          String(c?.codigo || "").toLowerCase().includes("verano") ||
+          String(c?.nombre_publico || "").toLowerCase().includes("verano")
+        )
+        .map((c) => String(c.codigo))
+    );
 
     const anioActual = new Date().getFullYear();
     const desde = `${anioActual}-01-01T00:00:00.000Z`;
@@ -75,6 +83,20 @@ export default function FichaResumenAlumnos() {
         .filter((p) => p?.pago_inscripcion)
         .map((p) => String(p.alumno_id))
     );
+    const veranoActivoRes = await fetch(
+      `${config.supabaseUrl}/rest/v1/matriculas?select=alumno_id,ciclo_codigo,estado&estado=eq.activa`,
+      { headers }
+    );
+    const veranoActivoData = veranoActivoRes.ok ? await veranoActivoRes.json() : [];
+    const veranoActivoSet = new Set(
+      (Array.isArray(veranoActivoData) ? veranoActivoData : [])
+        .filter((m) =>
+          ciclosVeranoSet.has(String(m?.ciclo_codigo || "")) ||
+          String(m?.ciclo_codigo || "").toLowerCase().includes("verano")
+        )
+        .map((m) => String(m.alumno_id))
+    );
+
     const filtros = [];
     if (filtroEstado === "activos") filtros.push("estado=eq.activa");
     if (filtroEstado === "inactivos") filtros.push("estado=in.(baja,finalizada)");
@@ -119,6 +141,7 @@ export default function FichaResumenAlumnos() {
       lista_espera: a.lista_espera,
       curso: a.inscripciones?.curso || "",
       inscripcion_paga: inscripcionesPagasSet.has(String(a.alumno_id)),
+      tiene_verano_activo: veranoActivoSet.has(String(a.alumno_id)),
       beneficiario_nombre:
         a.inscripciones?.beneficiario_id && map[a.inscripciones?.beneficiario_id]
           ? map[a.inscripciones?.beneficiario_id]
@@ -301,21 +324,21 @@ export default function FichaResumenAlumnos() {
         <thead className="bg-gray-100 sticky top-0 z-20">
             <tr>
                 {[
-                ["creado_en", "InscripciÃ³n"],
+                ["creado_en", "Fecha"],
+                ["inscripcion_paga", "Inscripción"],
                 ["nombre", "Nombre"],
                 ["fecha_nacimiento", "Fecha nacimiento"],
                 ["edad", "Edad"],
                 ["sede", "Sede"],
                 ["turno_1", "Turno"],
                 ["curso", "Curso"],
-                ["inscripcion_paga", "Inscripción paga"],
                 ["tiene_promo", "Promo"],
                 ["beneficiario_nombre", "Beneficiario"],
                 ["lista_espera", "Espera"],
                 ["ficha", "Ficha"],
                 ["escuela", "Escuela"],
                 ["responsable", "Responsable"],
-                ["telefono", "TelÃ©fono"],
+                ["telefono", "Teléfono"],
                 ["email", "Email"],
                 ].map(([key, label]) => (
                 <th
@@ -340,7 +363,8 @@ export default function FichaResumenAlumnos() {
                 <td className="px-3 py-2 whitespace-nowrap">
                     {new Date(a.creado_en).toLocaleDateString("es-AR")}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap">
+                <td className="px-3 py-2 text-center">{a.inscripcion_paga ? "✅" : ""}</td>
+                <td className={`px-3 py-2 whitespace-nowrap ${a.tiene_verano_activo ? "text-red-600 font-semibold" : ""}`}>
                     {a.nombre} {a.apellido}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">{formatFecha(a.fecha_nacimiento)}</td>
@@ -348,7 +372,6 @@ export default function FichaResumenAlumnos() {
                 <td className="px-3 py-2 whitespace-nowrap">{a.sede}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.turno_1}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{a.curso}</td>
-                <td className="px-3 py-2 text-center">{a.inscripcion_paga ? "✅" : ""}</td>
                 <td className="px-3 py-2 text-center">{a.tiene_promo ? "✅" : ""}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                     {a.beneficiario_nombre}
@@ -381,5 +404,3 @@ export default function FichaResumenAlumnos() {
     </div>
   );
 }
-
-
