@@ -1304,7 +1304,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
   if (!res.ok) {
     const err = await res.text();
     console.error(err);
-    setMensaje("No se pudo guardar la matr?cula");
+    setMensaje("No se pudo guardar la matrícula");
     return;
   }
 
@@ -1373,9 +1373,13 @@ const guardarNuevaMatricula = async () => {
   });
 
   if (!res.ok) {
-    const err = await res.text();
+    const err = await parseError(res);
     console.error(err);
-    setMensaje("No se pudo crear la matr?cula");
+    if (err?.code === "23505") {
+      setMensaje("Ya existe una matrícula activa para ese ciclo/curso/sede/día/horario.");
+    } else {
+      setMensaje("No se pudo crear la matrícula");
+    }
     return;
   }
 

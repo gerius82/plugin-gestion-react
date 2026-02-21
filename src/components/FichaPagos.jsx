@@ -42,6 +42,7 @@ export default function FichaPagos() {
   const [grupoId, setGrupoId] = useState(null);
   const [grupoIntegrantes, setGrupoIntegrantes] = useState([]);
   const [grupoDescuento, setGrupoDescuento] = useState(null);
+  const [promoDobleTurno, setPromoDobleTurno] = useState(false);
   const [pagarGrupo, setPagarGrupo] = useState(false);
   const [descuentoExtraPct, setDescuentoExtraPct] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -63,7 +64,7 @@ export default function FichaPagos() {
             headers: toHeaders(cfg),
           }),
           fetch(
-            `${cfg.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,curso_id,estado,dia,hora,creado_en,inscripciones(nombre,apellido,telefono,tiene_promo)&estado=eq.activa`,
+            `${cfg.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,curso_id,ciclo_codigo,estado,dia,hora,creado_en,inscripciones(nombre,apellido,telefono,tiene_promo)&estado=eq.activa`,
             { headers: toHeaders(cfg) }
           ),
         ]);
@@ -94,6 +95,7 @@ export default function FichaPagos() {
     setPagarGrupo(false);
     setPagaProporcional(false);
     setDescuentoExtraPct("");
+    setPromoDobleTurno(false);
   }, [matriculaId]);
 
   const normalizarDia = (v) =>
@@ -185,15 +187,34 @@ export default function FichaPagos() {
     cargarGrupo();
   }, [config, matriculaSel?.alumno_id]);
 
+  useEffect(() => {
+    const cargarPromoDobleTurno = async () => {
+      setPromoDobleTurno(false);
+      if (!config || !matriculaSel?.alumno_id || !matriculaSel?.ciclo_codigo) return;
+      try {
+        const res = await fetch(
+          `${config.supabaseUrl}/rest/v1/matriculas?select=id&alumno_id=eq.${matriculaSel.alumno_id}&ciclo_codigo=eq.${encodeURIComponent(matriculaSel.ciclo_codigo)}&estado=eq.activa`,
+          { headers: toHeaders(config) }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const cantidad = Array.isArray(data) ? data.length : 0;
+        setPromoDobleTurno(cantidad >= 2);
+      } catch {
+        setPromoDobleTurno(false);
+      }
+    };
+    cargarPromoDobleTurno();
+  }, [config, matriculaSel?.alumno_id, matriculaSel?.ciclo_codigo]);
+
   const calcularTotal = () => {
     if (!curso) return 0;
-    const pct = Number.isFinite(grupoDescuento) ? Math.max(0, Math.min(100, grupoDescuento)) : null;
-    const factorPromo =
-      grupoIntegrantes.length >= 2
-        ? pct != null
-          ? 1 - pct / 100
-          : 0.9
-        : 1;
+    const pctGrupo = Number.isFinite(grupoDescuento) ? Math.max(0, Math.min(100, grupoDescuento)) : 10;
+    const pctDobleTurno = 10;
+    const aplicaGrupo = grupoIntegrantes.length >= 2;
+    const aplicaPromo = aplicaGrupo || promoDobleTurno;
+    const promoPct = aplicaPromo ? (aplicaGrupo ? Math.max(pctGrupo, pctDobleTurno) : pctDobleTurno) : 0;
+    const factorPromo = 1 - promoPct / 100;
     const cantidad = grupoIntegrantes.length >= 2 && pagarGrupo ? grupoIntegrantes.length : 1;
     let monto = 0;
     if (pagaMes) {
@@ -365,6 +386,14 @@ export default function FichaPagos() {
                     </span>
                   ) : (
                     <span className="text-gray-600">Sin grupo de promo</span>
+                  )}
+                </div>
+                <div className="pt-1">
+                  <strong>Promo doble turno:</strong>{" "}
+                  {promoDobleTurno ? (
+                    <span className="text-green-700 font-medium">10% off (2 o más turnos activos en el ciclo)</span>
+                  ) : (
+                    <span className="text-gray-600">No aplica</span>
                   )}
                 </div>
 

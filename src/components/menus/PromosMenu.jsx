@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { FaChild, FaHandshake, FaSun } from "react-icons/fa";
+import { FaChild, FaHandshake, FaSun, FaCalendarWeek } from "react-icons/fa";
 
 export default function PromosMenu() {
   const navigate = useNavigate();
@@ -22,7 +22,7 @@ export default function PromosMenu() {
           Beneficios pensados para familias que quieren compartir la experiencia.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
           <div className="border border-emerald-200 rounded-2xl p-5 bg-emerald-50 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
@@ -65,6 +65,21 @@ export default function PromosMenu() {
             </div>
             <p className="text-sm text-gray-700">
               Si realizaron Taller de Verano durante Enero y Febrero, no abonan inscripción al Ciclo 2026
+            </p>
+          </div>
+
+          <div className="border border-violet-200 rounded-2xl p-5 bg-violet-50 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
+                <FaCalendarWeek className="text-violet-600 text-xl" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800">Promo doble turno</h3>
+                <p className="text-xs text-violet-700 font-semibold">10% de descuento</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700">
+              Si el alumno asiste dos veces por semana (en el mismo o en distintos talleres), tiene 10% de descuento en la cuota.
             </p>
           </div>
         </div>
