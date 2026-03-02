@@ -74,17 +74,11 @@ export default function FichaContactoAlumnosProfes() {
 
   const telefonoLimpio = String(alumnoSeleccionado?.telefono || "").replace(/\D/g, "");
   const telefonoConPais = telefonoLimpio ? `54${telefonoLimpio}` : "";
-  const urlWhatsappWeb = telefonoConPais
-    ? `https://api.whatsapp.com/send?phone=${telefonoConPais}`
-    : "";
+  const urlWhatsapp = telefonoConPais ? `https://wa.me/${telefonoConPais}` : "";
 
   const abrirWhatsapp = () => {
-    if (!telefonoConPais) return;
-    const urlWhatsappApp = `whatsapp://send?phone=${telefonoConPais}`;
-    window.location.href = urlWhatsappApp;
-    setTimeout(() => {
-      window.location.href = urlWhatsappWeb;
-    }, 900);
+    if (!urlWhatsapp) return;
+    window.open(urlWhatsapp, "_blank");
   };
 
   return (
@@ -140,7 +134,7 @@ export default function FichaContactoAlumnosProfes() {
                 <button
                   type="button"
                   onClick={abrirWhatsapp}
-                  disabled={!telefonoConPais}
+                  disabled={!urlWhatsapp}
                   className="inline-flex w-fit max-w-max items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-800 hover:bg-emerald-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ border: "1px solid #86efac" }}
                 >
