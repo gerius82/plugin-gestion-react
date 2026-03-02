@@ -59,6 +59,8 @@ export default function FichaGrillaTurnos() {
   const [turnos, setTurnos] = useState([]);
   const [matriculas, setMatriculas] = useState([]);
   const [inscripcionesMap, setInscripcionesMap] = useState({});
+  const [turnosProfes, setTurnosProfes] = useState([]);
+  const [profesMap, setProfesMap] = useState({});
 
   useEffect(() => {
     (async () => {
@@ -114,20 +116,38 @@ export default function FichaGrillaTurnos() {
 
         const urlMatriculas =
           `${config.supabaseUrl}/rest/v1/matriculas` +
-          `?select=alumno_id,sede,dia,hora,ciclo_codigo,estado,creado_en` +
+          `?select=alumno_id,sede,dia,hora,ciclo_codigo,estado,creado_en,lista_espera` +
           `&ciclo_codigo=eq.${encodeURIComponent(tipoInscripcion)}` +
           `&estado=eq.activa`;
 
-        const [resTurnos, resMatriculas] = await Promise.all([
+        const urlTurnosProfes =
+          `${config.supabaseUrl}/rest/v1/turnos_profes` +
+          `?select=profe_id,dia,hora,sede` +
+          `&ciclo_codigo=eq.${encodeURIComponent(tipoInscripcion)}`;
+
+        const urlProfes =
+          `${config.supabaseUrl}/rest/v1/profes?select=id,nombre`;
+
+        const [resTurnos, resMatriculas, resTurnosProfes, resProfes] = await Promise.all([
           fetch(urlTurnos, { headers }),
           fetch(urlMatriculas, { headers }),
+          fetch(urlTurnosProfes, { headers }),
+          fetch(urlProfes, { headers }),
         ]);
 
         const turnosData = await resTurnos.json();
         const matsData = await resMatriculas.json();
+        const turnosProfesData = await resTurnosProfes.json();
+        const profesData = await resProfes.json();
 
         setTurnos(Array.isArray(turnosData) ? turnosData : []);
         setMatriculas(Array.isArray(matsData) ? matsData : []);
+        setTurnosProfes(Array.isArray(turnosProfesData) ? turnosProfesData : []);
+        const mapProfes = {};
+        (Array.isArray(profesData) ? profesData : []).forEach((p) => {
+          mapProfes[String(p.id)] = p.nombre || "Profe";
+        });
+        setProfesMap(mapProfes);
 
         const ids = Array.from(new Set((matsData || []).map((m) => m.alumno_id))).filter(Boolean);
         if (ids.length) {
@@ -184,6 +204,7 @@ export default function FichaGrillaTurnos() {
     matriculas.forEach((m) => {
       if (tipoInscripcion && m.ciclo_codigo !== tipoInscripcion) return;
       if (sede && m.sede !== sede) return;
+      if (m.lista_espera === true) return;
       const key = `${m.dia}||${m.hora}`;
       const entry = map.get(key);
       if (!entry) return;
@@ -206,9 +227,21 @@ export default function FichaGrillaTurnos() {
     return map;
   }, [turnosFiltrados, matriculas, inscripcionesMap, sede, tipoInscripcion]);
 
+  const mapaProfes = useMemo(() => {
+    const map = new Map();
+    (Array.isArray(turnosProfes) ? turnosProfes : []).forEach((tp) => {
+      if (sede && tp.sede !== sede) return;
+      const key = `${tp.dia}||${tp.hora}`;
+      if (!map.has(key)) map.set(key, new Set());
+      const nombre = profesMap[String(tp.profe_id)];
+      if (nombre) map.get(key).add(nombre);
+    });
+    return map;
+  }, [turnosProfes, profesMap, sede]);
+
   return (
-    <div className="w-full max-w-6xl mx-auto mt-8 px-4">
-      <div className="max-w-screen-2xl mx-auto flex items-center justify-between mb-4 gap-4">
+    <div className="w-full mt-8 px-2 md:px-4">
+      <div className="w-full flex items-center justify-between mb-4 gap-4">
         <div className="flex items-center justify-center gap-3 flex-1">
           <FaThLarge className="text-emerald-600 text-3xl" />
           <h2 className="text-2xl font-bold text-center">Grilla por Turno</h2>
@@ -222,7 +255,7 @@ export default function FichaGrillaTurnos() {
         </button>
       </div>
 
-      <div className="max-w-screen-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+      <div className="w-full bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col">
             <label className="text-sm font-medium text-gray-700 mb-1">
@@ -263,7 +296,7 @@ export default function FichaGrillaTurnos() {
       ) : !turnosFiltrados.length ? (
         <div className="text-center py-10 text-gray-500">Sin turnos para mostrar.</div>
       ) : (
-        <div className="max-w-screen-2xl mx-auto">
+        <div className="w-full">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
             {dias.map((dia) => (
               <div
@@ -283,6 +316,9 @@ export default function FichaGrillaTurnos() {
                   {(slotsPorDia[dia] || []).map((turno) => {
                     const entry = mapaAlumnos.get(`${turno.dia}||${turno.hora}`) || { alumnos: [] };
                     const lista = entry.alumnos;
+                    const profesTurno = Array.from(
+                      mapaProfes.get(`${turno.dia}||${turno.hora}`) || []
+                    ).sort((a, b) => a.localeCompare(b));
                     const max = Number.isFinite(turno.cupo_maximo) ? turno.cupo_maximo : "-";
                     const completo = max !== "-" && lista.length >= max;
                     const cardCls = completo
@@ -301,6 +337,11 @@ export default function FichaGrillaTurnos() {
                           </span>
                         </div>
                         <div className="mt-1 space-y-0.5">
+                          {profesTurno.length > 0 && (
+                            <div className="text-[11px] font-semibold text-gray-900">
+                              {profesTurno.join(" · ")}
+                            </div>
+                          )}
                           {lista.length ? (
                             lista.map((al, i) => (
                               <div key={`${al.id}-${i}`} className="text-[11px] text-gray-800">

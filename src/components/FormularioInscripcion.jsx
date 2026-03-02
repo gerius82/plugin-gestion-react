@@ -634,7 +634,7 @@ const FormularioInscripcion = () => {
       const dataMat = await resMat.json();
       const existente = Array.isArray(dataMat) ? dataMat[0] : null;
       if (existente?.id) {
-        await fetch(`${config.supabaseUrl}/rest/v1/matriculas?id=eq.${existente.id}`, {
+        const resMatPatch = await fetch(`${config.supabaseUrl}/rest/v1/matriculas?id=eq.${existente.id}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -642,8 +642,13 @@ const FormularioInscripcion = () => {
           },
           body: JSON.stringify(matriculaPayload),
         });
+        if (!resMatPatch.ok) {
+          const errTxt = await resMatPatch.text();
+          setMensajeExito(`No se pudo actualizar la matrícula: ${errTxt || "Error"}`);
+          return;
+        }
       } else {
-        await fetch(`${config.supabaseUrl}/rest/v1/matriculas`, {
+        const resMatPost = await fetch(`${config.supabaseUrl}/rest/v1/matriculas`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -651,6 +656,11 @@ const FormularioInscripcion = () => {
           },
           body: JSON.stringify(matriculaPayload),
         });
+        if (!resMatPost.ok) {
+          const errTxt = await resMatPost.text();
+          setMensajeExito(`No se pudo crear la matrícula: ${errTxt || "Error"}`);
+          return;
+        }
       }
 
       await emailjs.send("service_efu6ess", "template_92ev0wo", {

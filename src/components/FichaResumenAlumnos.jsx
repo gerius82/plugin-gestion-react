@@ -102,11 +102,9 @@ export default function FichaResumenAlumnos() {
     if (filtroEstado === "inactivos") filtros.push("estado=in.(baja,finalizada)");
     if (filtroSede) filtros.push(`sede=eq.${encodeURIComponent(filtroSede)}`);
     if (filtroCiclo) filtros.push(`ciclo_codigo=eq.${encodeURIComponent(filtroCiclo)}`);
-    if (filtroDia) filtros.push(`dia=eq.${encodeURIComponent(filtroDia)}`);
-    if (filtroHora) filtros.push(`hora=eq.${encodeURIComponent(filtroHora)}`);
     const filtro = filtros.length ? `&${filtros.join("&")}` : "";
     const alumnosRes = await fetch(
-      `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,lista_espera,creado_en,inscripciones(id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,creado_en,tiene_promo,beneficiario_id,curso)${filtro}`,
+      `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,curso_nombre,estado,lista_espera,creado_en,inscripciones(id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,creado_en,tiene_promo,beneficiario_id,curso)${filtro}`,
       { headers }
     );
     if (!alumnosRes.ok) {
@@ -139,7 +137,7 @@ export default function FichaResumenAlumnos() {
       creado_en: a.creado_en || a.inscripciones?.creado_en || "",
       tiene_promo: a.inscripciones?.tiene_promo,
       lista_espera: a.lista_espera,
-      curso: a.inscripciones?.curso || "",
+      curso: a.curso_nombre || a.inscripciones?.curso || "",
       inscripcion_paga: inscripcionesPagasSet.has(String(a.alumno_id)),
       tiene_verano_activo: veranoActivoSet.has(String(a.alumno_id)),
       beneficiario_nombre:
@@ -148,7 +146,24 @@ export default function FichaResumenAlumnos() {
           : "-",
     }));
 
-    data.sort((a, b) => {
+    const horas = [
+      ...new Set(
+        data
+          .filter((a) => (!filtroDia || a.dia === filtroDia))
+          .map((a) => a.hora)
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+    setHorasDisponibles(horas);
+
+    const dataFiltradaPorDia = filtroDia
+      ? data.filter((a) => a.dia === filtroDia)
+      : data;
+    const dataFiltrada = filtroHora
+      ? dataFiltradaPorDia.filter((a) => a.hora === filtroHora)
+      : dataFiltradaPorDia;
+
+    dataFiltrada.sort((a, b) => {
       const valA = a[ordenColumna];
       const valB = b[ordenColumna];
       if (typeof valA === "string" && typeof valB === "string") {
@@ -157,7 +172,7 @@ export default function FichaResumenAlumnos() {
       return (valA > valB ? 1 : -1) * (ordenAscendente ? 1 : -1);
     });
 
-    setAlumnos(data);
+    setAlumnos(dataFiltrada);
 
     const diasOrden = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
     const normalizar = (valor) =>
@@ -173,15 +188,6 @@ export default function FichaResumenAlumnos() {
     );
     setDiasDisponibles(dias);
 
-    const horas = [
-      ...new Set(
-        data
-          .filter((a) => (!filtroDia || a.dia === filtroDia))
-          .map((a) => a.hora)
-          .filter(Boolean)
-      ),
-    ].sort((a, b) => a.localeCompare(b));
-      setHorasDisponibles(horas);
   }
 
   const handleOrden = (col) => {

@@ -32,6 +32,8 @@ import FichaCumplesPadres from "./components/FichaCumplesPadres";
 import InfoCumples from "./components/InfoCumples";
 import FichaCumplesAlumnos from "./components/FichaCumplesAlumnos";
 import CumplesMenu from "./components/menus/CumplesMenu";
+import FichaContactoAlumnosProfes from "./components/FichaContactoAlumnosProfes";
+import FichaUrgenciasProfes from "./components/FichaUrgenciasProfes";
 
 
 
@@ -54,6 +56,8 @@ function App() {
           <Route path="/menu-padres" element={<MenuPadres />} />
           <Route path="/promos" element={<PromosMenu />} />
           <Route path="/menu-profes" element={<MenuProfes />} />
+          <Route path="/profes-contacto-alumnos" element={<FichaContactoAlumnosProfes />} />
+          <Route path="/profes-urgencias" element={<FichaUrgenciasProfes />} />
           <Route path="/asistencias" element={<FichaAsistencia />} />
           <Route path="/pagos" element={<FichaPagos />} />
           <Route path="/estadisticas-pagos" element={<FichaPagosEstadisticas />} />

@@ -443,6 +443,8 @@ function KpiCard({ label, value }) {
 function PanelMensual() {
   const { url, headers } = useSupabaseConfig();
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7));
+  const [ciclos, setCiclos] = useState([]);
+  const [cicloSel, setCicloSel] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [totales, setTotales] = useState({
@@ -465,7 +467,7 @@ function PanelMensual() {
   });
 
   async function cargarMensual() {
-    if (!url) return;
+    if (!url || !cicloSel) return;
     setLoading(true);
     setError("");
     try {
@@ -480,7 +482,7 @@ function PanelMensual() {
 
       // 2) Activos por matricula (estado activa) y curso mas reciente por alumno
       const matriculasRes = await fetch(
-        `${url}/rest/v1/matriculas?select=alumno_id,curso_id,creado_en,inscripciones(tiene_promo)&estado=eq.activa`,
+        `${url}/rest/v1/matriculas?select=alumno_id,curso_id,creado_en,inscripciones(tiene_promo)&estado=eq.activa&ciclo_codigo=eq.${encodeURIComponent(cicloSel)}`,
         { headers }
       );
       const matriculasActivas = await matriculasRes.json();
@@ -564,14 +566,14 @@ function PanelMensual() {
       const desde = `${mes}-01T00:00:00`;
       const hasta = finDeMesIso(mes);
       const inRes = await fetch(
-        `${url}/rest/v1/inscripciones?select=id,creado_en&creado_en=gte.${desde}&creado_en=lte.${hasta}`,
+        `${url}/rest/v1/inscripciones?select=id,creado_en&creado_en=gte.${desde}&creado_en=lte.${hasta}&tipo_inscripcion=eq.${encodeURIComponent(cicloSel)}`,
         { headers }
       );
       const inscripciones = await inRes.json();
 
       // 4) Activaciones (reactivaciones): activo=true con actualizado_en en el mes, excluyendo los creados en el mes
       const actMesRes = await fetch(
-        `${url}/rest/v1/inscripciones?select=id,actualizado_en,creado_en,activo&activo=eq.true&actualizado_en=gte.${desde}&actualizado_en=lte.${hasta}`,
+        `${url}/rest/v1/inscripciones?select=id,actualizado_en,creado_en,activo&activo=eq.true&actualizado_en=gte.${desde}&actualizado_en=lte.${hasta}&tipo_inscripcion=eq.${encodeURIComponent(cicloSel)}`,
         { headers }
       );
       const activadosMes = await actMesRes.json();
@@ -580,7 +582,7 @@ function PanelMensual() {
 
       // 5) Inactivaciones
       const iaRes = await fetch(
-        `${url}/rest/v1/inscripciones?select=id,actualizado_en&activo=eq.false&actualizado_en=gte.${desde}&actualizado_en=lte.${hasta}`,
+        `${url}/rest/v1/inscripciones?select=id,actualizado_en&activo=eq.false&actualizado_en=gte.${desde}&actualizado_en=lte.${hasta}&tipo_inscripcion=eq.${encodeURIComponent(cicloSel)}`,
         { headers }
       );
       const inactivos = await iaRes.json();
@@ -613,8 +615,26 @@ function PanelMensual() {
   }
 
   useEffect(() => {
+    if (!url || !headers?.apikey) return;
+    (async () => {
+      try {
+        const res = await fetch(`${url}/rest/v1/ciclos?select=codigo,nombre_publico,orden&order=orden.asc`, { headers });
+        const data = await res.json();
+        const lista = Array.isArray(data) ? data : [];
+        setCiclos(lista);
+        if (!cicloSel && lista.length) {
+          const ciclo2026 = lista.find((c) => c.codigo === "CICLO_2026");
+          setCicloSel((ciclo2026 || lista[0]).codigo);
+        }
+      } catch {
+        setCiclos([]);
+      }
+    })();
+  }, [url, headers]);
+
+  useEffect(() => {
     cargarMensual();
-  }, [mes, url]);
+  }, [mes, url, cicloSel]);
 
   return (
     <div className="space-y-4">
@@ -627,6 +647,20 @@ function PanelMensual() {
               onChange={(e) => setMes(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-300 outline-none"
             />
+          </div>
+          <div className="md:w-72">
+            <label className="block text-sm font-semibold mb-1">Ciclo</label>
+            <select
+              value={cicloSel}
+              onChange={(e) => setCicloSel(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-300 outline-none"
+            >
+              {ciclos.map((c) => (
+                <option key={c.codigo} value={c.codigo}>
+                  {c.nombre_publico || c.codigo}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -780,7 +814,17 @@ function PanelGastos() {
   }, [url, headers]);
 
   useEffect(() => {
-    if (!url || !headers?.apikey) return;
+    if (!url || !headers?.apikey || !cicloSel) {
+      setIngresos((prev) => ({
+        ...prev,
+        real: 0,
+        hipotetico: 0,
+        cuotaBase: 0,
+        activosNormal: 0,
+        activosPromo: 0,
+      }));
+      return;
+    }
     (async () => {
       try {
         const mesNombre = monthNameEs(mes);
@@ -791,7 +835,7 @@ function PanelGastos() {
         const pagosMensuales = await pagosRes.json();
 
         const matriculasRes = await fetch(
-          `${url}/rest/v1/matriculas?select=alumno_id,curso_id,creado_en,inscripciones(tiene_promo)&estado=eq.activa`,
+          `${url}/rest/v1/matriculas?select=alumno_id,curso_id,creado_en,inscripciones(tiene_promo)&estado=eq.activa&ciclo_codigo=eq.${encodeURIComponent(cicloSel)}`,
           { headers }
         );
         const matriculasActivas = await matriculasRes.json();
@@ -867,7 +911,7 @@ function PanelGastos() {
         setIngresos((prev) => ({ ...prev, real: 0, hipotetico: 0 }));
       }
     })();
-  }, [url, headers, mes]);
+  }, [url, headers, mes, cicloSel]);
 
   useEffect(() => {
     if (!url || !headers?.apikey) return;
@@ -877,7 +921,10 @@ function PanelGastos() {
         const data = await res.json();
         const lista = Array.isArray(data) ? data : [];
         setCiclos(lista);
-        if (!cicloSel && lista.length) setCicloSel(lista[0].codigo);
+        if (!cicloSel && lista.length) {
+          const ciclo2026 = lista.find((c) => c.codigo === "CICLO_2026");
+          setCicloSel((ciclo2026 || lista[0]).codigo);
+        }
       } catch {
         setCiclos([]);
       }
@@ -1460,7 +1507,10 @@ function PanelAsignacionProfes() {
         const data = await res.json();
         const lista = Array.isArray(data) ? data : [];
         setCiclos(lista);
-        if (!cicloSel && lista.length) setCicloSel(lista[0].codigo);
+        if (!cicloSel && lista.length) {
+          const ciclo2026 = lista.find((c) => c.codigo === "CICLO_2026");
+          setCicloSel((ciclo2026 || lista[0]).codigo);
+        }
       } catch {
         setCiclos([]);
       }
@@ -1487,21 +1537,21 @@ function PanelAsignacionProfes() {
     if (!nombre) return;
     const res = await fetch(`${url}/rest/v1/profes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+        ...headers,
+      },
       body: JSON.stringify({ nombre, tarifa_turno: tarifa }),
     });
-    if (res.ok) {
-      setNuevoProfeNombre("");
-      setNuevoProfeTarifa("");
-      const data = await res.json();
-      if (Array.isArray(data) && data[0]) {
-        setProfes((prev) => [...prev, data[0]]);
-      } else {
-        const ref = await fetch(`${url}/rest/v1/profes?select=id,nombre,tarifa_turno&order=nombre.asc`, { headers });
-        const refrescado = await ref.json();
-        setProfes(Array.isArray(refrescado) ? refrescado : []);
-      }
-    }
+    if (!res.ok) return;
+
+    setNuevoProfeNombre("");
+    setNuevoProfeTarifa("");
+
+    const ref = await fetch(`${url}/rest/v1/profes?select=id,nombre,tarifa_turno&order=nombre.asc`, { headers });
+    const refrescado = await ref.json();
+    setProfes(Array.isArray(refrescado) ? refrescado : []);
   };
 
   const actualizarProfe = async (id, cambios) => {
