@@ -83,7 +83,7 @@ export default function FichaContactoAlumnosProfes() {
     const urlWhatsappApp = `whatsapp://send?phone=${telefonoConPais}`;
     window.location.href = urlWhatsappApp;
     setTimeout(() => {
-      window.open(urlWhatsappWeb, "_blank", "noopener,noreferrer");
+      window.location.href = urlWhatsappWeb;
     }, 900);
   };
 
