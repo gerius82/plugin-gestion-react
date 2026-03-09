@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 export default function FichaRecuperar() {
@@ -30,6 +30,7 @@ export default function FichaRecuperar() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
   const [okMsg, setOkMsg] = useState("");
+  const [feriadosSet, setFeriadosSet] = useState(new Set());
 
   // Cargar config
   useEffect(() => {
@@ -38,6 +39,26 @@ export default function FichaRecuperar() {
       .then((cfg) => setConfig(cfg))
       .catch(() => setError("No pude cargar la configuración (config.json)."));
   }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    (async () => {
+      try {
+        const res = await fetch(`${config.supabaseUrl}/rest/v1/feriados?select=fecha`, {
+          headers: headers(),
+        });
+        const data = await res.json();
+        const s = new Set();
+        (Array.isArray(data) ? data : []).forEach((f) => {
+          const iso = String(f?.fecha || "").split("T")[0];
+          if (iso) s.add(iso);
+        });
+        setFeriadosSet(s);
+      } catch {
+        setFeriadosSet(new Set());
+      }
+    })();
+  }, [config]);
 
   const headers = () => ({
     apikey: config?.supabaseKey ?? "",
@@ -60,11 +81,12 @@ export default function FichaRecuperar() {
       if (day === 0) continue; // excluir domingos
       const etiqueta = etiquetaCortaDia(d);
       const iso = toISO(d);
+      const esFeriado = feriadosSet.has(iso);
       const diaNombre = nombreDia(d); // "lunes".."sábado"
-      lista.push({ date: d, iso, etiqueta, diaNombre });
+      lista.push({ date: d, iso, etiqueta, diaNombre, esFeriado });
     }
     return lista;
-  }, []);
+  }, [feriadosSet]);
 
   // Buscar por teléfono
   const buscar = async () => {
@@ -154,7 +176,7 @@ export default function FichaRecuperar() {
 
       // próxima futura según turno_1 del primer alumno
       const turnoOriginal = alumnosList[0].turno_1?.toLowerCase();
-      const proxima = calcularProximaClase(turnoOriginal);
+      const proxima = calcularProximaClase(turnoOriginal, feriadosSet);
       if (proxima && !yaIncluidas.has(proxima)) {
         opciones.push(`${proxima} (próxima clase)`);
         yaIncluidas.add(proxima);
@@ -276,6 +298,10 @@ export default function FichaRecuperar() {
     }
     if (!turnoSeleccionado) {
       setError("Seleccioná un turno antes de confirmar.");
+      return;
+    }
+    if (diaSeleccionado?.iso && feriadosSet.has(diaSeleccionado.iso)) {
+      setError("No se puede recuperar en un día feriado.");
       return;
     }
 
@@ -465,14 +491,18 @@ export default function FichaRecuperar() {
                   <button
                     key={d.iso}
                     type="button"
-                    onClick={() => setDiaSeleccionado(d)}
+                    onClick={() => !d.esFeriado && setDiaSeleccionado(d)}
+                    disabled={d.esFeriado}
                     className={[
                       "px-2 py-2 rounded-md text-sm border transition",
-                      seleccionado
+                      d.esFeriado
+                        ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed hover:bg-gray-100"
+                        : seleccionado
                         ? "bg-green-100 border-green-500 font-semibold hover:bg-green-200"
                         : "bg-white border-gray-200 hover:bg-green-50"
                     ].join(" ")}
                     aria-pressed={seleccionado}
+                    title={d.esFeriado ? "Feriado (no disponible)" : ""}
                   >
                     <div className="text-xs text-gray-600 capitalize">{d.diaNombre.slice(0,3)}</div>
                     <div className="font-medium">{d.etiqueta.split(" ")[1]}</div>
@@ -566,16 +596,13 @@ function obtenerNombreMes(m) {
 }
 
 function normalizarDia(valor) {
-  const lower = String(valor || "").toLowerCase();
-  const arreglado = lower
-    .replace("miç¸rcoles", "miercoles")
-    .replace("miã©rcoles", "miercoles")
-    .replace("sç­bado", "sabado")
-    .replace("sã¡bado", "sabado");
-  return arreglado.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return String(valor || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
-function calcularProximaClase(turno) {
+function calcularProximaClase(turno, feriadosSet = new Set()) {
   if (!turno) return "";
   const dias = [
     "domingo",
@@ -590,10 +617,20 @@ function calcularProximaClase(turno) {
   const [diaNombre] = turno.split(" ");
   const diaDeseado = dias.findIndex((d) => normalizarDia(d) === normalizarDia(diaNombre));
   if (diaDeseado === -1) return "";
-  const delta = ((diaDeseado - hoy.getDay() + 7) % 7) || 7;
-  const proxima = new Date(hoy);
-  proxima.setDate(hoy.getDate() + delta);
-  return `${proxima.getDate()} de ${obtenerNombreMes(proxima.getMonth() + 1)}`;
+
+  let delta = ((diaDeseado - hoy.getDay() + 7) % 7) || 7;
+  let intentos = 0;
+  while (intentos < 60) {
+    const proxima = new Date(hoy);
+    proxima.setDate(hoy.getDate() + delta);
+    const iso = toISO(proxima);
+    if (!feriadosSet.has(iso)) {
+      return `${proxima.getDate()} de ${obtenerNombreMes(proxima.getMonth() + 1)}`;
+    }
+    delta += 7;
+    intentos += 1;
+  }
+  return "";
 }
 
 function convertirFechaTextoAISO(texto) {

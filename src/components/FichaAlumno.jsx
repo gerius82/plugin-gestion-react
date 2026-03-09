@@ -275,7 +275,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     if (!config || !personaId) return [];
 
     const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/inscripciones?persona_id=eq.${personaId}&select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion&order=creado_en.desc`,
+      `${config.supabaseUrl}/rest/v1/inscripciones?or=(id.eq.${personaId},persona_id.eq.${personaId})&select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion&order=creado_en.desc`,
       { headers }
     );
     const data = await res.json();

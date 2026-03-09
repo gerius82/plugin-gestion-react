@@ -15,6 +15,12 @@ export default function FichaAsistenciasEstadisticas() {
   const [filtroMes, setFiltroMes] = useState("");
   const [solo4Semanas, setSolo4Semanas] = useState(false);
 
+  const toIsoDate = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    return raw.includes("T") ? raw.split("T")[0] : raw;
+  };
+
 
   useEffect(() => {
     fetch("/config.json")
@@ -27,7 +33,7 @@ export default function FichaAsistenciasEstadisticas() {
   useEffect(() => {
     if (!config) return;
     cargarResumen();
-  }, [config, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroMes, solo4Semanas]);
+  }, [config, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroMes, solo4Semanas, ciclosDisponibles]);
 
   useEffect(() => {
     if (filtroMes !== "") {
@@ -39,7 +45,7 @@ export default function FichaAsistenciasEstadisticas() {
     if (!config) return;
     (async () => {
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,nombre_publico,activo,orden&order=orden.asc`,
+        `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,nombre_publico,activo,orden,fecha_inicio,fecha_inicio_ciclo&order=orden.asc`,
         {
           headers: {
             apikey: config.supabaseKey,
@@ -48,9 +54,15 @@ export default function FichaAsistenciasEstadisticas() {
         }
       );
       const data = await res.json();
-      setCiclosDisponibles(Array.isArray(data) ? data : []);
+      const lista = Array.isArray(data) ? data : [];
+      setCiclosDisponibles(lista);
+      if (!filtroCiclo && lista.length > 0) {
+        const ciclo2026 = lista.find((c) => c.codigo === "CICLO_2026");
+        const activo = lista.find((c) => c.activo);
+        setFiltroCiclo((ciclo2026 || activo || lista[0]).codigo);
+      }
     })();
-  }, [config]);
+  }, [config, filtroCiclo]);
 
     async function cargarResumen() {
     const filtrosBase = ["estado=eq.activa"];
@@ -90,12 +102,21 @@ export default function FichaAsistenciasEstadisticas() {
     alumnosData.sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || "")));
 
     const limit = filtroMes || solo4Semanas ? 200 : 10;
+    const cicloSel = (ciclosDisponibles || []).find((c) => c.codigo === filtroCiclo) || null;
+    const fechaInicioCiclo = filtroCiclo === "CICLO_2026"
+      ? "2026-03-01"
+      : (
+          toIsoDate(cicloSel?.fecha_inicio) ||
+          toIsoDate(cicloSel?.fecha_inicio_ciclo) ||
+          ""
+        );
 
     const asistenciasPromises = alumnosData.map((a) => {
       const filtroTurnoAsis = a.turno ? `&turno=eq.${encodeURIComponent(a.turno)}` : "";
       const filtroSedeAsis = a.sede ? `&sede=eq.${encodeURIComponent(a.sede)}` : "";
+      const filtroFechaInicioAsis = fechaInicioCiclo ? `&fecha=gte.${fechaInicioCiclo}` : "";
       return fetch(
-        `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.alumno_id}${filtroTurnoAsis}${filtroSedeAsis}&select=tipo,fecha&order=fecha.desc&limit=${limit}`,
+        `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.alumno_id}${filtroTurnoAsis}${filtroSedeAsis}${filtroFechaInicioAsis}&select=tipo,fecha&order=fecha.desc&limit=${limit}`,
         {
           headers: {
             apikey: config.supabaseKey,
@@ -112,6 +133,10 @@ export default function FichaAsistenciasEstadisticas() {
 
     const alumnosConAsistencias = alumnosData.map((a, idx) => {
       let lista = asistenciasData[idx] || [];
+
+      if (fechaInicioCiclo) {
+        lista = lista.filter((x) => toIsoDate(x.fecha) >= fechaInicioCiclo);
+      }
 
       if (filtroMes) {
         lista = lista.filter((x) => {

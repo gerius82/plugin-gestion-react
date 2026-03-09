@@ -15,6 +15,7 @@ const FichaAsistencia = () => {
   const [recuperadores, setRecuperadores] = useState([]);
   const [listaMostrada, setListaMostrada] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [cicloCodigo, setCicloCodigo] = useState("");
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
@@ -91,7 +92,7 @@ const FichaAsistencia = () => {
 
     loadData();
   }, [config, cicloCodigo]);
-  const ordenDias = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
+  const ordenDias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
   const normalizarDia = (valor = "") =>
     String(valor || "")
       .normalize("NFD")
@@ -129,44 +130,103 @@ const FichaAsistencia = () => {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
-    if (!config) return;
+    if (!config || guardando) return;
+    if (!sede || !turnoCompleto) {
+      setMensaje("Selecciona sede y turno antes de guardar.");
+      return;
+    }
+
+    setGuardando(true);
+
     const fechaISO = fecha || new Date().toISOString().split("T")[0];
     const presentes = listaMostrada.filter((a) => a.presente);
     const ausentes = listaMostrada.filter((a) => !a.presente);
 
-    const payload = [
+    const payloadRaw = [
       ...presentes.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "regular" })),
       ...ausentes.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "ausente" })),
       ...recuperadores.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "recuperacion" })),
     ];
 
-    const existentesRes = await fetch(
-      `${config.supabaseUrl}/rest/v1/asistencias?fecha=eq.${fechaISO}&select=alumno_id`,
-      { headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` } }
-    );
-    const ya = await existentesRes.json();
-    const existentes = new Set(ya.map((r) => r.alumno_id));
-    const nuevos = payload.filter((p) => !existentes.has(p.alumno_id));
+    const payloadMap = new Map();
+    const prioridadTipo = { regular: 1, ausente: 2, recuperacion: 3 };
+    payloadRaw.forEach((p) => {
+      if (!p?.alumno_id) return;
+      const key = String(p.alumno_id);
+      const prev = payloadMap.get(key);
+      if (!prev || (prioridadTipo[p.tipo] || 0) >= (prioridadTipo[prev.tipo] || 0)) {
+        payloadMap.set(key, p);
+      }
+    });
+    const payload = Array.from(payloadMap.values());
 
-    await Promise.all(
-      nuevos.map((r) =>
-        fetch(`${config.supabaseUrl}/rest/v1/asistencias`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: config.supabaseKey,
-            Authorization: `Bearer ${config.supabaseKey}`,
-          },
-          body: JSON.stringify(r),
-        })
-      )
-    );
-    setMensaje("✅ Asistencia guardada correctamente.");
-    setTimeout(() => {
-    setMensaje("");
-    setListaMostrada([]);
-    setRecuperadores([]);
-    }, 3000);
+    try {
+      const headersAuth = { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` };
+      const headersJson = { ...headersAuth, "Content-Type": "application/json" };
+
+      const existentesRes = await fetch(
+        `${config.supabaseUrl}/rest/v1/asistencias?select=id,alumno_id,tipo,fecha,turno,sede&fecha=eq.${fechaISO}&sede=eq.${encodeURIComponent(sede)}&turno=eq.${encodeURIComponent(turnoCompleto)}`,
+        { headers: headersAuth }
+      );
+      const existentes = await existentesRes.json();
+      const existentesLista = Array.isArray(existentes) ? existentes : [];
+
+      const porAlumno = new Map();
+      existentesLista.forEach((r) => {
+        const idAlumno = String(r?.alumno_id || "");
+        if (!idAlumno) return;
+        if (!porAlumno.has(idAlumno)) porAlumno.set(idAlumno, []);
+        porAlumno.get(idAlumno).push(r);
+      });
+
+      const ops = [];
+      payload.forEach((p) => {
+        const idAlumno = String(p.alumno_id);
+        const existentesAlumno = porAlumno.get(idAlumno) || [];
+
+        const existeExacto = existentesAlumno.some(
+          (eRow) =>
+            String(eRow.fecha) === String(p.fecha) &&
+            String(eRow.turno || "") === String(p.turno || "") &&
+            String(eRow.sede || "") === String(p.sede || "") &&
+            String(eRow.tipo || "regular") === String(p.tipo || "regular")
+        );
+        if (existeExacto) return;
+
+        if (existentesAlumno.length > 0) {
+          const aActualizar = existentesAlumno[0];
+          ops.push(
+            fetch(`${config.supabaseUrl}/rest/v1/asistencias?id=eq.${aActualizar.id}`, {
+              method: "PATCH",
+              headers: headersJson,
+              body: JSON.stringify({ tipo: p.tipo }),
+            })
+          );
+          return;
+        }
+
+        ops.push(
+          fetch(`${config.supabaseUrl}/rest/v1/asistencias`, {
+            method: "POST",
+            headers: headersJson,
+            body: JSON.stringify(p),
+          })
+        );
+      });
+
+      if (ops.length > 0) await Promise.all(ops);
+
+      setMensaje("Asistencia guardada correctamente.");
+      setTimeout(() => {
+        setMensaje("");
+        setListaMostrada([]);
+        setRecuperadores([]);
+      }, 3000);
+    } catch {
+      setMensaje("No se pudo guardar la asistencia.");
+    } finally {
+      setGuardando(false);
+    }
   };
   const handleBuscar = () => {
     if (!sede || !dia || !horario) return;
@@ -194,7 +254,7 @@ const FichaAsistencia = () => {
         ) : (
           <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Selector de ciclo / tipo de inscripción */}
+            {/* Selector de ciclo / tipo de inscripciÃƒÂ³n */}
             <div>
               <label className="font-medium block mb-1">Ciclo:</label>
               <select
@@ -221,9 +281,9 @@ const FichaAsistencia = () => {
               </select>
             </div>
             <div>
-              <label className="font-medium block mb-1">Día:</label>
+              <label className="font-medium block mb-1">Dí­a:</label>
               <select className="w-full border p-2 rounded" value={dia} onChange={(e) => setDia(e.target.value)}>
-                <option value="">-- Seleccionar día --</option>
+                <option value="">-- Seleccionar dí­a --</option>
                 {diasDisponibles.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
@@ -329,7 +389,7 @@ const FichaAsistencia = () => {
                 </ul>
               </div>
               <div className="text-center">
-                <button type="submit" className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded shadow">Guardar asistencia</button>
+                <button type="submit" disabled={guardando} className="bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2 rounded shadow">{guardando ? "Guardando..." : "Guardar asistencia"}</button>
               </div>
             </form>
           )}
@@ -341,4 +401,5 @@ const FichaAsistencia = () => {
 };
 
 export default FichaAsistencia;
+
 

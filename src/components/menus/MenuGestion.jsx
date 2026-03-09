@@ -8,7 +8,8 @@ import {
   FaChartPie,
   FaCog,
   FaClock,
-  FaBirthdayCake
+  FaBirthdayCake,
+  FaCalendarAlt
 } from "react-icons/fa";
 
 export default function MenuGestion() {
@@ -93,6 +94,14 @@ export default function MenuGestion() {
         >
           <FaClock className="text-indigo-500 text-3xl" />
           <span className="font-semibold text-lg">Gestor de Turnos</span>
+        </Link>
+
+        <Link
+          to="/gestor-feriados"
+          className="bg-white rounded-xl border-l-8 border-teal-500 p-4 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaCalendarAlt className="text-teal-600 text-3xl" />
+          <span className="font-semibold text-lg">Gestor de Feriados</span>
         </Link>
 
         <Link
