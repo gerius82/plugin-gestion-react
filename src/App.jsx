@@ -11,6 +11,7 @@ import MenuResumen from "./components/menus/MenuResumen";
 import FichaAlumno from "./components/FichaAlumno";
 import FichaAsistencia from "./components/FichaAsistencia";
 import FichaPagos from "./components/FichaPagos";
+import FichaFacturacion from "./components/FichaFacturacion";
 import FichaPagosEstadisticas from "./components/FichaPagosEstadisticas";
 import PagosMenu from "./components/menus/PagosMenu";
 import AsistenciaMenu from "./components/menus/AsistenciaMenu";
@@ -61,6 +62,7 @@ function App() {
           <Route path="/profes-urgencias" element={<FichaUrgenciasProfes />} />
           <Route path="/asistencias" element={<FichaAsistencia />} />
           <Route path="/pagos" element={<FichaPagos />} />
+          <Route path="/facturacion" element={<FichaFacturacion />} />
           <Route path="/estadisticas-pagos" element={<FichaPagosEstadisticas />} />
           <Route path="/pagos-menu" element={<PagosMenu />} />
           <Route path="/asistencia-menu" element={<AsistenciaMenu />} />

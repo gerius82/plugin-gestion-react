@@ -281,6 +281,50 @@ export default function FichaPagos() {
     }));
 
     try {
+      const anioActual = new Date().getFullYear();
+      const inicioAnio = `${anioActual}-01-01T00:00:00.000Z`;
+      const inicioAnioSiguiente = `${anioActual + 1}-01-01T00:00:00.000Z`;
+
+      const chequeos = await Promise.all(
+        payloads.map(async (body) => {
+          const filtros = [`alumno_id=eq.${body.alumno_id}`, "select=id,pago_mes,pago_inscripcion,mes,creado_en"];
+          if (body.pago_inscripcion) {
+            filtros.push(
+              `creado_en=gte.${encodeURIComponent(inicioAnio)}`,
+              `creado_en=lt.${encodeURIComponent(inicioAnioSiguiente)}`
+            );
+          }
+
+          const res = await fetch(`${config.supabaseUrl}/rest/v1/pagos?${filtros.join("&")}`, {
+            headers,
+          });
+          if (!res.ok) return { body, duplicados: [] };
+          const duplicados = await res.json();
+          return { body, duplicados: Array.isArray(duplicados) ? duplicados : [] };
+        })
+      );
+
+      const conflictos = chequeos
+        .map(({ body, duplicados }) => {
+          if (!duplicados.length) return null;
+          const alumnoDup = matriculas.find((m) => String(m.alumno_id) === String(body.alumno_id))?.inscripciones;
+          const nombre = alumnoDup ? `${alumnoDup.nombre} ${alumnoDup.apellido}` : `Alumno ${body.alumno_id}`;
+          const conceptos = [];
+          if (body.pago_mes && duplicados.some((d) => d.pago_mes && d.mes === body.mes)) {
+            conceptos.push(`cuota de ${body.mes}`);
+          }
+          if (body.pago_inscripcion && duplicados.some((d) => d.pago_inscripcion)) {
+            conceptos.push(`inscripción ${anioActual}`);
+          }
+          return conceptos.length ? `${nombre}: ${conceptos.join(" y ")}` : null;
+        })
+        .filter(Boolean);
+
+      if (conflictos.length) {
+        setMensaje(`Pago duplicado detectado. Ya existe registrado: ${conflictos.join(" | ")}`);
+        return;
+      }
+
       const results = await Promise.all(
         payloads.map((body) =>
           fetch(`${config.supabaseUrl}/rest/v1/pagos`, {

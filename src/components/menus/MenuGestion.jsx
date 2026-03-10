@@ -9,7 +9,8 @@ import {
   FaCog,
   FaClock,
   FaBirthdayCake,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaFileInvoiceDollar
 } from "react-icons/fa";
 
 export default function MenuGestion() {
@@ -53,6 +54,14 @@ export default function MenuGestion() {
         >
           <FaMoneyBillWave className="text-yellow-500 text-3xl" />
           <span className="font-semibold text-lg">Pagos</span>
+        </Link>
+
+        <Link
+          to="/facturacion?from=menu-gestion"
+          className="bg-white rounded-xl border-l-8 border-emerald-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaFileInvoiceDollar className="text-emerald-500 text-3xl" />
+          <span className="font-semibold text-lg">Facturación</span>
         </Link>
 
         <Link

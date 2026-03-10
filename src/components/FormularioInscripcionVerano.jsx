@@ -14,6 +14,9 @@ const normalizarTextoComparacion = (valor = "") =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
+const normalizarTelefono = (valor = "") => String(valor || "").replace(/\D/g, "").slice(0, 10);
+const validarTelefonoArg = (valor = "") => /^[1-9]\d{9}$/.test(normalizarTelefono(valor));
+
 const FormularioInscripcionVerano = () => {
   const navigate = useNavigate();
   const [mensajeExito, setMensajeExito] = useState("");
@@ -420,12 +423,15 @@ const elegirHorario = (hora) => {
 
   const handleChange = async (e) => {
     const { id, value } = e.target;
-    setFormulario((prev) => ({ ...prev, [id]: value }));
 
     if (id === "telefono") {
-      const soloNumeros = /^\d*$/;
-      setTelefonoValido(soloNumeros.test(value));
+      const telefonoNormalizado = normalizarTelefono(value);
+      setFormulario((prev) => ({ ...prev, [id]: telefonoNormalizado }));
+      setTelefonoValido(telefonoNormalizado === "" || validarTelefonoArg(telefonoNormalizado));
+      return;
     }
+
+    setFormulario((prev) => ({ ...prev, [id]: value }));
 
     if (id === "email") {
       const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -484,6 +490,13 @@ const elegirHorario = (hora) => {
 */
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const telefonoOk = validarTelefonoArg(formulario.telefono);
+    setTelefonoValido(telefonoOk);
+    if (!telefonoOk) {
+      alert("Ingresá un teléfono válido de 10 dígitos, sin 0 inicial, espacios ni guiones.");
+      return;
+    }
 
     if (!formulario.sede || !diaSel || !horaSel) {
       alert("⚠️ Elegí sede, día y horario.");
@@ -606,7 +619,10 @@ const elegirHorario = (hora) => {
       };
       const resMat = await fetch(
         `${config.supabaseUrl}/rest/v1/matriculas?select=id&alumno_id=eq.${personaFinal}` +
-          `&ciclo_codigo=eq.TDV&curso_id=eq.${Number(cursoSelId)}&order=creado_en.desc&limit=1`,
+          `&ciclo_codigo=eq.TDV&curso_id=eq.${Number(cursoSelId)}` +
+          `&dia=eq.${encodeURIComponent(diaSel)}` +
+          `&hora=eq.${encodeURIComponent(horaSel)}` +
+          `&order=creado_en.desc&limit=1`,
         { headers: supaHeaders(config) }
       );
       const dataMat = await resMat.json();
@@ -855,6 +871,9 @@ const elegirHorario = (hora) => {
               id="telefono"
               type="text"
               placeholder="Formato sugerido: 3415076241"
+              inputMode="numeric"
+              pattern="[1-9][0-9]{9}"
+              maxLength={10}
               value={formulario.telefono}
               onChange={handleChange}
               className={`w-full max-w-sm mx-auto border border-gray-300 rounded-lg p-2 sm:p-3 placeholder-gray-400 placeholder:italic text-sm sm:text-base text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-100 transition ${
@@ -862,7 +881,7 @@ const elegirHorario = (hora) => {
               }`}
               required
             />
-            {!telefonoValido && <p className="text-red-500 text-sm mt-1">Solo números</p>}
+            {!telefonoValido && <p className="text-red-500 text-sm mt-1">Debe tener 10 dígitos, sin 0 inicial, espacios ni guiones.</p>}
           </div>
 
           {/* Email */}
