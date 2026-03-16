@@ -7,6 +7,7 @@ const FichaPagosEstadisticas = () => {
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [asistenciasMap, setAsistenciasMap] = useState({});
   const [matriculasMap, setMatriculasMap] = useState({});
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
   const [cicloFiltro, setCicloFiltro] = useState("");
@@ -143,6 +144,39 @@ const FichaPagosEstadisticas = () => {
       : list.filter((a) => a.medio_pago === medioPago);
   }, [alumnos, pagosMap, medioPago, matriculasMap, cicloFiltro]);
 
+  useEffect(() => {
+    if (!config) return;
+
+    const ids = alumnosConEstado.map((a) => a.id).filter(Boolean);
+    if (!ids.length) {
+      setAsistenciasMap({});
+      return;
+    }
+
+    (async () => {
+      const headers = {
+        apikey: config.supabaseKey,
+        Authorization: `Bearer ${config.supabaseKey}`,
+      };
+
+      const idsQuery = ids.join(",");
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/asistencias?select=alumno_id,tipo,fecha&alumno_id=in.(${idsQuery})&order=fecha.desc`,
+        { headers }
+      );
+      const data = await res.json();
+      const grouped = {};
+      (Array.isArray(data) ? data : []).forEach((item) => {
+        if (!item?.alumno_id) return;
+        grouped[item.alumno_id] = grouped[item.alumno_id] || [];
+        if (grouped[item.alumno_id].length < 4) {
+          grouped[item.alumno_id].push(item);
+        }
+      });
+      setAsistenciasMap(grouped);
+    })();
+  }, [config, alumnosConEstado]);
+
   const alumnosOrdenados = useMemo(() => {
     const arr = [...alumnosConEstado];
     if (orden === "nombre") {
@@ -161,6 +195,18 @@ const FichaPagosEstadisticas = () => {
     const p = alumnosConEstado.filter((a) => a.pago).length;
     return { pagados: p, noPagados: alumnosConEstado.length - p };
   }, [alumnosConEstado]);
+
+  const colorAsistencia = (tipo) => {
+    if (tipo === "ausente") return "bg-red-500";
+    if (tipo === "regular" || tipo === "recuperacion") return "bg-green-500";
+    return "bg-gray-300";
+  };
+
+  const formatFechaCorta = (fecha) => {
+    const d = new Date(fecha);
+    if (Number.isNaN(d.getTime())) return fecha;
+    return d.toLocaleDateString("es-AR");
+  };
 
   const generarComprobante = async (alumnoId) => {
   const alumno = alumnos.find(a => a.id === alumnoId);
@@ -279,7 +325,7 @@ const FichaPagosEstadisticas = () => {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow p-6 max-w-5xl mx-auto">
+      <div className="bg-white rounded-xl shadow p-4 sm:p-6 max-w-5xl mx-auto overflow-hidden">
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
@@ -328,16 +374,18 @@ const FichaPagosEstadisticas = () => {
         <span className="text-red-600">Faltan pagar: {noPagados}</span>
       </div>
 
-      <table className="min-w-full table-auto border-t border-b text-left">
+      <div className="w-full overflow-x-auto">
+      <table className="w-full min-w-[620px] table-auto border-t border-b text-left">
         <thead>
           <tr>
-            <th className="cursor-pointer py-2 px-3 whitespace-nowrap" onClick={() => {
+            <th className="cursor-pointer py-2 px-3 whitespace-nowrap w-[62%]" onClick={() => {
               setOrden("nombre");
               setAscendente((v) => !v);
             }}>
               Alumno ⬍
             </th>
-            <th className="cursor-pointer py-2 px-3 whitespace-nowrap" onClick={() => {
+            <th className="py-2 px-4 whitespace-nowrap text-right w-[110px]">Asist.</th>
+            <th className="cursor-pointer py-2 px-3 whitespace-nowrap w-[150px]" onClick={() => {
               setOrden("pago");
               setAscendente((v) => !v);
             }}>
@@ -348,7 +396,20 @@ const FichaPagosEstadisticas = () => {
         <tbody>
           {alumnosOrdenados.map((a) => (
             <tr key={a.id} className="border-t">
-              <td className="py-2 px-3 whitespace-normal">{a.nombre} {a.apellido}</td>
+              <td className="py-2 px-3">
+                <div className="max-w-[320px] break-words">{a.nombre} {a.apellido}</div>
+              </td>
+              <td className="py-2 px-4 w-[110px]">
+                <div className="flex items-center justify-end gap-1.5 min-w-[72px]">
+                  {(asistenciasMap[a.id] || []).map((r, idx) => (
+                    <span
+                      key={`${a.id}-${idx}`}
+                      className={`inline-block w-2 h-2 rounded-full ${colorAsistencia(r.tipo)}`}
+                      title={`${r.tipo} - ${formatFechaCorta(r.fecha)}`}
+                    />
+                  ))}
+                </div>
+              </td>
               <td className={`py-2 px-3 font-bold ${a.pago ? "text-green-600" : "text-red-600"}`}>
                 {a.pago ? (
                   <div className="flex items-center gap-2">
@@ -394,6 +455,7 @@ const FichaPagosEstadisticas = () => {
           ))}
         </tbody>
       </table>
+      </div>
       </div>
     </div>
   );
