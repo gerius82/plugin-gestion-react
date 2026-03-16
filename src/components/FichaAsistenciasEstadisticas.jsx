@@ -218,7 +218,7 @@ export default function FichaAsistenciasEstadisticas() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow p-6 max-w-5xl mx-auto">
+      <div className="bg-white rounded-xl shadow p-4 sm:p-6 max-w-5xl mx-auto overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Sede */}
         <div>
@@ -329,7 +329,8 @@ export default function FichaAsistenciasEstadisticas() {
 
 
 
-      <table className="min-w-full table-auto border-t border-b text-left text-sm">
+      <div className="w-full overflow-x-auto">
+      <table className="w-full min-w-[640px] table-auto border-t border-b text-left text-sm">
         <thead className="bg-gray-100">
           <tr>
             <th className="py-2 px-3">Alumno</th>
@@ -346,8 +347,8 @@ export default function FichaAsistenciasEstadisticas() {
         <tbody>
           {alumnos.map((a) => (
             <tr key={a.id} className="border-t">
-              <td className="py-2 px-3 whitespace-nowrap">{a.nombre} {a.apellido}</td>
-              <td className="py-2 px-3 whitespace-nowrap">{a.turno}</td>
+              <td className="py-2 px-3"><div className="min-w-[170px] break-words">{a.nombre} {a.apellido}</div></td>
+              <td className="py-2 px-3"><div className="min-w-[150px] break-words">{a.turno}</div></td>
               <td className="py-2 px-3">
                 <div className="flex gap-1 flex-wrap">
                   {a.asistencias.slice().reverse().map((r, i) => (
@@ -363,6 +364,7 @@ export default function FichaAsistenciasEstadisticas() {
           ))}
         </tbody>
       </table>
+      </div>
 
       </div>
     </div>
