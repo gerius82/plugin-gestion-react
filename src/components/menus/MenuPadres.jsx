@@ -69,6 +69,7 @@ export default function MenuPadres() {
       </Link>
 
       {cumplesHabilitado ? (
+        <div className="relative">
         <Link
           to="/cumples-info?from=menu-padres"
           className="bg-white border-l-8 border-pink-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
@@ -79,6 +80,13 @@ export default function MenuPadres() {
             <span className="text-xs text-gray-500">Cumples creativos para chicos de 7 a 12 años</span>
           </div>
         </Link>
+          <span
+            className="absolute top-2 right-6 text-xs font-bold px-3 py-1 rounded-full bg-pink-100 text-pink-700 border border-pink-200 shadow-md animate-blink"
+            style={{ boxShadow: "0 0 10px rgba(236, 72, 153, 0.28)" }}
+          >
+            Nuevo
+          </span>
+        </div>
       ) : (
         <div className="bg-gray-100 border-l-8 border-gray-300 text-gray-500 rounded-xl p-5 shadow-sm text-left flex items-center gap-4 cursor-not-allowed">
           <FaBirthdayCake className="text-pink-500 text-3xl" />
