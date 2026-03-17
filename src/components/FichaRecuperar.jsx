@@ -31,6 +31,7 @@ export default function FichaRecuperar() {
   const [error, setError] = useState("");
   const [okMsg, setOkMsg] = useState("");
   const [feriadosSet, setFeriadosSet] = useState(new Set());
+  const [cicloActivo, setCicloActivo] = useState("");
 
   // Cargar config
   useEffect(() => {
@@ -44,6 +45,15 @@ export default function FichaRecuperar() {
     if (!config) return;
     (async () => {
       try {
+        const resCiclos = await fetch(
+          `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,activo,orden&order=orden.asc`,
+          { headers: headers() }
+        );
+        const dataCiclos = await resCiclos.json();
+        const listaCiclos = Array.isArray(dataCiclos) ? dataCiclos : [];
+        const cicloActual = listaCiclos.find((c) => c.activo) || listaCiclos[0] || null;
+        setCicloActivo(cicloActual?.codigo || "");
+
         const res = await fetch(`${config.supabaseUrl}/rest/v1/feriados?select=fecha`, {
           headers: headers(),
         });
@@ -111,6 +121,7 @@ export default function FichaRecuperar() {
       const res = await fetch(
         `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,sede,dia,hora,ciclo_codigo,inscripciones!inner(nombre,apellido,telefono)` +
           `&estado=eq.activa` +
+          (cicloActivo ? `&ciclo_codigo=eq.${encodeURIComponent(cicloActivo)}` : "") +
           `&inscripciones.telefono=ilike.*${tel}*`,
         { headers: headers() }
       );
@@ -306,7 +317,9 @@ export default function FichaRecuperar() {
     }
 
     const falta = faltaSeleccionada || "sin especificar";
-    const nombres = seleccionados.map((a) => `${a.nombre} ${a.apellido}`);
+    const nombres = Array.from(
+      new Set(seleccionados.map((a) => `${a.nombre} ${a.apellido}`.replace(/\s+/g, " ").trim()))
+    );
 
     // Abrir WhatsApp con el mensaje formateado
     const mensaje = encodeURIComponent(
