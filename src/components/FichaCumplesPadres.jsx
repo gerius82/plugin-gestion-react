@@ -276,7 +276,7 @@ export default function FichaCumplesPadres() {
         "Mensaje adicional",
         `${reservaForm.mensaje || "-"}`,
       ].join("\n");
-      const waUrl = `https://wa.me/5493415064891?text=${encodeURIComponent(detalleMsg)}`;
+      const waUrl = `https://wa.me/543412153057?text=${encodeURIComponent(detalleMsg)}`;
       window.open(waUrl, "_blank");
     }
 

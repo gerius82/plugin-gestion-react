@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+const normalizarTelefonoBusqueda = (valor = "") =>
+  String(valor || "").replace(/\D/g, "").replace(/^0+/, "");
+
 export default function DarDeBaja() {
   // Ruta de regreso: por defecto /menu-padres; si viene con ?from=alumnos-menu => /alumnos-menu
   const navigate = useNavigate();
@@ -38,7 +41,7 @@ export default function DarDeBaja() {
     setOkMsg("");
     setAlumnos([]);
 
-    const tel = telefono.trim().replace(/\D/g, "");
+    const tel = normalizarTelefonoBusqueda(telefono);
     if (!tel) {
       setError("Ingresá un número de teléfono válido.");
       return;
@@ -50,7 +53,9 @@ export default function DarDeBaja() {
       const res = await fetch(`${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,curso_nombre,sede,dia,hora,inscripciones!inner(nombre,apellido,telefono)` +
           `&estado=eq.activa` +
           `&inscripciones.telefono=ilike.*${tel}*`, { headers: headers() });
-      const data = await res.json();
+      const data = (await res.json()).filter(
+        (a) => normalizarTelefonoBusqueda(a.inscripciones?.telefono) === tel
+      );
 
       if (!Array.isArray(data) || data.length === 0) {
         setError("No se encontraron alumnos activos con ese teléfono.");

@@ -56,7 +56,7 @@ export default function InfoCumples() {
     return `$${formatted}`;
   };
 
-  const telefonoWhatsapp = String(config?.whatsappCumples || "5493415064891").replace(/\D/g, "");
+  const telefonoWhatsapp = String(config?.whatsappCumples || "543412153057").replace(/\D/g, "");
   const mensajeWhatsapp = [
     "🎈✨ ¡Hola Plugin!",
     "Estamos pensando en festejar un cumpleaños con ustedes 🤖🎂",

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+const normalizarTelefonoBusqueda = (valor = "") =>
+  String(valor || "").replace(/\D/g, "").replace(/^0+/, "");
+
 export default function CambioTurno() {
   // Ruta de regreso coherente con FichaRecuperar: /menu-padres o /alumnos-menu
   const navigate = useNavigate();
@@ -23,6 +26,7 @@ export default function CambioTurno() {
   const [turnosDisponibles, setTurnosDisponibles] = useState([]); // [{turno, disponible}]
   const [turnoSeleccionado, setTurnoSeleccionado] = useState("");
 
+  const [cicloActivo, setCicloActivo] = useState("");
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
@@ -36,6 +40,24 @@ export default function CambioTurno() {
       .catch(() => setError("No pude cargar la configuración (config.json)."));
 
   }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    (async () => {
+      try {
+        const resCiclos = await fetch(
+          `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,activo,orden&order=orden.asc`,
+          { headers: headers() }
+        );
+        const dataCiclos = await resCiclos.json();
+        const listaCiclos = Array.isArray(dataCiclos) ? dataCiclos : [];
+        const cicloActual = listaCiclos.find((c) => c.activo) || listaCiclos[0] || null;
+        setCicloActivo(cicloActual?.codigo || "");
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [config]);
 
   const headers = () => ({
     apikey: config?.supabaseKey ?? "",
@@ -79,7 +101,7 @@ export default function CambioTurno() {
     setTurnosDisponibles([]);
     setTurnoSeleccionado("");
 
-    const tel = telefono.trim().replace(/\D/g, "");
+    const tel = normalizarTelefonoBusqueda(telefono);
     if (!tel) {
       setError("Ingresá un número de teléfono válido.");
       return;
@@ -91,10 +113,13 @@ export default function CambioTurno() {
       const res = await fetch(
         `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,sede,dia,hora,ciclo_codigo,inscripciones!inner(nombre,apellido,telefono)` +
           `&estado=eq.activa` +
+          (cicloActivo ? `&ciclo_codigo=eq.${encodeURIComponent(cicloActivo)}` : "") +
           `&inscripciones.telefono=ilike.*${tel}*`,
         { headers: headers() }
       );
-      const data = await res.json();
+      const data = (await res.json()).filter(
+        (a) => normalizarTelefonoBusqueda(a.inscripciones?.telefono) === tel
+      );
 
       if (!Array.isArray(data) || data.length === 0) {
         setError("No se encontraron alumnos con ese teléfono.");
