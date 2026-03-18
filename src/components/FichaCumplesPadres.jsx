@@ -58,6 +58,8 @@ const addMinutes = (hora, minutos) => {
 
 export default function FichaCumplesPadres() {
   const [config, setConfig] = useState(null);
+  const [precioCumple, setPrecioCumple] = useState(null);
+  const [promoCumple, setPromoCumple] = useState("");
   const [mesSeleccionado, setMesSeleccionado] = useState(() => {
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -80,6 +82,7 @@ export default function FichaCumplesPadres() {
     menu_especial_cantidad: "",
     menu_opcion: "",
   });
+  const promoDefault = "Promo lanzamiento reservando en febrero 20% off: $450.000.";
 
   const formatFecha = (fecha) => {
     if (!fecha) return "";
@@ -88,11 +91,39 @@ export default function FichaCumplesPadres() {
     return `${d}-${m}-${y}`;
   };
 
+  const formatPrecio = (valor) => {
+    if (valor == null || Number.isNaN(Number(valor))) return "$570.000";
+    const formatted = new Intl.NumberFormat("es-AR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(Number(valor));
+    return `$${formatted}`;
+  };
+
   useEffect(() => {
     fetch("/config.json")
       .then((res) => res.json())
       .then((cfg) => setConfig(cfg));
   }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${config.supabaseUrl}/rest/v1/cumples_config?select=precio,promo&id=eq.global`,
+          { headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` } }
+        );
+        const data = await res.json();
+        const row = Array.isArray(data) ? data[0] : null;
+        setPrecioCumple(row?.precio ?? null);
+        setPromoCumple(row?.promo || "");
+      } catch {
+        setPrecioCumple(null);
+        setPromoCumple("");
+      }
+    })();
+  }, [config]);
 
   const headers = useMemo(() => {
     if (!config) return {};
@@ -208,15 +239,22 @@ export default function FichaCumplesPadres() {
     });
   }, [diaSeleccionado, slotsPorDia, reservasPorSlot]);
   const pasoReserva = slotSeleccionado ? 3 : diaSeleccionado ? 2 : 1;
+  const mensajeEsError = mensaje.startsWith("Completa");
 
   const handleReserva = async () => {
     if (!config || !slotSeleccionado) return;
-    if (!reservaForm.nombre || !reservaForm.apellido || !reservaForm.telefono) {
-      setMensaje("Completa nombre, apellido y telefono.");
-      return;
+    const camposFaltantes = [];
+    if (!reservaForm.nombre.trim()) camposFaltantes.push("nombre");
+    if (!reservaForm.apellido.trim()) camposFaltantes.push("apellido");
+    if (!reservaForm.telefono.trim()) camposFaltantes.push("teléfono");
+    if (!reservaForm.cumpleanero_nombre.trim()) camposFaltantes.push("nombre del cumpleañero");
+    if (!String(reservaForm.cumpleanero_edad).trim()) camposFaltantes.push("edad que cumple");
+    if (!reservaForm.menu_opcion.trim()) camposFaltantes.push("menú");
+    if (reservaForm.menu_especial && !String(reservaForm.menu_especial_cantidad).trim()) {
+      camposFaltantes.push("cantidad de comida especial");
     }
-    if (!reservaForm.menu_opcion) {
-      setMensaje("Selecciona el menu.");
+    if (camposFaltantes.length > 0) {
+      setMensaje(`Completa: ${camposFaltantes.join(", ")}.`);
       return;
     }
 
@@ -312,11 +350,30 @@ export default function FichaCumplesPadres() {
       <div className="mt-4 overflow-hidden">
         <img src={IMG_CUMPLES} alt="Festeja tu cumple" className="w-full h-auto" />
       </div>
-      {mensaje && (
-        <div className="text-center text-sm text-emerald-700 mt-4 px-2 sm:px-4">{mensaje}</div>
-      )}
-
       <div className="mt-6">
+        <div className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 via-cyan-50 to-emerald-50 p-4 sm:p-5 shadow-sm mb-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
+            <div className="flex-1 rounded-xl bg-white/80 border border-white px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-sky-600 mb-1">
+                Precio del cumple
+              </div>
+              <div className="text-2xl sm:text-3xl font-bold text-gray-900">
+                {formatPrecio(precioCumple)}
+              </div>
+              <div className="text-xs sm:text-sm text-gray-600 mt-1">
+                Reserva con el 50% para confirmar la fecha.
+              </div>
+            </div>
+            <div className="flex-[1.2] rounded-xl bg-white/80 border border-white px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-emerald-600 mb-1">
+                Promo vigente
+              </div>
+              <div className="text-sm sm:text-base font-medium text-gray-800 whitespace-pre-line">
+                {promoCumple || promoDefault}
+              </div>
+            </div>
+          </div>
+        </div>
         <h3 className="text-lg font-semibold mb-4">Solicitud de reserva</h3>
         <div className="text-xs sm:text-sm text-gray-600 mb-4 space-y-2">
           <div className="font-semibold text-gray-800">Cómo realizar la reserva del cumpleaños en Plugin</div>
@@ -670,6 +727,11 @@ export default function FichaCumplesPadres() {
                 >
                   Enviar solicitud por Whatsapp
                 </button>
+                {mensajeEsError && (
+                  <span className="text-xs text-red-600 text-left">
+                    {mensaje}
+                  </span>
+                )}
               </div>
             </div>
           </div>
