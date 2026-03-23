@@ -297,7 +297,28 @@ const FichaPagosEstadisticas = () => {
   doc.setTextColor(150);
   doc.text(`Fecha: ${fechaTxt}`, 85, 132, { align: "right" });
 
-  doc.save(`Comprobante_${alumno.nombre}_${alumno.apellido}_${mesSeleccionado}.pdf`);
+  const nombreArchivo = `Comprobante_${alumno.nombre}_${alumno.apellido}_${mesSeleccionado}.pdf`;
+  const pdfBlob = doc.output("blob");
+  const pdfFile = new File([pdfBlob], nombreArchivo, { type: "application/pdf" });
+
+  if (
+    navigator.share &&
+    navigator.canShare &&
+    navigator.canShare({ files: [pdfFile] })
+  ) {
+    try {
+      await navigator.share({
+        title: "Comprobante de pago",
+        text: `Comprobante de pago de ${alumno.nombre} ${alumno.apellido}`,
+        files: [pdfFile],
+      });
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+
+  doc.save(nombreArchivo);
 };
 
   return (
