@@ -212,7 +212,7 @@ const FichaPagosEstadisticas = () => {
   const alumno = alumnos.find(a => a.id === alumnoId);
   if (!alumno || !config) return;
 
-  const resPago = await fetch(`${config.supabaseUrl}/rest/v1/pagos?alumno_id=eq.${alumnoId}&mes=eq.${mesSeleccionado}&pago_mes=eq.true&select=medio_pago,pago_inscripcion,pago_mes,mes,monto_total`, {
+  const resPago = await fetch(`${config.supabaseUrl}/rest/v1/pagos?alumno_id=eq.${alumnoId}&mes=eq.${mesSeleccionado}&pago_mes=eq.true&select=medio_pago,pago_inscripcion,pago_mes,mes,monto_total,creado_en`, {
     headers: {
       apikey: config.supabaseKey,
       Authorization: `Bearer ${config.supabaseKey}`,
@@ -225,20 +225,8 @@ const FichaPagosEstadisticas = () => {
     return;
   }
 
-  let montoTotal = pago.monto_total;
-  let nombreCompleto = `${alumno.nombre} ${alumno.apellido}`;
-
-  if (alumno.tiene_promo) {
-    const hermanos = alumnos.filter(a =>
-      a.id !== alumnoId &&
-      a.telefono === alumno.telefono &&
-      a.tiene_promo
-    );
-    if (hermanos.length > 0) {
-      nombreCompleto = `${alumno.nombre} y ${hermanos[0].nombre} ${alumno.apellido}`;
-      montoTotal *= 2;
-    }
-  }
+  const montoTotal = pago.monto_total;
+  const nombreCompleto = `${alumno.nombre} ${alumno.apellido}`;
 
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [90, 140] });
@@ -288,8 +276,6 @@ const FichaPagosEstadisticas = () => {
   let conceptos = [];
   if (pago.pago_mes) conceptos.push(`Pago cuota mes ${mesSeleccionado}`);
   if (pago.pago_inscripcion) conceptos.push("Inscripción");
-  if (alumno.tiene_promo) conceptos.push("Con promo");
-  
   y += 5;
   for (const concepto of conceptos) {
     doc.text(`- ${concepto}`, 8, y);
@@ -304,7 +290,9 @@ const FichaPagosEstadisticas = () => {
   doc.setTextColor(100);
   doc.text(pago.medio_pago.charAt(0).toUpperCase() + pago.medio_pago.slice(1), 5, y + 5);
 
-  const fechaTxt = new Date().toLocaleDateString("es-AR");
+  const fechaTxt = pago.creado_en
+    ? new Date(pago.creado_en).toLocaleDateString("es-AR")
+    : new Date().toLocaleDateString("es-AR");
   doc.setFontSize(10);
   doc.setTextColor(150);
   doc.text(`Fecha: ${fechaTxt}`, 85, 132, { align: "right" });
