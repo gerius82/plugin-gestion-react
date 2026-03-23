@@ -242,6 +242,38 @@ export default function FichaPagos() {
     return Math.max(0, subtotal * (1 - descPct / 100));
   };
 
+  const construirDescuentoPago = () => {
+    if (!curso) {
+      return { descuentoPct: null, descuentoDetalle: null };
+    }
+
+    const pctGrupo = Number.isFinite(grupoDescuento) ? Math.max(0, Math.min(100, grupoDescuento)) : 10;
+    const pctDobleTurno = 10;
+    const aplicaGrupo = grupoIntegrantes.length >= 2;
+    const aplicaPromoBase = aplicaGrupo || promoDobleTurno;
+    const promoPct = aplicaPromoBase
+      ? (aplicaGrupo ? Math.max(pctGrupo, pctDobleTurno) : pctDobleTurno)
+      : 0;
+    const extraPct = Number.isFinite(Number(descuentoExtraPct))
+      ? Math.min(100, Math.max(0, Number(descuentoExtraPct)))
+      : 0;
+
+    const detalles = [];
+    if (aplicaGrupo) {
+      detalles.push(`Promo grupo ${promoPct}%`);
+    } else if (promoDobleTurno) {
+      detalles.push(`Promo doble turno ${promoPct}%`);
+    }
+    if (extraPct > 0) {
+      detalles.push(`Descuento manual ${extraPct}%`);
+    }
+
+    return {
+      descuentoPct: promoPct + extraPct > 0 ? promoPct + extraPct : null,
+      descuentoDetalle: detalles.length ? detalles.join(" + ") : null,
+    };
+  };
+
   const detalleProporcional = useMemo(() => {
     if (!matriculaSel?.creado_en || !matriculaSel?.dia || !pagaMes || !mes) return null;
     const fechaAlta = new Date(matriculaSel.creado_en);
@@ -271,6 +303,7 @@ export default function FichaPagos() {
       grupoIntegrantes.length >= 2 && pagarGrupo
         ? Array.from(new Set(grupoIntegrantes.map((g) => g.id).filter(Boolean)))
         : [matriculaSel.alumno_id];
+    const { descuentoPct, descuentoDetalle } = construirDescuentoPago();
     const payloads = idsGrupo.map((alumnoId) => ({
       alumno_id: alumnoId,
       mes: pagaMes ? mes : "N/A",
@@ -278,6 +311,8 @@ export default function FichaPagos() {
       pago_inscripcion: pagaInscripcion,
       medio_pago: medioPago,
       monto_total: Math.round(total / idsGrupo.length),
+      descuento_pct: descuentoPct,
+      descuento_detalle: descuentoDetalle,
     }));
 
     try {
@@ -326,17 +361,36 @@ export default function FichaPagos() {
       }
 
       const results = await Promise.all(
-        payloads.map((body) =>
-          fetch(`${config.supabaseUrl}/rest/v1/pagos`, {
+        payloads.map(async (body) => {
+          const res = await fetch(`${config.supabaseUrl}/rest/v1/pagos`, {
             method: "POST",
             headers,
             body: JSON.stringify(body),
-          })
-        )
+          });
+          if (res.ok) return res;
+
+          const errTxt = await res.text();
+          const schemaError =
+            errTxt.includes("descuento_pct") || errTxt.includes("descuento_detalle");
+
+          if (!schemaError) {
+            return { ok: false, _errorText: errTxt };
+          }
+
+          const { descuento_pct, descuento_detalle, ...bodySinDescuento } = body;
+          const retry = await fetch(`${config.supabaseUrl}/rest/v1/pagos`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(bodySinDescuento),
+          });
+          if (retry.ok) return retry;
+          const retryErrTxt = await retry.text();
+          return { ok: false, _errorText: retryErrTxt };
+        })
       );
       const allOk = results.every((r) => r.ok);
       if (!allOk) {
-        const errTxt = await results.find((r) => !r.ok)?.text();
+        const errTxt = results.find((r) => !r.ok)?._errorText;
         setMensaje(`Error al registrar pago: ${errTxt || "Error"}`);
         return;
       }

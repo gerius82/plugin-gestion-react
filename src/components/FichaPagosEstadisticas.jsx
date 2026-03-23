@@ -212,12 +212,18 @@ const FichaPagosEstadisticas = () => {
   const alumno = alumnos.find(a => a.id === alumnoId);
   if (!alumno || !config) return;
 
-  const resPago = await fetch(`${config.supabaseUrl}/rest/v1/pagos?alumno_id=eq.${alumnoId}&mes=eq.${mesSeleccionado}&pago_mes=eq.true&select=medio_pago,pago_inscripcion,pago_mes,mes,monto_total,creado_en`, {
-    headers: {
-      apikey: config.supabaseKey,
-      Authorization: `Bearer ${config.supabaseKey}`,
-    },
+  const headers = {
+    apikey: config.supabaseKey,
+    Authorization: `Bearer ${config.supabaseKey}`,
+  };
+  let resPago = await fetch(`${config.supabaseUrl}/rest/v1/pagos?alumno_id=eq.${alumnoId}&mes=eq.${mesSeleccionado}&pago_mes=eq.true&select=medio_pago,pago_inscripcion,pago_mes,mes,monto_total,creado_en,descuento_pct,descuento_detalle`, {
+    headers,
   });
+  if (!resPago.ok) {
+    resPago = await fetch(`${config.supabaseUrl}/rest/v1/pagos?alumno_id=eq.${alumnoId}&mes=eq.${mesSeleccionado}&pago_mes=eq.true&select=medio_pago,pago_inscripcion,pago_mes,mes,monto_total,creado_en`, {
+      headers,
+    });
+  }
 
   const [pago] = await resPago.json();
   if (!pago) {
@@ -276,6 +282,7 @@ const FichaPagosEstadisticas = () => {
   let conceptos = [];
   if (pago.pago_mes) conceptos.push(`Pago cuota mes ${mesSeleccionado}`);
   if (pago.pago_inscripcion) conceptos.push("Inscripción");
+  if (pago.descuento_detalle) conceptos.push(pago.descuento_detalle);
   y += 5;
   for (const concepto of conceptos) {
     doc.text(`- ${concepto}`, 8, y);
