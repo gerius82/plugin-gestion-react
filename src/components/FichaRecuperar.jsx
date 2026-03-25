@@ -636,7 +636,7 @@ function calcularProximaClase(turno, feriadosSet = new Set()) {
   const diaDeseado = dias.findIndex((d) => normalizarDia(d) === normalizarDia(diaNombre));
   if (diaDeseado === -1) return "";
 
-  let delta = ((diaDeseado - hoy.getDay() + 7) % 7) || 7;
+  let delta = (diaDeseado - hoy.getDay() + 7) % 7;
   let intentos = 0;
   while (intentos < 60) {
     const proxima = new Date(hoy);
