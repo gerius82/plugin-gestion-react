@@ -3,22 +3,23 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 const FichaAsistencia = () => {
   const navigate = useNavigate();
-  const [config, setConfig] = useState(null);
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const from = `/${params.get("from")}`;
+
+  const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
   const [sede, setSede] = useState("");
   const [dia, setDia] = useState("");
   const [horario, setHorario] = useState("");
   const [fecha, setFecha] = useState("");
-  const [recuperadores, setRecuperadores] = useState([]);
   const [listaMostrada, setListaMostrada] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [cicloCodigo, setCicloCodigo] = useState("");
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
+
   useEffect(() => {
     const loadConfig = async () => {
       const cfg = await (await fetch("/config.json")).json();
@@ -54,9 +55,7 @@ const FichaAsistencia = () => {
 
     const loadData = async () => {
       setCargando(true);
-      const filtroCiclo = cicloCodigo
-        ? `&ciclo_codigo=eq.${encodeURIComponent(cicloCodigo)}`
-        : "";
+      const filtroCiclo = cicloCodigo ? `&ciclo_codigo=eq.${encodeURIComponent(cicloCodigo)}` : "";
       const res = await fetch(
         `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,curso_nombre,inscripciones(nombre,apellido)&estado=eq.activa${filtroCiclo}`,
         {
@@ -86,29 +85,32 @@ const FichaAsistencia = () => {
       setDia("");
       setHorario("");
       setListaMostrada([]);
-      setRecuperadores([]);
       setCargando(false);
     };
 
     loadData();
   }, [config, cicloCodigo]);
-  const ordenDias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+
+  const ordenDias = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
   const normalizarDia = (valor = "") =>
     String(valor || "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .trim();
+
   const ordenarDias = (lista = []) =>
     [...new Set(lista)].sort((a, b) => {
       const ia = ordenDias.indexOf(normalizarDia(a));
       const ib = ordenDias.indexOf(normalizarDia(b));
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     });
+
   const inicioDeRango = (valor) => {
     const m = String(valor || "").match(/(\d{1,2}:\d{2})/);
     return m ? m[1].padStart(5, "0") : String(valor || "");
   };
+
   const ordenarHorarios = (lista = []) =>
     [...new Set(lista)].sort((a, b) => inicioDeRango(a).localeCompare(inicioDeRango(b)));
 
@@ -128,6 +130,112 @@ const FichaAsistencia = () => {
 
   const turnoCompleto = [dia, horario].filter(Boolean).join(" ");
 
+  const cargarListaTurno = async () => {
+    if (!config || !sede || !dia || !horario) return;
+
+    const fechaISO = fecha || new Date().toISOString().split("T")[0];
+    const headersAuth = {
+      apikey: config.supabaseKey,
+      Authorization: `Bearer ${config.supabaseKey}`,
+    };
+
+    const seleccionadosBase = alumnos
+      .filter((a) => a.sede === sede && a.dia === dia && a.hora === horario)
+      .map((a) => ({
+        ...a,
+        presente: true,
+        esRecuperacion: false,
+        asistencia_id: null,
+      }));
+
+    try {
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/asistencias?select=id,alumno_id,tipo,fecha,turno,sede,inscripciones(nombre,apellido)&fecha=eq.${fechaISO}&sede=eq.${encodeURIComponent(sede)}&turno=eq.${encodeURIComponent(turnoCompleto)}`,
+        { headers: headersAuth }
+      );
+      const data = await res.json();
+      const existentes = Array.isArray(data) ? data : [];
+      const porAlumno = new Map(existentes.map((item) => [String(item.alumno_id), item]));
+
+      const listaRegular = seleccionadosBase.map((a) => {
+        const existente = porAlumno.get(String(a.alumno_id));
+        return {
+          ...a,
+          presente: String(existente?.tipo || "regular") !== "ausente",
+          asistencia_id: existente?.id || null,
+        };
+      });
+
+      const idsBase = new Set(listaRegular.map((a) => String(a.alumno_id)));
+      const listaRecuperaciones = existentes
+        .filter((item) => String(item.tipo || "") === "recuperacion" && !idsBase.has(String(item.alumno_id)))
+        .map((item) => {
+          const alumno = Array.isArray(item.inscripciones) ? item.inscripciones[0] : item.inscripciones || {};
+          return {
+            id: item.alumno_id,
+            alumno_id: item.alumno_id,
+            nombre: alumno.nombre || "",
+            apellido: alumno.apellido || "",
+            sede,
+            dia,
+            hora: horario,
+            curso: "",
+            presente: true,
+            esRecuperacion: true,
+            asistencia_id: item.id,
+          };
+        });
+
+      setListaMostrada([...listaRegular, ...listaRecuperaciones]);
+    } catch {
+      setListaMostrada(seleccionadosBase);
+    }
+  };
+
+  const agregarRecuperador = (id) => {
+    if (!id) return;
+    const alumno = alumnos.find((a) => String(a.id) === String(id));
+    if (!alumno) return;
+    setListaMostrada((prev) => {
+      if (prev.some((item) => String(item.alumno_id) === String(alumno.alumno_id))) return prev;
+      return [
+        ...prev,
+        {
+          ...alumno,
+          presente: true,
+          esRecuperacion: true,
+          asistencia_id: null,
+        },
+      ];
+    });
+  };
+
+  const marcarAusenciaRecuperada = async (headersAuth, headersJson, alumnoId, fechaISO) => {
+    const resAusencias = await fetch(
+      `${config.supabaseUrl}/rest/v1/asistencias?select=id,fecha&alumno_id=eq.${alumnoId}&tipo=eq.ausente&recuperada=is.false`,
+      { headers: headersAuth }
+    );
+    const ausenciasPendientes = await resAusencias.json();
+    const listaPendientes = Array.isArray(ausenciasPendientes) ? ausenciasPendientes : [];
+    if (listaPendientes.length === 0) return;
+
+    const fechaRecuperacionMs = new Date(`${fechaISO}T00:00:00`).getTime();
+    const ausenciaObjetivo = listaPendientes
+      .map((item) => ({
+        ...item,
+        distancia: Math.abs(new Date(`${String(item.fecha).split("T")[0]}T00:00:00`).getTime() - fechaRecuperacionMs),
+      }))
+      .sort((a, b) => a.distancia - b.distancia)[0];
+
+    if (!ausenciaObjetivo?.id) return;
+
+    await fetch(`${config.supabaseUrl}/rest/v1/asistencias?id=eq.${ausenciaObjetivo.id}`, {
+      method: "PATCH",
+      headers: headersJson,
+      body: JSON.stringify({ recuperada: true }),
+    });
+  };
+
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!config || guardando) return;
@@ -139,13 +247,36 @@ const FichaAsistencia = () => {
     setGuardando(true);
 
     const fechaISO = fecha || new Date().toISOString().split("T")[0];
-    const presentes = listaMostrada.filter((a) => a.presente);
-    const ausentes = listaMostrada.filter((a) => !a.presente);
+    const headersAuth = { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` };
+    const headersJson = { ...headersAuth, "Content-Type": "application/json" };
+
+    const presentes = listaMostrada.filter((a) => a.presente && !a.esRecuperacion);
+    const ausentes = listaMostrada.filter((a) => !a.presente && !a.esRecuperacion);
+    const recuperacionesPresentes = listaMostrada.filter((a) => a.presente && a.esRecuperacion);
+    const recuperacionesAusentes = listaMostrada.filter((a) => !a.presente && a.esRecuperacion);
 
     const payloadRaw = [
-      ...presentes.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "regular" })),
-      ...ausentes.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "ausente" })),
-      ...recuperadores.map((a) => ({ alumno_id: a.alumno_id || a.id, fecha: fechaISO, turno: turnoCompleto, sede, tipo: "recuperacion" })),
+      ...presentes.map((a) => ({
+        alumno_id: a.alumno_id || a.id,
+        fecha: fechaISO,
+        turno: turnoCompleto,
+        sede,
+        tipo: "regular",
+      })),
+      ...ausentes.map((a) => ({
+        alumno_id: a.alumno_id || a.id,
+        fecha: fechaISO,
+        turno: turnoCompleto,
+        sede,
+        tipo: "ausente",
+      })),
+      ...recuperacionesPresentes.map((a) => ({
+        alumno_id: a.alumno_id || a.id,
+        fecha: fechaISO,
+        turno: turnoCompleto,
+        sede,
+        tipo: "recuperacion",
+      })),
     ];
 
     const payloadMap = new Map();
@@ -161,11 +292,8 @@ const FichaAsistencia = () => {
     const payload = Array.from(payloadMap.values());
 
     try {
-      const headersAuth = { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` };
-      const headersJson = { ...headersAuth, "Content-Type": "application/json" };
-
       const existentesRes = await fetch(
-        `${config.supabaseUrl}/rest/v1/asistencias?select=id,alumno_id,tipo,fecha,turno,sede&fecha=eq.${fechaISO}&sede=eq.${encodeURIComponent(sede)}&turno=eq.${encodeURIComponent(turnoCompleto)}`,
+        `${config.supabaseUrl}/rest/v1/asistencias?select=id,alumno_id,tipo,fecha,turno,sede,recuperada&fecha=eq.${fechaISO}&sede=eq.${encodeURIComponent(sede)}&turno=eq.${encodeURIComponent(turnoCompleto)}`,
         { headers: headersAuth }
       );
       const existentes = await existentesRes.json();
@@ -180,6 +308,21 @@ const FichaAsistencia = () => {
       });
 
       const ops = [];
+
+      recuperacionesAusentes.forEach((a) => {
+        const existentesAlumno = porAlumno.get(String(a.alumno_id || a.id)) || [];
+        existentesAlumno
+          .filter((row) => String(row.tipo || "") === "recuperacion")
+          .forEach((row) => {
+            ops.push(
+              fetch(`${config.supabaseUrl}/rest/v1/asistencias?id=eq.${row.id}`, {
+                method: "DELETE",
+                headers: headersAuth,
+              })
+            );
+          });
+      });
+
       payload.forEach((p) => {
         const idAlumno = String(p.alumno_id);
         const existentesAlumno = porAlumno.get(idAlumno) || [];
@@ -216,24 +359,20 @@ const FichaAsistencia = () => {
 
       if (ops.length > 0) await Promise.all(ops);
 
+      for (const alumnoRecupera of recuperacionesPresentes) {
+        await marcarAusenciaRecuperada(headersAuth, headersJson, alumnoRecupera.alumno_id, fechaISO);
+      }
+
       setMensaje("Asistencia guardada correctamente.");
       setTimeout(() => {
         setMensaje("");
         setListaMostrada([]);
-        setRecuperadores([]);
       }, 3000);
     } catch {
       setMensaje("No se pudo guardar la asistencia.");
     } finally {
       setGuardando(false);
     }
-  };
-  const handleBuscar = () => {
-    if (!sede || !dia || !horario) return;
-    const seleccionados = alumnos
-      .filter((a) => a.sede === sede && a.dia === dia && a.hora === horario)
-      .map((a) => ({ ...a, presente: true }));
-    setListaMostrada(seleccionados);
   };
 
   return (
@@ -253,153 +392,165 @@ const FichaAsistencia = () => {
           <p className="text-center">Cargando datos...</p>
         ) : (
           <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Selector de ciclo / tipo de inscripciÃƒÂ³n */}
-            <div>
-              <label className="font-medium block mb-1">Ciclo:</label>
-              <select
-                className="w-full border p-2 rounded"
-                value={cicloCodigo}
-                onChange={(e) => setCicloCodigo(e.target.value)}
-              >
-                <option value="">Todos</option>
-                {ciclosDisponibles.map((c) => (
-                  <option key={c.codigo} value={c.codigo}>
-                    {c.nombre_publico || c.codigo}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="font-medium block mb-1">Sede:</label>
-              <select className="w-full border p-2 rounded" value={sede} onChange={(e) => setSede(e.target.value)}>
-                <option value="">-- Seleccionar sede --</option>
-                {sedesDisponibles.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="font-medium block mb-1">Dí­a:</label>
-              <select className="w-full border p-2 rounded" value={dia} onChange={(e) => setDia(e.target.value)}>
-                <option value="">-- Seleccionar dí­a --</option>
-                {diasDisponibles.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="font-medium block mb-1">Horario:</label>
-              <select className="w-full border p-2 rounded" value={horario} onChange={(e) => setHorario(e.target.value)}>
-                <option value="">-- Seleccionar horario --</option>
-                {horariosDisponibles.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="font-medium block mb-1">Fecha:</label>
-              <input className="w-full border p-2 rounded" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="flex gap-4 justify-center mb-6">
-            <button onClick={handleBuscar} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Buscar alumnos</button>
-          </div>
-
-          {mensaje && (
-            <div className="mb-4 text-center text-green-800 font-semibold bg-green-100 border border-green-300 px-4 py-3 rounded shadow animate-fade-in-out">
-                {mensaje}
-            </div>
-          )}
-
-
-          {listaMostrada.length > 0 && (
-            <form onSubmit={handleGuardar} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
-                <h4 className="text-xl font-semibold mb-2">Alumnos asignados</h4>
-                
+                <label className="font-medium block mb-1">Ciclo:</label>
+                <select
+                  className="w-full border p-2 rounded"
+                  value={cicloCodigo}
+                  onChange={(e) => setCicloCodigo(e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {ciclosDisponibles.map((c) => (
+                    <option key={c.codigo} value={c.codigo}>
+                      {c.nombre_publico || c.codigo}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <ul className="space-y-2">
+              <div>
+                <label className="font-medium block mb-1">Sede:</label>
+                <select className="w-full border p-2 rounded" value={sede} onChange={(e) => setSede(e.target.value)}>
+                  <option value="">-- Seleccionar sede --</option>
+                  {sedesDisponibles.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-medium block mb-1">Dia:</label>
+                <select className="w-full border p-2 rounded" value={dia} onChange={(e) => setDia(e.target.value)}>
+                  <option value="">-- Seleccionar dia --</option>
+                  {diasDisponibles.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-medium block mb-1">Horario:</label>
+                <select className="w-full border p-2 rounded" value={horario} onChange={(e) => setHorario(e.target.value)}>
+                  <option value="">-- Seleccionar horario --</option>
+                  {horariosDisponibles.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="font-medium block mb-1">Fecha:</label>
+                <input className="w-full border p-2 rounded" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="flex gap-4 justify-center mb-6">
+              <button onClick={cargarListaTurno} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+                Buscar alumnos
+              </button>
+            </div>
+
+            {mensaje && (
+              <div className="mb-4 text-center text-green-800 font-semibold bg-green-100 border border-green-300 px-4 py-3 rounded shadow animate-fade-in-out">
+                {mensaje}
+              </div>
+            )}
+
+            {listaMostrada.length > 0 && (
+              <form onSubmit={handleGuardar} className="space-y-4">
+                <div>
+                  <h4 className="text-xl font-semibold mb-2">Alumnos asignados</h4>
+
+                  <ul className="space-y-2">
                     {listaMostrada.map((a, i) => {
-                        const ausente = !a.presente;
-                        return (
+                      const ausente = !a.presente;
+                      return (
                         <li
-                            key={a.id}
-                            className={`flex items-center gap-4 p-3 rounded border transition ${
-                            ausente ? "bg-red-100 border-red-300" : "bg-white border-gray-300"
-                            }`}
+                          key={`${a.alumno_id}-${a.esRecuperacion ? "rec" : "reg"}`}
+                          className={`flex items-center gap-4 p-3 rounded border transition ${
+                            a.esRecuperacion
+                              ? ausente
+                                ? "bg-amber-100 border-amber-300"
+                                : "bg-sky-50 border-sky-300"
+                              : ausente
+                              ? "bg-red-100 border-red-300"
+                              : "bg-white border-gray-300"
+                          }`}
                         >
-                            <input
+                          <input
                             type="checkbox"
                             checked={a.presente}
                             onChange={() => {
-                                const copia = [...listaMostrada];
-                                copia[i].presente = !copia[i].presente;
-                                setListaMostrada(copia);
+                              const copia = [...listaMostrada];
+                              copia[i].presente = !copia[i].presente;
+                              setListaMostrada(copia);
                             }}
                             className="w-5 h-5 text-green-600 rounded focus:ring-green-500 border-gray-300"
-                            />
-                            <div>
-                            <p className="font-medium">{a.nombre} {a.apellido}</p>
-                            <p className="text-sm text-gray-600">{a.curso}</p>
-                            </div>
+                          />
+                          <div>
+                            <p className="font-medium">
+                              {a.nombre} {a.apellido}
+                            </p>
+                            <p className="text-sm text-gray-600">{a.esRecuperacion ? "Recuperando clase" : a.curso}</p>
+                          </div>
+                          {a.esRecuperacion && (
+                            <span className="ml-auto rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700">
+                              Recupera
+                            </span>
+                          )}
                         </li>
-                        );
+                      );
                     })}
-                </ul>
+                  </ul>
+                </div>
+                <p className="text-sm text-gray-700 mb-3">
+                  Presentes: {listaMostrada.filter((a) => a.presente).length} | Ausentes:{" "}
+                  {listaMostrada.filter((a) => !a.presente).length}
+                </p>
 
-
-              </div>
-              <p className="text-sm text-gray-700 mb-3">
-                ✅ Presentes: {listaMostrada.filter(a => a.presente).length + recuperadores.length} | ❌ Ausentes: {listaMostrada.filter(a => !a.presente).length}
-              </p>
-
-              <div>
-                <h4 className="text-xl font-semibold mb-2">Agregar recuperadores</h4>
-                <select className="w-full border p-2 rounded" onChange={(e) => {
-                  const id = e.target.value;
-                  const ya = recuperadores.find(r => r.id === id);
-                  if (!id || ya) return;
-                  const alumno = alumnos.find(a => a.id === id);
-                  if (alumno) setRecuperadores([...recuperadores, alumno]);
-                }}>
-                  <option value="">-- Seleccionar alumno --</option>
-                  {alumnos
-                    .sort((a, b) => a.nombre.localeCompare(b.nombre))
-                    .map(a => (
-                      <option key={a.id} value={a.id}>{a.nombre} {a.apellido}</option>
-                    ))}
-                </select>
-                <ul className="mt-2 space-y-1">
-                  {recuperadores.map((a, i) => (
-                    <li
-                      key={a.id}
-                      className="cursor-pointer text-blue-700 hover:underline"
-                      onClick={() => {
-                        const copia = [...recuperadores];
-                        copia.splice(i, 1);
-                        setRecuperadores(copia);
-                      }}
-                    >
-                      {a.nombre} {a.apellido} (clic para quitar)
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="text-center">
-                <button type="submit" disabled={guardando} className="bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2 rounded shadow">{guardando ? "Guardando..." : "Guardar asistencia"}</button>
-              </div>
-            </form>
-          )}
-        </>
-      )}
+                <div>
+                  <h4 className="text-xl font-semibold mb-2">Agregar recuperadores</h4>
+                  <select
+                    className="w-full border p-2 rounded"
+                    defaultValue=""
+                    onChange={(e) => {
+                      agregarRecuperador(e.target.value);
+                      e.target.value = "";
+                    }}
+                  >
+                    <option value="">-- Seleccionar alumno --</option>
+                    {alumnos
+                      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.nombre} {a.apellido}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Se agregan a la lista principal y quedan identificados como recuperacion.
+                  </p>
+                </div>
+                <div className="text-center">
+                  <button
+                    type="submit"
+                    disabled={guardando}
+                    className="bg-green-500 hover:bg-green-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2 rounded shadow"
+                  >
+                    {guardando ? "Guardando..." : "Guardar asistencia"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
 };
 
 export default FichaAsistencia;
-
-

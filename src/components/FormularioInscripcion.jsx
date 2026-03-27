@@ -12,6 +12,21 @@ const normalizarTextoComparacion = (valor = "") =>
 
 const normalizarTelefono = (valor = "") => String(valor || "").replace(/\D/g, "").slice(0, 10);
 const validarTelefonoArg = (valor = "") => /^[1-9]\d{9}$/.test(normalizarTelefono(valor));
+const normalizarDiaOrden = (valor = "") =>
+  String(valor || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+const ORDEN_DIAS = {
+  lunes: 0,
+  martes: 1,
+  miercoles: 2,
+  jueves: 3,
+  viernes: 4,
+  sabado: 5,
+  domingo: 6,
+};
 
 const FormularioInscripcion = () => {
   const navigate = useNavigate();
@@ -289,15 +304,42 @@ const FormularioInscripcion = () => {
   }, [config, cicloSel, cursoParam]);
 
   useEffect(() => {
-    const s = Object.keys(turnosConfig || {});
-    setSedes(s);
+    if (!config || !cicloSel) {
+      setSedes([]);
+      return;
+    }
+
+    (async () => {
+      try {
+        const url =
+          `${config.supabaseUrl}/rest/v1/turnos` +
+          `?select=sede` +
+          `&ciclo_codigo=eq.${encodeURIComponent(cicloSel)}` +
+          `&activo=eq.true`;
+
+        const res = await fetch(url, {
+          headers: {
+            apikey: config.supabaseKey,
+            Authorization: `Bearer ${config.supabaseKey}`,
+          },
+        });
+        const data = await res.json();
+        const sedesUnicas = Array.from(
+          new Set((Array.isArray(data) ? data : []).map((item) => item?.sede).filter(Boolean))
+        ).sort((a, b) => String(a).localeCompare(String(b)));
+        setSedes(sedesUnicas);
+      } catch (error) {
+        console.error(error);
+        setSedes([]);
+      }
+    })();
 
     setDiaSel("");
     setHoraSel("");
     setFormulario((prev) => ({ ...prev, sede: "", turno_1: "" }));
     setTurnosCards([]);
     setTurnoEnListaEspera(false);
-  }, [turnosConfig]);
+  }, [config, cicloSel, cursoSelId]);
 
   const contarMatriculasActivasPorTurno = async ({ cicloCodigo, sede, dia, hora }) => {
     const url =
@@ -412,16 +454,7 @@ const FormularioInscripcion = () => {
         cupos.set(key, Number(t.cupo_maximo));
       });
 
-      const turnosPorSede = turnosConfig?.[sede] || {};
-      const baseTurnos = [];
-      Object.entries(turnosPorSede).forEach(([dia, horarios]) => {
-        const lista = Array.isArray(horarios) ? horarios : [];
-        lista.forEach((hora) => {
-          if (hora) baseTurnos.push({ dia, hora });
-        });
-      });
-
-      const cards = baseTurnos.map((t) => {
+      const cards = (Array.isArray(turnos) ? turnos : []).map((t) => {
         const key = `${t.dia}||${inicioDeRango(t.hora)}`;
         const anotados = counts.get(key) || 0;
         const cupo = cupos.get(key);
@@ -436,19 +469,9 @@ const FormularioInscripcion = () => {
         };
       });
 
-      const ordenMap = {
-        lunes: 0,
-        martes: 1,
-        miercoles: 2,
-        jueves: 3,
-        viernes: 4,
-        sabado: 5,
-        domingo: 6,
-      };
-
       cards.sort((a, b) => {
-        const da = ordenMap[String(a.dia || "").toLowerCase()] ?? 99;
-        const db = ordenMap[String(b.dia || "").toLowerCase()] ?? 99;
+        const da = ORDEN_DIAS[normalizarDiaOrden(a.dia)] ?? 99;
+        const db = ORDEN_DIAS[normalizarDiaOrden(b.dia)] ?? 99;
         if (da !== db) return da - db;
         return String(a.hora).localeCompare(String(b.hora));
       });

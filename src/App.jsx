@@ -16,6 +16,7 @@ import FichaPagosEstadisticas from "./components/FichaPagosEstadisticas";
 import PagosMenu from "./components/menus/PagosMenu";
 import AsistenciaMenu from "./components/menus/AsistenciaMenu";
 import FichaAsistenciasEstadisticas from "./components/FichaAsistenciasEstadisticas";
+import FichaControlAsistenciaMensual from "./components/FichaControlAsistenciaMensual";
 import AlumnosMenu from "./components/menus/AlumnosMenu";
 import FichaResumenAlumnos from "./components/FichaResumenAlumnos";
 import FichaInactivos from "./components/FichaInactivos";
@@ -67,6 +68,7 @@ function App() {
           <Route path="/pagos-menu" element={<PagosMenu />} />
           <Route path="/asistencia-menu" element={<AsistenciaMenu />} />
           <Route path="/estadisticas-asistencias" element={<FichaAsistenciasEstadisticas />} />
+          <Route path="/control-asistencias" element={<FichaControlAsistenciaMensual />} />
           <Route path="/resumen-alumnos" element={<FichaResumenAlumnos />} />
           <Route path="/inactivos" element={<FichaInactivos />} />
           <Route path="/recuperar" element={<FichaRecuperar />} />

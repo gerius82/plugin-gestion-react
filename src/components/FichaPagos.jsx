@@ -44,10 +44,28 @@ export default function FichaPagos() {
   const [grupoDescuento, setGrupoDescuento] = useState(null);
   const [promoDobleTurno, setPromoDobleTurno] = useState(false);
   const [pagarGrupo, setPagarGrupo] = useState(false);
+  const [pagarTodosLosTurnosCurso, setPagarTodosLosTurnosCurso] = useState(false);
   const [descuentoExtraPct, setDescuentoExtraPct] = useState("");
   const [cargando, setCargando] = useState(true);
 
-  const matriculaSel = matriculas.find((m) => String(m.id) === String(matriculaId));
+  const opcionesMatricula = useMemo(() => {
+    const grupos = new Map();
+    (Array.isArray(matriculas) ? matriculas : []).forEach((m) => {
+      const key = `${m.alumno_id || ""}||${m.curso_id || ""}||${m.ciclo_codigo || ""}`;
+      const existente = grupos.get(key);
+      if (!existente) {
+        grupos.set(key, { ...m, cantidadTurnosMismoCurso: 1 });
+        return;
+      }
+      grupos.set(key, {
+        ...existente,
+        cantidadTurnosMismoCurso: (existente.cantidadTurnosMismoCurso || 1) + 1,
+      });
+    });
+    return Array.from(grupos.values());
+  }, [matriculas]);
+
+  const matriculaSel = opcionesMatricula.find((m) => String(m.id) === String(matriculaId));
   const alumno = matriculaSel?.inscripciones;
   const curso = cursosMap[matriculaSel?.curso_id];
 
@@ -93,6 +111,7 @@ export default function FichaPagos() {
     setPagaInscripcion(false);
     setMedioPago("transferencia");
     setPagarGrupo(false);
+    setPagarTodosLosTurnosCurso(false);
     setPagaProporcional(false);
     setDescuentoExtraPct("");
     setPromoDobleTurno(false);
@@ -215,7 +234,12 @@ export default function FichaPagos() {
     const aplicaPromo = aplicaGrupo || promoDobleTurno;
     const promoPct = aplicaPromo ? (aplicaGrupo ? Math.max(pctGrupo, pctDobleTurno) : pctDobleTurno) : 0;
     const factorPromo = 1 - promoPct / 100;
-    const cantidad = grupoIntegrantes.length >= 2 && pagarGrupo ? grupoIntegrantes.length : 1;
+    const cantidad =
+      grupoIntegrantes.length >= 2 && pagarGrupo
+        ? grupoIntegrantes.length
+        : pagarTodosLosTurnosCurso
+        ? Math.max(1, Number(matriculaSel?.cantidadTurnosMismoCurso || 1))
+        : 1;
     let monto = 0;
     if (pagaMes) {
       let baseMes = Number(curso.precio_curso || 0) * factorPromo;
@@ -437,20 +461,26 @@ export default function FichaPagos() {
               onChange={(e) => setMatriculaId(e.target.value)}
             >
               <option value="">-- Seleccionar --</option>
-              {[...matriculas]
+              {[...opcionesMatricula]
                 .sort((a, b) =>
                   `${a.inscripciones?.nombre || ""} ${a.inscripciones?.apellido || ""}`.localeCompare(
                     `${b.inscripciones?.nombre || ""} ${b.inscripciones?.apellido || ""}`
                   )
                 )
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.inscripciones?.nombre} {m.inscripciones?.apellido}
-                    {m.curso_id && cursosMap[m.curso_id]?.nombre
-                      ? ` — ${cursosMap[m.curso_id].nombre}`
-                      : ""}
-                  </option>
-                ))}
+                .map((m) => {
+                  const partes = [`${m.inscripciones?.nombre || ""} ${m.inscripciones?.apellido || ""}`.trim()];
+                  if (m.curso_id && cursosMap[m.curso_id]?.nombre) {
+                    partes.push(cursosMap[m.curso_id].nombre);
+                  }
+                  if (Number(m.cantidadTurnosMismoCurso || 1) > 1) {
+                    partes.push(`${m.cantidadTurnosMismoCurso} turnos`);
+                  }
+                  return (
+                    <option key={m.id} value={m.id}>
+                      {partes.join(" - ")}
+                    </option>
+                  );
+                })}
             </select>
           </div>
 
@@ -495,13 +525,33 @@ export default function FichaPagos() {
                   )}
                 </div>
 
+                {Number(matriculaSel?.cantidadTurnosMismoCurso || 1) > 1 && (
+                  <label className="flex items-center gap-2 text-sm mt-2">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={pagarTodosLosTurnosCurso}
+                      onChange={(e) => {
+                        setPagarTodosLosTurnosCurso(e.target.checked);
+                        if (e.target.checked) setPagarGrupo(false);
+                      }}
+                    />
+                    <span>
+                      Cobrar todos los turnos de este curso ({matriculaSel.cantidadTurnosMismoCurso} turnos)
+                    </span>
+                  </label>
+                )}
+
                 {grupoIntegrantes.length >= 2 && (
                   <label className="flex items-center gap-2 text-sm mt-2">
                     <input
                       type="checkbox"
                       className="w-4 h-4"
                       checked={pagarGrupo}
-                      onChange={(e) => setPagarGrupo(e.target.checked)}
+                      onChange={(e) => {
+                        setPagarGrupo(e.target.checked);
+                        if (e.target.checked) setPagarTodosLosTurnosCurso(false);
+                      }}
                     />
                     <span>
                       Pagar grupo completo ({grupoIntegrantes.length} alumnos)
@@ -626,5 +676,6 @@ export default function FichaPagos() {
     </div>
   );
 }
+
 
 

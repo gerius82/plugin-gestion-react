@@ -335,7 +335,7 @@ export default function FichaAsistenciasEstadisticas() {
           <tr>
             <th className="py-2 px-3">Alumno</th>
             <th className="py-2 px-3">Turno</th>
-            <th className="py-2 px-3">
+            <th className="py-2 px-3 text-right">
               {filtroMes
                 ? `Asistencias de ${filtroMes}`
                 : solo4Semanas
@@ -350,7 +350,7 @@ export default function FichaAsistenciasEstadisticas() {
               <td className="py-2 px-3"><div className="min-w-[170px] break-words">{a.nombre} {a.apellido}</div></td>
               <td className="py-2 px-3"><div className="min-w-[150px] break-words">{a.turno}</div></td>
               <td className="py-2 px-3">
-                <div className="flex gap-1 flex-wrap">
+                <div className="flex gap-1 flex-wrap justify-end">
                   {a.asistencias.slice().reverse().map((r, i) => (
                     <span
                       key={i}

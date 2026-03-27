@@ -347,32 +347,14 @@ export default function FichaRecuperar() {
         const fechaRecuperaISO = diaSeleccionado?.iso || fechaHoy;
         const faltaEsProxima = falta.toLowerCase().includes("próxima");
 
-        if (falta !== "No hay fechas para recuperar") {
-          if (!faltaEsProxima) {
-            // 1) Buscar registro de ausencia exacto y marcar recuperada=true
-            const fechaFaltaISO = convertirFechaTextoAISO(falta);
-            const resBuscar = await fetch(
-              `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.alumno_id}&fecha=eq.${fechaFaltaISO}&tipo=eq.ausente&select=id`,
-              { headers: headers() }
-            );
-            const [registro] = await resBuscar.json();
-            if (registro?.id) {
-              await fetch(
-                `${config.supabaseUrl}/rest/v1/asistencias?id=eq.${registro.id}`,
-                {
-                  method: "PATCH",
-                  headers: {
-                    ...headers(),
-                    "Content-Type": "application/json",
-                    prefer: "return=representation",
-                  },
-                  body: JSON.stringify({ recuperada: true }),
-                }
-              );
-            }
-          } else {
-            // 2) Si es "próxima clase": crear un ausente recuperada en la fecha futura (según falta)
-            const fechaProximaISO = convertirFechaTextoAISO(falta);
+        if (falta !== "No hay fechas para recuperar" && faltaEsProxima) {
+          const fechaProximaISO = convertirFechaTextoAISO(falta);
+          const resAusenciaFutura = await fetch(
+            `${config.supabaseUrl}/rest/v1/asistencias?select=id&alumno_id=eq.${a.alumno_id}&fecha=eq.${fechaProximaISO}&tipo=eq.ausente`,
+            { headers: headers() }
+          );
+          const ausenciaFutura = await resAusenciaFutura.json();
+          if (!Array.isArray(ausenciaFutura) || ausenciaFutura.length === 0) {
             await fetch(`${config.supabaseUrl}/rest/v1/asistencias`, {
               method: "POST",
               headers: { ...headers(), "Content-Type": "application/json" },
@@ -380,7 +362,7 @@ export default function FichaRecuperar() {
                 alumno_id: a.alumno_id,
                 fecha: fechaProximaISO,
                 tipo: "ausente",
-                recuperada: true,
+                recuperada: false,
                 turno: alumnos[0]?.turno_1,
                 sede: alumnos[0]?.sede,
               }),
@@ -388,20 +370,26 @@ export default function FichaRecuperar() {
           }
         }
 
-        // 3) Registrar movimiento de recuperación en la fecha elegida
-        await fetch(`${config.supabaseUrl}/rest/v1/asistencias`, {
-          method: "POST",
-          headers: { ...headers(), "Content-Type": "application/json" },
-          body: JSON.stringify({
-            alumno_id: a.alumno_id,
-            fecha: fechaRecuperaISO,
-            tipo: "recuperacion",
-            turno: turnoSeleccionado,
-            sede: alumnos[0]?.sede,
-          }),
-        });
+        const resRecuperacion = await fetch(
+          `${config.supabaseUrl}/rest/v1/asistencias?select=id&alumno_id=eq.${a.alumno_id}&fecha=eq.${fechaRecuperaISO}&tipo=eq.recuperacion&turno=eq.${encodeURIComponent(turnoSeleccionado)}&sede=eq.${encodeURIComponent(alumnos[0]?.sede || "")}`,
+          { headers: headers() }
+        );
+        const recuperacionExistente = await resRecuperacion.json();
+        if (!Array.isArray(recuperacionExistente) || recuperacionExistente.length === 0) {
+          await fetch(`${config.supabaseUrl}/rest/v1/asistencias`, {
+            method: "POST",
+            headers: { ...headers(), "Content-Type": "application/json" },
+            body: JSON.stringify({
+              alumno_id: a.alumno_id,
+              fecha: fechaRecuperaISO,
+              tipo: "recuperacion",
+              turno: turnoSeleccionado,
+              sede: alumnos[0]?.sede,
+            }),
+          });
+        }
       }
-      setOkMsg("Solicitud enviada y registros actualizados.");
+      setOkMsg("Solicitud enviada y recuperacion programada.");
     } catch (e) {
       console.error(e);
       setError("No pude actualizar los registros. Revisá la conexión e intentá de nuevo.");
