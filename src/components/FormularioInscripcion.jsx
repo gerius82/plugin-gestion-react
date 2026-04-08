@@ -583,6 +583,7 @@ const FormularioInscripcion = () => {
       ...formulario,
       edad: edadCalculada === "" ? null : edadCalculada,
       fecha_nacimiento: formulario.fecha_nacimiento || null,
+      activo: true,
       tipo_inscripcion: cicloSel,
       curso: cursoNombre,
       turno_1: `${diaSel} ${horaSel}`,
@@ -631,7 +632,7 @@ const FormularioInscripcion = () => {
             "Content-Type": "application/json",
             ...supaHeaders(config),
           },
-          body: JSON.stringify({ persona_id: alumnoId }),
+          body: JSON.stringify({ persona_id: alumnoId, activo: true }),
         });
       }
       const matriculaPayload = {

@@ -551,6 +551,7 @@ const elegirHorario = (hora) => {
   const payloadBase = {
     ...formulario,
     edad: parseInt(formulario.edad),
+    activo: true,
     tipo_inscripcion: TIPO_INSCRIPCION,  // TDV
     curso: cursoNombre,                  // ? Rob?tica (no "Taller de Verano")
     turno_1: `${diaSel} ${horaSel}`,      // legacy
@@ -602,7 +603,7 @@ const elegirHorario = (hora) => {
             "Content-Type": "application/json",
             ...supaHeaders(config),
           },
-          body: JSON.stringify({ persona_id: alumnoId }),
+          body: JSON.stringify({ persona_id: alumnoId, activo: true }),
         });
       }
       const matriculaPayload = {

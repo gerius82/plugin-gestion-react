@@ -137,7 +137,7 @@ export default function FichaCumplesPadres() {
   const mesesDisponibles = useMemo(() => {
     const now = new Date();
     const lista = [];
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i <= 8; i += 1) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       lista.push({
