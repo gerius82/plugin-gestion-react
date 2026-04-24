@@ -47,6 +47,14 @@ const buildMonthDays = (ym) => {
   return days;
 };
 
+const extraerMontoPromo = (texto = "") => {
+  const matches = String(texto || "").match(/\$?\s*[\d.]{3,}/g);
+  if (!matches?.length) return null;
+  const limpio = matches[matches.length - 1].replace(/[^\d]/g, "");
+  const monto = Number(limpio);
+  return Number.isFinite(monto) ? monto : null;
+};
+
 export default function FichaCumples() {
   const [config, setConfig] = useState(null);
   const [cumplesHabilitado, setCumplesHabilitado] = useState(false);
@@ -83,6 +91,7 @@ export default function FichaCumples() {
   const [reservaDetalle, setReservaDetalle] = useState(null);
   const [modoEditarDetalle, setModoEditarDetalle] = useState(false);
   const [detalleForm, setDetalleForm] = useState(null);
+  const promoMonto = useMemo(() => extraerMontoPromo(promoCumple), [promoCumple]);
 
   const formatFecha = (fecha) => {
     if (!fecha) return "";
@@ -373,6 +382,10 @@ export default function FichaCumples() {
         cumpleanero_edad: reservaForm.cumpleanero_edad || null,
         menu_especial: !!reservaForm.menu_especial,
         menu_especial_cantidad: reservaForm.menu_especial ? reservaForm.menu_especial_cantidad || null : null,
+        monto_total: Number.isFinite(promoMonto) ? promoMonto : Number(precioCumple || 0),
+        promo_aplicada: Number.isFinite(promoMonto),
+        promo_detalle: Number.isFinite(promoMonto) ? promoCumple || null : null,
+        reserva_senia_pct: 50,
         estado: "pendiente",
         creado_en: new Date().toISOString(),
       }),

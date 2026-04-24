@@ -56,6 +56,14 @@ const addMinutes = (hora, minutos) => {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 };
 
+const extraerMontoPromo = (texto = "") => {
+  const matches = String(texto || "").match(/\$?\s*[\d.]{3,}/g);
+  if (!matches?.length) return null;
+  const limpio = matches[matches.length - 1].replace(/[^\d]/g, "");
+  const monto = Number(limpio);
+  return Number.isFinite(monto) ? monto : null;
+};
+
 export default function FichaCumplesPadres() {
   const [config, setConfig] = useState(null);
   const [precioCumple, setPrecioCumple] = useState(null);
@@ -83,6 +91,7 @@ export default function FichaCumplesPadres() {
     menu_opcion: "",
   });
   const promoDefault = "Promo lanzamiento reservando en febrero 20% off: $450.000.";
+  const promoMonto = useMemo(() => extraerMontoPromo(promoCumple || promoDefault), [promoCumple, promoDefault]);
 
   const formatFecha = (fecha) => {
     if (!fecha) return "";
@@ -282,6 +291,10 @@ export default function FichaCumplesPadres() {
           ? reservaForm.menu_especial_cantidad || null
           : null,
         menu_opcion: reservaForm.menu_opcion || "",
+        monto_total: Number.isFinite(promoMonto) ? promoMonto : precioCumple,
+        promo_aplicada: Number.isFinite(promoMonto),
+        promo_detalle: Number.isFinite(promoMonto) ? promoCumple || promoDefault : null,
+        reserva_senia_pct: 50,
         estado: "pendiente",
         creado_en: new Date().toISOString(),
       }),
