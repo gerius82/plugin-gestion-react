@@ -14,8 +14,8 @@
       "Viernes 14:30 a 16:00hs": 10,
       "Viernes 16:30 a 18:00hs": 13,
       "Viernes 18:30 a 20:00hs": 13,
-      "Sábado 09:00 a 10:30hs": 13,
-      "Sábado 11:00 a 12:30hs": 13
+      "Sábado 09:30 a 11:00hs": 13,
+      "Sábado 11:30 a 13:00hs": 13
     },
     "Fisherton": {
       "Lunes 18:30 a 20:00hs": 13,
@@ -27,8 +27,8 @@
       "Jueves 18:30 a 20:00hs": 13,
       "Viernes 16:30 a 18:00hs": 10,
       "Viernes 18:30 a 20:00hs": 13,
-      "Sábado 09:00 a 10:30hs": 13,
-      "Sábado 11:00 a 12:30hs": 13
+      "Sábado 09:30 a 11:00hs": 13,
+      "Sábado 11:30 a 13:00hs": 13
     }
   }
   
