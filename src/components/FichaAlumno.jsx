@@ -750,7 +750,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
 
   // Normalizar sede/día/hora cuando cargan turnos_config
   useEffect(() => {
-    if (!modoEdicion || !matriculaForm) return;
+    if (!modoEdicionMatriculaId || !matriculaForm) return;
     const keys = Object.keys(turnosConfig || {});
     if (keys.length === 0) return;
 
@@ -778,7 +778,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
         hora: horaNorm || "",
       }));
     }
-  }, [turnosConfig, modoEdicion, matriculaForm]);
+  }, [turnosConfig, modoEdicionMatriculaId, matriculaForm]);
 
   // ----------------------------
   // Guardar

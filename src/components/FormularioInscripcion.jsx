@@ -413,11 +413,23 @@ const FormularioInscripcion = () => {
     return match ? match[1].padStart(5, "0") : String(valor || "");
   };
 
-  const cargarTurnosConEstado = async (sede) => {
+  const cargarTurnosConEstado = async (sede, configTurnosOverride = null) => {
     if (!config || !sede || !cicloSel) return;
     setCargandoTurnos(true);
 
     try {
+      const configTurnos = configTurnosOverride || turnosConfig || {};
+      const horariosCurso = Object.entries(configTurnos?.[sede] || {}).flatMap(([dia, horas]) =>
+        (Array.isArray(horas) ? horas : []).map((hora) => ({ dia, hora }))
+      );
+      const keysCurso = new Set(
+        (Array.isArray(horariosCurso) ? horariosCurso : []).map((item) =>
+          typeof item === "string"
+            ? `${sede}||${inicioDeRango(item)}`
+            : `${item.dia}||${inicioDeRango(item.hora)}`
+        )
+      );
+
       const urlTurnos =
         `${config.supabaseUrl}/rest/v1/turnos` +
         `?select=dia,hora,cupo_maximo` +
@@ -429,6 +441,9 @@ const FormularioInscripcion = () => {
         headers: { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` },
       });
       const turnos = await resTurnos.json();
+      const turnosFiltrados = (Array.isArray(turnos) ? turnos : []).filter((t) =>
+        keysCurso.has(`${t.dia}||${inicioDeRango(t.hora)}`)
+      );
 
       const urlMats =
         `${config.supabaseUrl}/rest/v1/matriculas` +
@@ -449,12 +464,12 @@ const FormularioInscripcion = () => {
       });
 
       const cupos = new Map();
-      (Array.isArray(turnos) ? turnos : []).forEach((t) => {
+      turnosFiltrados.forEach((t) => {
         const key = `${t.dia}||${inicioDeRango(t.hora)}`;
         cupos.set(key, Number(t.cupo_maximo));
       });
 
-      const cards = (Array.isArray(turnos) ? turnos : []).map((t) => {
+      const cards = turnosFiltrados.map((t) => {
         const key = `${t.dia}||${inicioDeRango(t.hora)}`;
         const anotados = counts.get(key) || 0;
         const cupo = cupos.get(key);
@@ -495,8 +510,15 @@ const FormularioInscripcion = () => {
 
   const seleccionarCurso = (curso) => {
     setCursoSelId(curso.id);
-    setTurnosConfig(parseTurnosConfig(curso.turnos_config));
-    setFormulario((prev) => ({ ...prev, curso: curso.nombre || "" }));
+    const configCurso = parseTurnosConfig(curso.turnos_config);
+    setTurnosConfig(configCurso);
+    setFormulario((prev) => ({ ...prev, curso: curso.nombre || "", turno_1: "" }));
+    setDiaSel("");
+    setHoraSel("");
+    setTurnoEnListaEspera(false);
+    if (formulario.sede) {
+      cargarTurnosConEstado(formulario.sede, configCurso);
+    }
   };
 
   const handleChange = (e) => {
