@@ -36,6 +36,14 @@ const formatFecha = (iso) => {
   return `${d}/${m}/${y}`;
 };
 
+const fechaHoraTurno = (fechaISO, hora) => {
+  const [year, month, day] = String(fechaISO || "").split("-").map(Number);
+  const match = String(hora || "").match(/(\d{1,2}):(\d{2})/);
+  if (!year || !month || !day || !match) return null;
+  const [, hh, mm] = match;
+  return new Date(year, month - 1, day, Number(hh), Number(mm), 0, 0);
+};
+
 export default function FichaControlTomaAsistencia() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
@@ -97,7 +105,7 @@ export default function FichaControlTomaAsistencia() {
           { headers }
         ),
         fetch(
-          `${config.supabaseUrl}/rest/v1/asistencias?select=fecha,turno,sede&fecha=gte.${from}&fecha=lte.${to}`,
+          `${config.supabaseUrl}/rest/v1/asistencias?select=fecha,turno,sede,tipo&fecha=gte.${from}&fecha=lte.${to}`,
           { headers }
         ),
         fetch(
@@ -112,6 +120,7 @@ export default function FichaControlTomaAsistencia() {
 
       const mapAsistencias = new Map();
       (Array.isArray(dataAsistencias) ? dataAsistencias : []).forEach((a) => {
+        if (String(a?.tipo || "").toLowerCase() === "recuperacion") return;
         const fecha = String(a?.fecha || "").split("T")[0];
         const key = `${fecha}||${a?.sede || ""}||${a?.turno || ""}`;
         mapAsistencias.set(key, true);
@@ -134,6 +143,7 @@ export default function FichaControlTomaAsistencia() {
 
     const [year, month] = mesSeleccionado.split("-").map(Number);
     const totalDias = new Date(year, month, 0).getDate();
+    const ahora = new Date();
     const items = [];
 
     for (let day = 1; day <= totalDias; day += 1) {
@@ -148,7 +158,13 @@ export default function FichaControlTomaAsistencia() {
         const turnoTexto = `${turno.dia} ${turno.hora}`;
         const key = `${fechaIso}||${turno.sede}||${turnoTexto}`;
         const esFeriado = feriadosSet.has(fechaIso);
-        const tomada = esFeriado ? false : asistenciasMap.has(key);
+        const inicioTurno = fechaHoraTurno(fechaIso, turno.hora);
+        const pendiente =
+          !esFeriado &&
+          inicioTurno instanceof Date &&
+          !Number.isNaN(inicioTurno.getTime()) &&
+          inicioTurno > ahora;
+        const tomada = !pendiente && !esFeriado ? asistenciasMap.has(key) : false;
 
         items.push({
           fechaIso,
@@ -158,6 +174,7 @@ export default function FichaControlTomaAsistencia() {
           hora: turno.hora,
           turnoTexto,
           esFeriado,
+          pendiente,
           tomada,
         });
       });
@@ -182,8 +199,8 @@ export default function FichaControlTomaAsistencia() {
   }, [registros]);
 
   const resumen = useMemo(() => {
-    const total = registros.filter((r) => !r.esFeriado).length;
-    const tomadas = registros.filter((r) => !r.esFeriado && r.tomada).length;
+    const total = registros.filter((r) => !r.esFeriado && !r.pendiente).length;
+    const tomadas = registros.filter((r) => !r.esFeriado && !r.pendiente && r.tomada).length;
     return { total, tomadas, faltantes: Math.max(0, total - tomadas) };
   }, [registros]);
 
@@ -269,6 +286,10 @@ export default function FichaControlTomaAsistencia() {
                       ) : item.tomada ? (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
                           Tomada
+                        </span>
+                      ) : item.pendiente ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">
+                          Pendiente
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">

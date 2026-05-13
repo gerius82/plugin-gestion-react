@@ -67,6 +67,14 @@ const formatearFecha = (fechaISO) => {
   return `${d}-${m}-${y}`;
 };
 
+const fechaHoraTurno = (fechaISO, hora) => {
+  const [year, month, day] = String(fechaISO || "").split("-").map(Number);
+  const match = String(hora || "").match(/(\d{1,2}):(\d{2})/);
+  if (!year || !month || !day || !match) return null;
+  const [, hh, mm] = match;
+  return new Date(year, month - 1, day, Number(hh), Number(mm), 0, 0);
+};
+
 const claseEstado = {
   tomada: "bg-emerald-100 text-emerald-800 border border-emerald-200",
   pendiente: "bg-sky-100 text-sky-800 border border-sky-200",
@@ -214,6 +222,7 @@ export default function FichaControlAsistenciaMensual() {
   const mapaAsistencias = useMemo(() => {
     const map = new Map();
     asistencias.forEach((a) => {
+      if (String(a.tipo || "").toLowerCase() === "recuperacion") return;
       const key = [String(a.fecha || "").split("T")[0], a.sede, a.turno].join("|");
       map.set(key, (map.get(key) || 0) + 1);
     });
@@ -221,7 +230,8 @@ export default function FichaControlAsistenciaMensual() {
   }, [asistencias]);
 
   const registros = useMemo(() => {
-    const hoy = new Date();
+    const ahora = new Date();
+    const hoy = new Date(ahora);
     hoy.setHours(0, 0, 0, 0);
 
     return fechasDelMes(mesSel)
@@ -246,11 +256,18 @@ export default function FichaControlAsistenciaMensual() {
             const cantidadAsistencias = mapaAsistencias.get(keyAsistencia) || 0;
             const esFeriado = mapaFeriados.has(fecha.fechaISO);
             const esFuturo = new Date(`${fecha.fechaISO}T00:00:00`) > hoy;
+            const inicioTurno = fechaHoraTurno(fecha.fechaISO, turno.hora);
+            const esTurnoPendienteHoy =
+              !esFuturo &&
+              inicioTurno instanceof Date &&
+              !Number.isNaN(inicioTurno.getTime()) &&
+              inicioTurno > ahora;
+            const esPendiente = esFuturo || esTurnoPendienteHoy;
 
             let estado = "sin_registrar";
             if (esFeriado) estado = "feriado";
-            else if (esFuturo) estado = "pendiente";
             else if (cantidadAlumnos === 0) estado = "sin_alumnos";
+            else if (esPendiente) estado = "pendiente";
             else if (cantidadAsistencias > 0) estado = "tomada";
 
             return {
