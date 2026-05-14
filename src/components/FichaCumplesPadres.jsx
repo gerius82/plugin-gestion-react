@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 const IMG_CUMPLES =
   "https://cvogoablzgymmodegfft.supabase.co/storage/v1/object/sign/cumples/cumples%20info.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hYWJmYzhjNy0wZGU5LTRkMGQtODc2YS0zODEyNjZmMjRmOWUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjdW1wbGVzL2N1bXBsZXMgaW5mby5wbmciLCJpYXQiOjE3Njg4NzYwODMsImV4cCI6MjA4NDIzNjA4M30.fViNIiMR5BubUrqEqem3H6VQ6bV28MhsIkhy2KsvjGQ";
 
-const HORAS_DEFAULT = ["14:30", "18:00"];
+const HORAS_DEFAULT = ["14:00", "18:30"];
 const MESES = [
   "Enero",
   "Febrero",
