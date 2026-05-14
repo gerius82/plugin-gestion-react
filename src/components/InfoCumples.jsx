@@ -131,8 +131,8 @@ export default function InfoCumples() {
               <div className="font-semibold">Menú para los chicos</div>
               <div>El menú se elige previamente por los padres y puede incluir:</div>
               <ul className="list-disc list-inside">
-                <li>Fingers de pollo + papas Noisette + Snacks</li>
-                <li>Super Pancho + Snacks</li>
+                <li>Sandwichs de miga jamón y queso + snacks</li>
+                <li>Panchos + snacks</li>
               </ul>
               <div>👉 Opción para celíacos disponible, avisando con anticipación.</div>
             </div>
@@ -142,7 +142,7 @@ export default function InfoCumples() {
             <div>
               <div className="font-semibold">Bebidas</div>
               <div>Bebida libre durante todo el cumple, provista por el local:</div>
-              <div>Coca-Cola · Sprite · Fanta · Agua</div>
+              <div>Línea Pepsi + Agua mineral</div>
             </div>
           </div>
           <div className="rounded-xl bg-white/80 border border-gray-100 p-4 shadow-sm flex gap-3">
