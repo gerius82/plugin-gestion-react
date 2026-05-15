@@ -21,14 +21,6 @@ const formatPrecio = (valor) => {
   }).format(num);
 };
 
-const extraerMontoPromo = (texto = "") => {
-  const matches = String(texto || "").match(/\$?\s*[\d.]{3,}/g);
-  if (!matches?.length) return null;
-  const limpio = matches[matches.length - 1].replace(/[^\d]/g, "");
-  const monto = Number(limpio);
-  return Number.isFinite(monto) ? monto : null;
-};
-
 const labelConcepto = (concepto) => {
   if (concepto === "total") return "Pago total";
   return concepto.charAt(0).toUpperCase() + concepto.slice(1);
@@ -44,7 +36,6 @@ export default function FichaPagosCumples() {
   const [mensaje, setMensaje] = useState("");
   const [selecciones, setSelecciones] = useState({});
   const [pagosPorReserva, setPagosPorReserva] = useState({});
-  const promoMonto = useMemo(() => extraerMontoPromo(promoCumple), [promoCumple]);
 
   const headers = useMemo(() => {
     if (!config) return {};
@@ -106,7 +97,6 @@ export default function FichaPagosCumples() {
               next[r.id] = {
                 concepto: String(r.estado || "").toLowerCase() === "confirmada" ? "diferencia" : "reserva",
                 medioPago: "transferencia",
-                aplicaPromo: !!r.promo_aplicada,
               };
             }
           });
@@ -118,9 +108,8 @@ export default function FichaPagosCumples() {
     })();
   }, [config, headers]);
 
-  const calcularMonto = (concepto, aplicaPromo = false, montoReserva = null, seniaPct = 50) => {
-    const totalBase = aplicaPromo && Number.isFinite(promoMonto) ? promoMonto : montoReserva ?? precioCumple;
-    const total = Number(totalBase || 0);
+  const calcularMonto = (concepto, montoReserva = null, seniaPct = 50) => {
+    const total = Number(montoReserva || 0);
     if (!Number.isFinite(total)) return 0;
     const pct = Number(seniaPct || 50);
     const senia = Math.round(total * ((Number.isFinite(pct) ? pct : 50) / 100));
@@ -135,16 +124,10 @@ export default function FichaPagosCumples() {
     const seleccion = selecciones[reserva.id] || {
       concepto: String(reserva.estado || "").toLowerCase() === "confirmada" ? "diferencia" : "reserva",
       medioPago: "transferencia",
-      aplicaPromo: !!reserva.promo_aplicada,
     };
     const nombreCumple =
       reserva.cumpleanero_nombre || `${reserva.nombre || ""} ${reserva.apellido || ""}`.trim();
-    const monto = calcularMonto(
-      seleccion.concepto,
-      seleccion.aplicaPromo,
-      reserva.monto_total,
-      reserva.reserva_senia_pct
-    );
+    const monto = calcularMonto(seleccion.concepto, reserva.monto_total, reserva.reserva_senia_pct);
 
     setMensaje("");
 
@@ -200,8 +183,8 @@ export default function FichaPagosCumples() {
         concepto: seleccion.concepto,
         monto,
         medio_pago: seleccion.medioPago,
-        aplica_promo: !!seleccion.aplicaPromo,
-        promo_detalle: seleccion.aplicaPromo ? reserva.promo_detalle || promoCumple || null : null,
+        aplica_promo: !!reserva.promo_aplicada,
+        promo_detalle: reserva.promo_detalle || null,
       };
 
       const resInsert = await fetch(`${config.supabaseUrl}/rest/v1/cumple_pagos`, {
@@ -229,8 +212,8 @@ export default function FichaPagosCumples() {
             concepto: seleccion.concepto,
             monto,
             medio_pago: seleccion.medioPago,
-            aplica_promo: !!seleccion.aplicaPromo,
-            promo_detalle: seleccion.aplicaPromo ? reserva.promo_detalle || promoCumple || null : null,
+            aplica_promo: !!reserva.promo_aplicada,
+            promo_detalle: reserva.promo_detalle || null,
             creado_en: new Date().toISOString(),
           },
           ...(prev[reserva.id] || []),
@@ -283,16 +266,10 @@ export default function FichaPagosCumples() {
               const seleccion = selecciones[reserva.id] || {
                 concepto: String(reserva.estado || "").toLowerCase() === "confirmada" ? "diferencia" : "reserva",
                 medioPago: "transferencia",
-                aplicaPromo: !!reserva.promo_aplicada,
               };
               const nombreCumple =
                 reserva.cumpleanero_nombre || `${reserva.nombre || ""} ${reserva.apellido || ""}`.trim();
-              const monto = calcularMonto(
-                seleccion.concepto,
-                seleccion.aplicaPromo,
-                reserva.monto_total,
-                reserva.reserva_senia_pct
-              );
+              const monto = calcularMonto(seleccion.concepto, reserva.monto_total, reserva.reserva_senia_pct);
               const pagosRegistrados = pagosPorReserva[reserva.id] || [];
               const conceptosPagados = new Set(
                 pagosRegistrados.map((pago) => String(pago.concepto || "").toLowerCase())
@@ -300,6 +277,10 @@ export default function FichaPagosCumples() {
               const pagoCompleto =
                 conceptosPagados.has("total") ||
                 (conceptosPagados.has("reserva") && conceptosPagados.has("diferencia"));
+              const totalReserva = Number(reserva.monto_total || 0);
+              const seniaPct = Number(reserva.reserva_senia_pct || 50);
+              const montoSenia = Math.round(totalReserva * ((Number.isFinite(seniaPct) ? seniaPct : 50) / 100));
+              const montoSaldo = totalReserva - montoSenia;
               const opcionesConcepto = [
                 {
                   value: "reserva",
@@ -374,26 +355,29 @@ export default function FichaPagosCumples() {
                         <option value="efectivo">Efectivo</option>
                       </select>
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="inline-flex items-center gap-2 text-sm font-normal text-gray-700 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={!!seleccion.aplicaPromo}
-                          onChange={(e) =>
-                            setSelecciones((prev) => ({
-                              ...prev,
-                              [reserva.id]: { ...seleccion, aplicaPromo: e.target.checked },
-                            }))
-                          }
-                          disabled={!promoCumple || !Number.isFinite(promoMonto)}
-                        />
-                        Aplica promo vigente
-                      </label>
-                      {seleccion.aplicaPromo && Number.isFinite(promoMonto) && (
-                        <div className="mt-1 text-xs text-sky-700">
-                          Monto promocional: {formatPrecio(promoMonto)}
+                    <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                      <div>
+                        <div className="text-xs font-medium text-gray-500">Total reservado</div>
+                        <div className="text-sm font-semibold text-gray-900">{formatPrecio(totalReserva)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-500">Promo al reservar</div>
+                        <div className="text-sm text-sky-700">
+                          {reserva.promo_aplicada
+                            ? reserva.promo_detalle || "Reservó con promo"
+                            : "Reservó sin promo"}
                         </div>
-                      )}
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-500">Seña</div>
+                        <div className="text-sm text-gray-800">
+                          {formatPrecio(montoSenia)} ({Number.isFinite(seniaPct) ? seniaPct : 50}%)
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-500">Saldo</div>
+                        <div className="text-sm text-gray-800">{formatPrecio(montoSaldo)}</div>
+                      </div>
                     </div>
                   </div>
 

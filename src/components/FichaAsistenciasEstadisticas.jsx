@@ -14,6 +14,7 @@ export default function FichaAsistenciasEstadisticas() {
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
   const [filtroMes, setFiltroMes] = useState("");
   const [solo4Semanas, setSolo4Semanas] = useState(false);
+  const [incluirOtrosTurnos, setIncluirOtrosTurnos] = useState(false);
 
   const toIsoDate = (value) => {
     const raw = String(value || "").trim();
@@ -33,7 +34,7 @@ export default function FichaAsistenciasEstadisticas() {
   useEffect(() => {
     if (!config) return;
     cargarResumen();
-  }, [config, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroMes, solo4Semanas, ciclosDisponibles]);
+  }, [config, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroMes, solo4Semanas, incluirOtrosTurnos, ciclosDisponibles]);
 
   useEffect(() => {
     if (filtroMes !== "") {
@@ -112,11 +113,13 @@ export default function FichaAsistenciasEstadisticas() {
         );
 
     const asistenciasPromises = alumnosData.map((a) => {
-      const filtroTurnoAsis = a.turno ? `&turno=eq.${encodeURIComponent(a.turno)}` : "";
-      const filtroSedeAsis = a.sede ? `&sede=eq.${encodeURIComponent(a.sede)}` : "";
+      const filtroTurnoAsis =
+        !incluirOtrosTurnos && a.turno ? `&turno=eq.${encodeURIComponent(a.turno)}` : "";
+      const filtroSedeAsis =
+        !incluirOtrosTurnos && a.sede ? `&sede=eq.${encodeURIComponent(a.sede)}` : "";
       const filtroFechaInicioAsis = fechaInicioCiclo ? `&fecha=gte.${fechaInicioCiclo}` : "";
       return fetch(
-        `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.alumno_id}${filtroTurnoAsis}${filtroSedeAsis}${filtroFechaInicioAsis}&select=tipo,fecha&order=fecha.desc&limit=${limit}`,
+        `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${a.alumno_id}${filtroTurnoAsis}${filtroSedeAsis}${filtroFechaInicioAsis}&select=tipo,fecha,turno,sede&order=fecha.desc&limit=${limit}`,
         {
           headers: {
             apikey: config.supabaseKey,
@@ -152,6 +155,12 @@ export default function FichaAsistenciasEstadisticas() {
           return dif <= cuatroSemanas;
         });
       }
+
+      lista = lista.map((x) => ({
+        ...x,
+        fueraDeTurno:
+          String(x.turno || "") !== String(a.turno || "") || String(x.sede || "") !== String(a.sede || ""),
+      }));
 
       return { ...a, asistencias: lista };
     });
@@ -197,6 +206,11 @@ export default function FichaAsistenciasEstadisticas() {
     if (tipo === "ausente") return "bg-red-400";
     if (tipo === "recuperacion") return "bg-blue-400";
     return "bg-gray-300";
+  };
+
+  const claseMarcaAsistencia = (registro) => {
+    const base = colorClase(registro?.tipo);
+    return registro?.fueraDeTurno ? `${base} ring-2 ring-amber-400` : base;
   };
 
    // arriba del componente (o dentro):
@@ -321,6 +335,18 @@ export default function FichaAsistenciasEstadisticas() {
             </span>
           </div>
         </div>
+        <div>
+          <label className="block font-medium mb-1">Turnos:</label>
+          <label className="mt-2 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="w-4 h-4"
+              checked={incluirOtrosTurnos}
+              onChange={(e) => setIncluirOtrosTurnos(e.target.checked)}
+            />
+            <span className="text-gray-800">Incluir asistencias en otros turnos</span>
+          </label>
+        </div>
       </div>
 
       
@@ -354,8 +380,10 @@ export default function FichaAsistenciasEstadisticas() {
                   {a.asistencias.slice().reverse().map((r, i) => (
                     <span
                       key={i}
-                      className={`w-3.5 h-3.5 rounded-sm ${colorClase(r.tipo)}`}
-                      title={formatISODate(r.fecha)}
+                      className={`w-3.5 h-3.5 rounded-sm ${claseMarcaAsistencia(r)}`}
+                      title={`${formatISODate(r.fecha)}${r.turno ? ` - ${r.turno}` : ""}${
+                        r.fueraDeTurno ? " - otro turno" : ""
+                      }`}
                     ></span>
                   ))}
                 </div>
