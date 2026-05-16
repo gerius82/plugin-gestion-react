@@ -27,13 +27,9 @@ function formatearFechaLarga(iso) {
 
 function getRutaFormulario(codigo) {
   if (codigo === "TDV") {
-    // Taller de Verano
     return "/formulario-verano?origen=padres";
   }
-  // Cualquier otro ciclo va al menu de cursos
-  return `/menu-inscripcion-cursos?origen=padres&ciclo=${encodeURIComponent(
-    codigo
-  )}`;
+  return `/menu-inscripcion-cursos?origen=padres&ciclo=${encodeURIComponent(codigo)}`;
 }
 
 function getIcono(codigo) {
@@ -43,7 +39,6 @@ function getIcono(codigo) {
 
 export default function MenuInscripcionPadres() {
   const navigate = useNavigate();
-  const [config, setConfig] = useState(null);
   const [ciclos, setCiclos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -53,17 +48,13 @@ export default function MenuInscripcionPadres() {
       try {
         const resCfg = await fetch("/config.json");
         const jsonCfg = await resCfg.json();
-        setConfig(jsonCfg);
 
         const headers = {
           apikey: jsonCfg.supabaseKey,
           Authorization: `Bearer ${jsonCfg.supabaseKey}`,
         };
 
-        const resCiclos = await fetch(
-          `${jsonCfg.supabaseUrl}/rest/v1/ciclos?select=*`,
-          { headers }
-        );
+        const resCiclos = await fetch(`${jsonCfg.supabaseUrl}/rest/v1/ciclos?select=*`, { headers });
 
         if (!resCiclos.ok) {
           const txt = await resCiclos.text();
@@ -74,7 +65,6 @@ export default function MenuInscripcionPadres() {
         const data = await resCiclos.json();
         const lista = Array.isArray(data) ? data : [];
 
-        // Orden: primero CICLO_2026, luego por "orden", luego por fecha_inicio
         lista.sort((a, b) => {
           const prefA = a.codigo === "CICLO_2026" ? 0 : 1;
           const prefB = b.codigo === "CICLO_2026" ? 0 : 1;
@@ -106,50 +96,48 @@ export default function MenuInscripcionPadres() {
     const fechaEnFuturo = fechaIni && fechaIni > hoyISO;
     const habilitadoPorFecha = !fechaIni || !fechaEnFuturo;
     const habilitado = c.activo && habilitadoPorFecha;
+    const descripcionVisible =
+      c.codigo === "CICLO_2026"
+        ? "Taller de robótica y programación para el ciclo 2026. Puede comenzar en cualquier momento del año."
+        : c.codigo === "TDV"
+        ? "Taller de verano para los meses de enero y febrero"
+        : c.descripcion;
 
     const contenido = (
       <div
-        className={`relative flex items-center gap-4 p-4 rounded-2xl border shadow-sm transition
-        ${
+        className={`relative flex items-center gap-4 p-4 rounded-2xl border shadow-sm transition ${
           habilitado
             ? "bg-white border-yellow-300 hover:shadow-md hover:border-yellow-400"
             : "bg-gray-100 border-gray-200 text-gray-400"
         }`}
       >
-       
-
-
         <div className="ml-2 flex items-center gap-4">
           <div>{getIcono(c.codigo)}</div>
           <div>
             <div className="flex items-center gap-2">
-              <h3
-                className={`text-lg font-semibold ${
-                  habilitado ? "text-gray-900" : "text-gray-500"
-                }`}
-              >
+              <h3 className={`text-lg font-semibold ${habilitado ? "text-gray-900" : "text-gray-500"}`}>
                 {c.nombre_publico || c.codigo}
               </h3>
               {!habilitado && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-300 text-gray-700">
-                  Próximamente
+                  Terminado
                 </span>
               )}
             </div>
 
-            {c.descripcion && (
-              <p
-                className={`text-sm mt-1 ${
-                  habilitado ? "text-gray-600" : "text-gray-500"
-                }`}
-              >
-                {c.descripcion}
+            {descripcionVisible && (
+              <p className={`text-sm mt-1 ${habilitado ? "text-gray-600" : "text-gray-500"}`}>
+                {descripcionVisible}
               </p>
             )}
 
-            {!habilitado && fechaIni && (
+            {!habilitado && (
               <p className="text-xs mt-1 text-gray-500">
-                La inscripción abrirá el {formatearFechaLarga(fechaIni)}.
+                {c.codigo === "TDV"
+                  ? "La inscripción comenzará el 1 de noviembre de 2026."
+                  : fechaIni
+                  ? `La inscripción abrirá el ${formatearFechaLarga(fechaIni)}.`
+                  : ""}
               </p>
             )}
           </div>
@@ -165,7 +153,6 @@ export default function MenuInscripcionPadres() {
       );
     }
 
-    // Inactivo: sin Link, solo div
     return (
       <div key={c.id} className="block cursor-not-allowed">
         {contenido}
@@ -176,35 +163,23 @@ export default function MenuInscripcionPadres() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center px-4 py-8">
       <div className="w-full max-w-xl">
-        <h1 className="text-3xl font-bold text-center mb-2">
-          Elegí el ciclo de inscripción
-        </h1>
+        <h1 className="text-3xl font-bold text-center mb-2">Elegí el ciclo de inscripción</h1>
         <p className="text-center text-gray-600 mb-6">
-          Seleccioná si querés inscribir al Taller de Verano o a un ciclo
-          lectivo.
+          Seleccioná si querés inscribirte al Taller de Verano o a un ciclo lectivo.
         </p>
 
-        {cargando && (
-          <div className="text-center text-gray-500 py-10">
-            Cargando ciclos…
-          </div>
-        )}
+        {cargando && <div className="text-center text-gray-500 py-10">Cargando ciclos...</div>}
 
-        {!cargando && error && (
-          <div className="text-center text-red-600 mb-4 text-sm">{error}</div>
-        )}
+        {!cargando && error && <div className="text-center text-red-600 mb-4 text-sm">{error}</div>}
 
         {!cargando && !error && ciclos.length === 0 && (
-          <div className="text-center text-gray-500 py-8 text-sm">
-            No hay ciclos configurados todavía.
-          </div>
+          <div className="text-center text-gray-500 py-8 text-sm">No hay ciclos configurados todavía.</div>
         )}
 
         {!cargando && !error && ciclos.length > 0 && (
           <div className="space-y-3 mb-8">{ciclos.map(renderCard)}</div>
         )}
 
-        {/* Botón volver */}
         <div className="flex justify-center">
           <button
             onClick={() => navigate("/menu-padres")}
