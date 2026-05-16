@@ -46,7 +46,7 @@ export default function MenuPadres() {
             <span className="font-semibold text-lg">Información de talleres</span>
           </div>
           <span className="mx-auto text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-md animate-blink glow-badge">
-            Puede comenzar en cualquier momento del año
+            Inscripción abierta
           </span>
         </Link>
       </div>
