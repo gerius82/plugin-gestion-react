@@ -1641,6 +1641,12 @@ function PanelAsignacionProfes() {
     })();
   }, [url, headers, cicloSel, sedeSel]);
 
+  const turnosActivosKeys = useMemo(() => {
+    return new Set(
+      (Array.isArray(turnos) ? turnos : []).map((t) => `${t.dia || ""}||${t.hora || ""}`)
+    );
+  }, [turnos]);
+
   useEffect(() => {
     if (!url || !headers?.apikey || !cicloSel || !sedeSel) return;
     setErrorAsign("");
@@ -1662,8 +1668,9 @@ function PanelAsignacionProfes() {
         const map = {};
         lista.forEach((r) => {
           const key = `${r.dia}||${r.hora}`;
+          if (!turnosActivosKeys.has(key)) return;
           if (!map[key]) map[key] = new Set();
-          if (r.profe_id) map[key].add(r.profe_id);
+          if (r.profe_id) map[key].add(String(r.profe_id));
         });
         const normalizado = {};
         Object.entries(map).forEach(([key, set]) => {
@@ -1676,7 +1683,7 @@ function PanelAsignacionProfes() {
         setErrorAsign(e.message || "No pude cargar asignaciones");
       }
     })();
-  }, [url, headers, cicloSel, sedeSel]);
+  }, [url, headers, cicloSel, sedeSel, turnosActivosKeys]);
 
   const toggleProfe = (turnoKey, profeId) => {
     setAsignaciones((prev) => {
@@ -1694,14 +1701,15 @@ function PanelAsignacionProfes() {
 
     const existentes = new Map();
     asignacionesDb.forEach((r) => {
-      const key = `${r.dia}||${r.hora}||${r.profe_id}`;
+      const key = `${r.dia}||${r.hora}||${String(r.profe_id || "")}`;
       existentes.set(key, r.id);
     });
 
     const actuales = new Set();
     Object.entries(asignaciones).forEach(([turnoKey, lista]) => {
+      if (!turnosActivosKeys.has(turnoKey)) return;
       (lista || []).forEach((profeId) => {
-        actuales.add(`${turnoKey}||${profeId}`);
+        actuales.add(`${turnoKey}||${String(profeId)}`);
       });
     });
 
@@ -1756,15 +1764,19 @@ function PanelAsignacionProfes() {
 
   const sueldosEstimados = useMemo(() => {
     const conteo = new Map();
-    Object.values(asignaciones).forEach((lista) => {
-      const unicos = new Set(lista || []);
-      unicos.forEach((profeId) => {
-        conteo.set(profeId, (conteo.get(profeId) || 0) + 1);
-      });
+    const vistos = new Set();
+    (Array.isArray(asignacionesDb) ? asignacionesDb : []).forEach((r) => {
+      const turnoKey = `${r.dia || ""}||${r.hora || ""}`;
+      if (!turnosActivosKeys.has(turnoKey) || !r.profe_id) return;
+      const profeId = String(r.profe_id);
+      const key = `${turnoKey}||${profeId}`;
+      if (vistos.has(key)) return;
+      vistos.add(key);
+      conteo.set(profeId, (conteo.get(profeId) || 0) + 1);
     });
     return profes
       .map((p) => {
-        const turnosTrab = conteo.get(p.id) || 0;
+        const turnosTrab = conteo.get(String(p.id)) || 0;
         const tarifa = Number(p.tarifa_turno);
         const valor = Number.isFinite(tarifa) ? tarifa : Number(valorTurno || 0);
         return {
@@ -1775,7 +1787,7 @@ function PanelAsignacionProfes() {
         };
       })
       .filter((p) => p.turnos > 0);
-  }, [asignaciones, profes, valorTurno]);
+  }, [asignacionesDb, profes, turnosActivosKeys, valorTurno]);
 
   const turnosPorDia = useMemo(() => {
     const orden = { lunes: 0, martes: 1, miercoles: 2, jueves: 3, viernes: 4, sabado: 5, domingo: 6 };

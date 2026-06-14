@@ -592,13 +592,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
       return;
     }
 
-    // refrescar lista y seleccionado
-    const lista = await cargarAlumnos();
     const pid = personaIdFrom(alumnoSeleccionado);
-    const actualizado = (Array.isArray(lista) ? lista : []).find(
-      (a) => String(personaIdFrom(a)) === String(pid)
-    );
-    if (actualizado) setAlumnoSeleccionado(actualizado);
 
     // --- Gestionar grupo de promo (soporta 2+) ---
     const { grupoId: grupoActualId, integrantes: integrantesActuales, descuento: descuentoActual } =
@@ -660,6 +654,13 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     }
 
     await cargarGrupoPromo(pid);
+
+    // refrescar lista y ficha luego de aplicar los cambios de promo
+    const listaActualizada = await cargarAlumnos();
+    const actualizado = (Array.isArray(listaActualizada) ? listaActualizada : []).find(
+      (a) => String(personaIdFrom(a)) === String(pid)
+    );
+    if (actualizado) setAlumnoSeleccionado(actualizado);
 
     setModoEdicionAlumno(false);
     setMensaje("✅ Alumno actualizado");
