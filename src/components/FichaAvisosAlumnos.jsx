@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 
 export default function FichaAvisosAlumnos() {
+  const MODULO_PLANTILLAS = "avisos";
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
@@ -101,21 +102,39 @@ export default function FichaAvisosAlumnos() {
     ...extra,
   });
 
+  const filtrarActivas = (data) =>
+    (Array.isArray(data) ? data : []).filter((p) => p.activo !== false);
+
   const cargarPlantillas = async () => {
     try {
       const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/avisos_plantillas?select=id,label,text,orden,activo&order=orden.asc`,
+        `${config.supabaseUrl}/rest/v1/avisos_plantillas?select=id,label,text,orden,activo,modulo&modulo=eq.${encodeURIComponent(MODULO_PLANTILLAS)}&order=orden.asc`,
         { headers: headers() }
       );
       if (!res.ok) throw new Error("No pude cargar las plantillas.");
       const data = await res.json();
-      const activas = (Array.isArray(data) ? data : []).filter((p) => p.activo !== false);
+      const activas = filtrarActivas(data);
       if (activas.length > 0) {
         setPlantillasEditables(activas);
         return;
       }
       await sembrarPlantillasBase();
     } catch {
+      try {
+        const fallback = await fetch(
+          `${config.supabaseUrl}/rest/v1/avisos_plantillas?select=id,label,text,orden,activo&order=orden.asc`,
+          { headers: headers() }
+        );
+        if (!fallback.ok) throw new Error("No pude cargar las plantillas.");
+        const dataFallback = await fallback.json();
+        const activasFallback = filtrarActivas(dataFallback);
+        if (activasFallback.length > 0) {
+          setPlantillasEditables(activasFallback);
+          return;
+        }
+      } catch {
+        // si falla también el fallback, usar plantillas locales
+      }
       setPlantillasEditables(plantillasBase);
     }
   };
@@ -125,7 +144,7 @@ export default function FichaAvisosAlumnos() {
       const res = await fetch(`${config.supabaseUrl}/rest/v1/avisos_plantillas`, {
         method: "POST",
         headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
-        body: JSON.stringify(plantillasBase),
+        body: JSON.stringify(plantillasBase.map((p) => ({ ...p, modulo: MODULO_PLANTILLAS }))),
       });
       if (!res.ok) throw new Error("No pude guardar las plantillas base.");
       const data = await res.json();
@@ -139,7 +158,7 @@ export default function FichaAvisosAlumnos() {
     const res = await fetch(`${config.supabaseUrl}/rest/v1/avisos_plantillas`, {
       method: "POST",
       headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, modulo: MODULO_PLANTILLAS }),
     });
     if (!res.ok) throw new Error("No pude crear la plantilla.");
     const data = await res.json();
@@ -148,7 +167,7 @@ export default function FichaAvisosAlumnos() {
 
   const actualizarPlantilla = async (id, payload) => {
     const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}`,
+      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}&modulo=eq.${encodeURIComponent(MODULO_PLANTILLAS)}`,
       {
         method: "PATCH",
         headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
@@ -162,7 +181,7 @@ export default function FichaAvisosAlumnos() {
 
   const eliminarPlantilla = async (id) => {
     const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}`,
+      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}&modulo=eq.${encodeURIComponent(MODULO_PLANTILLAS)}`,
       { method: "DELETE", headers: headers({ Prefer: "return=minimal" }) }
     );
     if (!res.ok) throw new Error("No pude eliminar la plantilla.");

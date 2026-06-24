@@ -1,8 +1,10 @@
 ﻿// FichaPagosEstadisticas.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaWhatsapp } from "react-icons/fa";
 
 const FichaPagosEstadisticas = () => {
+  const MODULO_PLANTILLAS = "pagos_estadisticas";
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
@@ -11,10 +13,41 @@ const FichaPagosEstadisticas = () => {
   const [matriculasMap, setMatriculasMap] = useState({});
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
   const [cicloFiltro, setCicloFiltro] = useState("");
+  const [estadoPagoFiltro, setEstadoPagoFiltro] = useState("todos");
+  const [mensajeWhatsapp, setMensajeWhatsapp] = useState("");
+  const [plantillaActiva, setPlantillaActiva] = useState("");
+  const [mostrarPlantillas, setMostrarPlantillas] = useState(false);
+  const [plantillasEditables, setPlantillasEditables] = useState([]);
+  const [plantillaEditId, setPlantillaEditId] = useState("");
+  const [plantillaForm, setPlantillaForm] = useState({ label: "", text: "" });
+  const [errorPlantillas, setErrorPlantillas] = useState("");
   const mesesBase = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
+  const plantillasBase = useMemo(
+    () => [
+      {
+        id: "recordatorio_pago",
+        orden: 1,
+        label: "Recordatorio de pago",
+        text:
+          "Hola {nombre} {apellido}, cómo estás?\n" +
+          "Notamos que todavía no tenemos registrado el pago correspondiente a {mes}.\n" +
+          "Si ya lo realizaste, quizás se nos pasó registrarlo. Nos podrías confirmar?\n" +
+          "Gracias.",
+      },
+      {
+        id: "agradecimiento_pago",
+        orden: 2,
+        label: "Agradecimiento",
+        text:
+          "Hola {nombre} {apellido}, muchas gracias por el pago de {mes}.\n" +
+          "Cualquier duda, escribinos.",
+      },
+    ],
+    []
+  );
   const mesIndex = useMemo(
     () =>
       mesesBase.reduce((acc, m, idx) => {
@@ -45,6 +78,15 @@ const FichaPagosEstadisticas = () => {
       setConfig(json);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!mostrarPlantillas) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mostrarPlantillas]);
 
   useEffect(() => {
     if (!config) return;
@@ -85,6 +127,83 @@ const FichaPagosEstadisticas = () => {
       const listaCiclos = Array.isArray(dataCiclos) ? dataCiclos : [];
       setCiclosDisponibles(listaCiclos);
     })();
+  }, [config]);
+
+  const headers = (extra = {}) => ({
+    apikey: config?.supabaseKey,
+    Authorization: `Bearer ${config?.supabaseKey}`,
+    ...extra,
+  });
+
+  const cargarPlantillas = async () => {
+    try {
+      setErrorPlantillas("");
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/avisos_plantillas?select=id,label,text,orden,activo,modulo&modulo=eq.${encodeURIComponent(MODULO_PLANTILLAS)}&order=orden.asc`,
+        { headers: headers() }
+      );
+      if (!res.ok) throw new Error("No pude cargar las plantillas.");
+      const data = await res.json();
+      const activas = (Array.isArray(data) ? data : []).filter((p) => p.activo !== false);
+      if (activas.length > 0) {
+        setPlantillasEditables(activas);
+        return;
+      }
+      await sembrarPlantillasBase();
+    } catch {
+      setPlantillasEditables(plantillasBase);
+      setErrorPlantillas("No pude leer las plantillas desde Supabase. Ejecutá primero la migración SQL.");
+    }
+  };
+
+  const sembrarPlantillasBase = async () => {
+    const payload = plantillasBase.map((p) => ({ ...p, modulo: MODULO_PLANTILLAS }));
+    const res = await fetch(`${config.supabaseUrl}/rest/v1/avisos_plantillas`, {
+      method: "POST",
+      headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("No pude guardar las plantillas base.");
+    const data = await res.json();
+    setPlantillasEditables(Array.isArray(data) ? data : plantillasBase);
+  };
+
+  const crearPlantilla = async (payload) => {
+    const res = await fetch(`${config.supabaseUrl}/rest/v1/avisos_plantillas`, {
+      method: "POST",
+      headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
+      body: JSON.stringify({ ...payload, modulo: MODULO_PLANTILLAS, activo: true }),
+    });
+    if (!res.ok) throw new Error("No pude crear la plantilla.");
+    const data = await res.json();
+    return Array.isArray(data) ? data[0] : data;
+  };
+
+  const actualizarPlantilla = async (id, payload) => {
+    const res = await fetch(
+      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}&modulo=eq.${encodeURIComponent(MODULO_PLANTILLAS)}`,
+      {
+        method: "PATCH",
+        headers: headers({ "Content-Type": "application/json", Prefer: "return=representation" }),
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!res.ok) throw new Error("No pude actualizar la plantilla.");
+    const data = await res.json();
+    return Array.isArray(data) ? data[0] : data;
+  };
+
+  const eliminarPlantilla = async (id) => {
+    const res = await fetch(
+      `${config.supabaseUrl}/rest/v1/avisos_plantillas?id=eq.${encodeURIComponent(id)}&modulo=eq.${encodeURIComponent(MODULO_PLANTILLAS)}`,
+      { method: "DELETE", headers: headers({ Prefer: "return=minimal" }) }
+    );
+    if (!res.ok) throw new Error("No pude eliminar la plantilla.");
+  };
+
+  useEffect(() => {
+    if (!config) return;
+    cargarPlantillas();
   }, [config]);
 
   useEffect(() => {
@@ -139,10 +258,14 @@ const FichaPagosEstadisticas = () => {
         pago: pagosMap.has(a.id),
         medio_pago: pagosMap.get(a.id) || null,
       }));
-    return medioPago === "todos"
-      ? list
-      : list.filter((a) => a.medio_pago === medioPago);
-  }, [alumnos, pagosMap, medioPago, matriculasMap, cicloFiltro]);
+    const filtradosPorMedio =
+      medioPago === "todos"
+        ? list
+        : list.filter((a) => a.medio_pago === medioPago);
+    if (estadoPagoFiltro === "pagados") return filtradosPorMedio.filter((a) => a.pago);
+    if (estadoPagoFiltro === "no_pagados") return filtradosPorMedio.filter((a) => !a.pago);
+    return filtradosPorMedio;
+  }, [alumnos, pagosMap, medioPago, matriculasMap, cicloFiltro, estadoPagoFiltro]);
 
   useEffect(() => {
     if (!config) return;
@@ -206,6 +329,34 @@ const FichaPagosEstadisticas = () => {
     const d = new Date(fecha);
     if (Number.isNaN(d.getTime())) return fecha;
     return d.toLocaleDateString("es-AR");
+  };
+
+  const resetPlantillaForm = () => {
+    setPlantillaEditId("");
+    setPlantillaForm({ label: "", text: "" });
+  };
+
+  const interpolarMensaje = (plantilla, alumno) => {
+    if (!plantilla) return "";
+    const reemplazos = {
+      "{nombre}": (alumno?.nombre || "").trim(),
+      "{apellido}": (alumno?.apellido || "").trim(),
+      "{mes}": mesSeleccionado,
+      "{estado_pago}": alumno?.pago ? "pagado" : "pendiente",
+      "{medio_pago}": alumno?.medio_pago || "",
+    };
+    return Object.keys(reemplazos).reduce(
+      (acc, key) => acc.split(key).join(reemplazos[key]),
+      plantilla
+    );
+  };
+
+  const buildWhatsappLink = (telefono, mensajePlano, alumno) => {
+    if (!telefono || !mensajePlano) return null;
+    const limpio = telefono.replace(/\D/g, "");
+    if (!limpio) return null;
+    const personalizado = interpolarMensaje(mensajePlano, alumno);
+    return `https://wa.me/54${limpio}?text=${encodeURIComponent(personalizado)}`;
   };
 
   const generarComprobante = async (alumnoId) => {
@@ -385,6 +536,74 @@ const FichaPagosEstadisticas = () => {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="block font-medium mb-1">Estado de pago:</label>
+          <select
+            className="w-full border p-2 rounded"
+            value={estadoPagoFiltro}
+            onChange={(e) => setEstadoPagoFiltro(e.target.value)}
+          >
+            <option value="todos">Todos</option>
+            <option value="pagados">Pagaron</option>
+            <option value="no_pagados">No pagaron</option>
+          </select>
+        </div>
+        <div>
+          <label className="block font-medium mb-1">Mensaje a enviar por WhatsApp:</label>
+          <div className="mb-2">
+            <button
+              type="button"
+              className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+              onClick={() => setMostrarPlantillas(true)}
+            >
+              Crear / editar mensajes
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-3 mb-2">
+            {plantillasEditables.map((p) => (
+              <label
+                key={p.id}
+                className="inline-flex items-center gap-2 text-sm px-2 py-1 rounded-full border border-gray-200 bg-gray-50"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={plantillaActiva === p.id}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setPlantillaActiva(p.id);
+                      setMensajeWhatsapp(p.text);
+                    } else {
+                      setPlantillaActiva("");
+                      setMensajeWhatsapp("");
+                    }
+                  }}
+                />
+                <span>{p.label}</span>
+              </label>
+            ))}
+          </div>
+          <textarea
+            className="w-full border rounded p-3 text-sm min-h-[90px]"
+            placeholder="Escribí el mensaje para WhatsApp"
+            value={mensajeWhatsapp}
+            onChange={(e) => {
+              const valor = e.target.value;
+              setMensajeWhatsapp(valor);
+              const activa = plantillasEditables.find((p) => p.id === plantillaActiva);
+              if (activa && valor !== activa.text) {
+                setPlantillaActiva("");
+              }
+            }}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Podés usar {`{nombre}`}, {`{apellido}`}, {`{mes}`}, {`{estado_pago}`} y {`{medio_pago}`}.
+          </p>
+          {errorPlantillas && <p className="mt-2 text-sm text-red-600">{errorPlantillas}</p>}
+        </div>
+      </div>
+
       <div className="flex justify-center gap-6 font-medium text-lg my-4">
         <span className="text-green-600">Pagados: {pagados}</span>
         <span className="text-red-600">Faltan pagar: {noPagados}</span>
@@ -430,6 +649,17 @@ const FichaPagosEstadisticas = () => {
                 {a.pago ? (
                   <div className="flex items-center gap-2">
                     <span>Sí</span>
+                    {buildWhatsappLink(a.telefono || "", mensajeWhatsapp, a) && (
+                      <a
+                        href={buildWhatsappLink(a.telefono || "", mensajeWhatsapp, a)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center w-7 h-7 rounded bg-green-500 hover:bg-green-600 transition text-white"
+                        title="Enviar mensaje por WhatsApp"
+                      >
+                        <FaWhatsapp className="w-4 h-4" />
+                      </a>
+                    )}
                     <button
                         onClick={() => generarComprobante(a.id)}
                         className="flex items-center gap-1 bg-red-100 hover:bg-red-200 text-red-800 font-medium px-2 py-1 rounded text-xs shadow-sm transition"
@@ -446,23 +676,16 @@ const FichaPagosEstadisticas = () => {
                 ) : (
                   <div className="flex items-center gap-2">
                     <span>No</span>
-                    {a.telefono && (
+                    {buildWhatsappLink(a.telefono || "", mensajeWhatsapp, a) && (
                       <a
-                        href={`https://wa.me/54${a.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(
-                            `Hola, cómo estás? Notamos que todavía no tenemos registro del pago de la cuota correspondiente a ${mesSeleccionado}. Si ya lo realizaste, quizás se nos pasó registrarlo. Nos podrías confirmar? Gracias! y disculpas por la molestia...`
-                        )}`}
+                        href={buildWhatsappLink(a.telefono || "", mensajeWhatsapp, a)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded bg-green-500 hover:bg-green-600 transition"
-                        title="Recordar por WhatsApp"
-                        >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 16 16" className="w-4 h-4">
-                            <path d="M13.601 2.326A7.955 7.955 0 0 0 8 0C3.582 0 0 3.582 0 8c0 1.425.375 2.748 1.03 3.914L0 16l4.188-1.03A7.963 7.963 0 0 0 8 16c4.418 0 8-3.582 8-8 0-2.137-.832-4.089-2.399-5.674zM8 14.5a6.5 6.5 0 1 1 4.401-11.074l.19.185A6.495 6.495 0 0 1 8 14.5z"/>
-                            <path d="M11.168 9.29c-.228-.114-1.348-.667-1.556-.743-.207-.077-.358-.114-.51.114-.152.228-.586.743-.72.895-.133.152-.266.171-.494.057-.228-.114-.962-.354-1.83-1.13-.676-.602-1.133-1.347-1.267-1.575-.133-.228-.014-.352.1-.466.103-.102.228-.266.342-.399.115-.133.152-.228.229-.38.076-.152.038-.285-.019-.399-.058-.114-.51-1.23-.699-1.681-.184-.445-.372-.384-.51-.392-.133-.008-.285-.01-.437-.01-.152 0-.4.057-.61.285-.21.228-.81.792-.81 1.931 0 1.14.83 2.243.945 2.399.114.152 1.63 2.5 3.96 3.494.554.24.984.384 1.32.49.554.176 1.057.152 1.455.092.444-.066 1.348-.551 1.538-1.083.19-.532.19-.99.133-1.083-.057-.095-.209-.152-.437-.266z"/>
-                        </svg>
-                        </a>
-                    
-                    
+                        className="inline-flex items-center justify-center w-7 h-7 rounded bg-green-500 hover:bg-green-600 transition text-white"
+                        title="Enviar mensaje por WhatsApp"
+                      >
+                        <FaWhatsapp className="w-4 h-4" />
+                      </a>
                     )}
                   </div>
                 )}
@@ -473,6 +696,146 @@ const FichaPagosEstadisticas = () => {
       </table>
       </div>
       </div>
+      {mostrarPlantillas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Mensajes prediseñados</h3>
+              <button
+                type="button"
+                className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                onClick={() => {
+                  setMostrarPlantillas(false);
+                  resetPlantillaForm();
+                  setErrorPlantillas("");
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="mb-4">
+              <div className="text-sm font-medium mb-1">Nombre del mensaje</div>
+              <input
+                className="w-full border rounded px-3 py-2 text-sm"
+                value={plantillaForm.label}
+                onChange={(e) => setPlantillaForm((p) => ({ ...p, label: e.target.value }))}
+              />
+              <div className="text-sm font-medium mt-3 mb-1">Texto del mensaje</div>
+              <textarea
+                className="w-full border rounded px-3 py-2 text-sm min-h-[120px]"
+                value={plantillaForm.text}
+                onChange={(e) => setPlantillaForm((p) => ({ ...p, text: e.target.value }))}
+              />
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                  onClick={async () => {
+                    if (!plantillaForm.label.trim() || !plantillaForm.text.trim()) {
+                      setErrorPlantillas("Completá nombre y texto del mensaje.");
+                      return;
+                    }
+                    try {
+                      if (plantillaEditId) {
+                        const actualizada = await actualizarPlantilla(plantillaEditId, {
+                          label: plantillaForm.label,
+                          text: plantillaForm.text,
+                        });
+                        const updated = plantillasEditables.map((p) =>
+                          p.id === plantillaEditId ? { ...p, ...actualizada } : p
+                        );
+                        setPlantillasEditables(updated);
+                      } else {
+                        const ordenMax = plantillasEditables.reduce(
+                          (max, p) => Math.max(max, p.orden || 0),
+                          0
+                        );
+                        const nueva = await crearPlantilla({
+                          id: `custom-${Date.now()}`,
+                          label: plantillaForm.label,
+                          text: plantillaForm.text,
+                          orden: ordenMax + 1,
+                        });
+                        setPlantillasEditables([...plantillasEditables, nueva]);
+                      }
+                      setErrorPlantillas("");
+                      resetPlantillaForm();
+                    } catch {
+                      setErrorPlantillas("No pude guardar la plantilla en Supabase.");
+                    }
+                  }}
+                >
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  className="text-sm px-3 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                  onClick={() => {
+                    resetPlantillaForm();
+                    setErrorPlantillas("");
+                  }}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold mb-2">Mensajes</div>
+              {plantillasEditables.length === 0 ? (
+                <div className="text-sm text-gray-500">No hay mensajes.</div>
+              ) : (
+                <div className="space-y-2">
+                  {plantillasEditables.map((p) => (
+                    <div
+                      key={p.id}
+                      className="border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                    >
+                      <div>
+                        <div className="text-sm font-medium">{p.label}</div>
+                        <div className="text-xs text-gray-500 whitespace-pre-line">{p.text}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          onClick={async () => {
+                            setPlantillaEditId(p.id);
+                            setPlantillaForm({ label: p.label, text: p.text });
+                            setErrorPlantillas("");
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          onClick={async () => {
+                            try {
+                              await eliminarPlantilla(p.id);
+                              const updated = plantillasEditables.filter((item) => item.id !== p.id);
+                              setPlantillasEditables(updated);
+                              if (plantillaEditId === p.id) resetPlantillaForm();
+                              if (plantillaActiva === p.id) {
+                                setPlantillaActiva("");
+                                setMensajeWhatsapp("");
+                              }
+                              setErrorPlantillas("");
+                            } catch {
+                              setErrorPlantillas("No pude eliminar la plantilla en Supabase.");
+                            }
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
