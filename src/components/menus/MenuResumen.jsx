@@ -322,7 +322,8 @@ function PanelDiario() {
             <div key={sede}>
               <h4 className="font-semibold text-gray-800 mb-2">{sede}</h4>
 
-              <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] text-sm border border-gray-200 rounded-lg overflow-hidden">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-3 py-2 text-left text-gray-600">Turno</th>
@@ -345,6 +346,7 @@ function PanelDiario() {
                     ))}
                 </tbody>
               </table>
+              </div>
             </div>
           ))}
         </div>
