@@ -16,6 +16,28 @@ const MESES = [
   "Diciembre",
 ];
 
+const mesANumero = (mes) => {
+  const idx = MESES.indexOf(mes);
+  return idx >= 0 ? idx + 1 : null;
+};
+
+const calcularPeriodoFacturado = (mes) => {
+  const numeroMes = mesANumero(mes);
+  if (!numeroMes) return null;
+
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+  const anio = numeroMes > mesActual ? anioActual - 1 : anioActual;
+
+  return {
+    anio,
+    mes: numeroMes,
+    yyyyMm: `${anio}-${String(numeroMes).padStart(2, "0")}`,
+    etiqueta: `${mes} ${anio}`,
+  };
+};
+
 const toHeaders = (cfg) => ({
   apikey: cfg?.supabaseKey,
   Authorization: `Bearer ${cfg?.supabaseKey}`,
@@ -214,6 +236,11 @@ export default function FichaFacturacion() {
     [pagosFiltrados]
   );
 
+  const periodoFacturado = useMemo(
+    () => calcularPeriodoFacturado(mesFiltro),
+    [mesFiltro]
+  );
+
   const toggleSeleccion = (id) => {
     setSeleccionados((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -240,18 +267,34 @@ export default function FichaFacturacion() {
 
   const handleEnviar = () => {
     if (!idsSeleccionados.length) {
+      setMensaje("Selecciona al menos un pago pendiente para facturar.");
+      return;
+    }
+    if (!periodoFacturado) {
+      setMensaje("Elegí­ un mes especí­fico para facturar e informar el perí­odo correcto.");
+      return;
+    }
+    if (!idsSeleccionados.length) {
       setMensaje("Seleccioná al menos un pago pendiente para facturar.");
       return;
     }
 
     const enviar = async () => {
       try {
-        setMensaje(`Enviando ${idsSeleccionados.length} pago(s) a facturar...`);
+        setMensaje(
+          `Enviando ${idsSeleccionados.length} pago(s) a facturar para el perí­odo ${periodoFacturado.etiqueta}...`
+        );
         const apiUrl = config?.facturacionApiUrl || "http://127.0.0.1:8787";
         const response = await fetch(`${apiUrl}/facturar`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pago_ids: idsSeleccionados }),
+          body: JSON.stringify({
+            pago_ids: idsSeleccionados,
+            periodo_facturado: periodoFacturado.yyyyMm,
+            periodo_anio: periodoFacturado.anio,
+            periodo_mes: periodoFacturado.mes,
+            periodo_label: periodoFacturado.etiqueta,
+          }),
         });
         const data = await response.json();
         if (!response.ok || !data?.ok) {
@@ -398,6 +441,11 @@ export default function FichaFacturacion() {
                   ${Number(totalSeleccionado || 0).toLocaleString()}
                 </div>
               </div>
+            </div>
+
+            <div className="mb-5 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <span className="font-medium">Periodo facturado:</span>{" "}
+              {periodoFacturado ? periodoFacturado.etiqueta : "Elegi un mes especifico"}
             </div>
 
             <div className="grid grid-cols-5 gap-3 mb-5 text-sm">
