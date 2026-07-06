@@ -5,6 +5,7 @@ const IMG_CUMPLES =
 
 const ESTADOS_RESERVA = ["pendiente", "confirmada", "cancelada"];
 const HORAS_DEFAULT = ["14:30", "18:00"];
+const MENU_OPTIONS = ["Sandwichs de miga jamón y queso + snacks", "Panchos + snacks"];
 const MESES = [
   "Enero",
   "Febrero",
@@ -85,6 +86,7 @@ export default function FichaCumples() {
     mensaje: "",
     cumpleanero_nombre: "",
     cumpleanero_edad: "",
+    menu_opcion: "",
     menu_especial: false,
     menu_especial_cantidad: "",
   });
@@ -250,7 +252,7 @@ export default function FichaCumples() {
 
     const urlReservas =
       `${config.supabaseUrl}/rest/v1/cumple_reservas` +
-      `?select=id,fecha,hora,nombre,apellido,telefono,mensaje,estado,creado_en,cumpleanero_nombre,cumpleanero_edad,menu_especial,menu_especial_cantidad` +
+      `?select=id,fecha,hora,nombre,apellido,telefono,mensaje,estado,creado_en,cumpleanero_nombre,cumpleanero_edad,menu_opcion,menu_especial,menu_especial_cantidad` +
       `&order=fecha.asc&order=hora.asc`;
 
     const [resSlots, resReservas] = await Promise.all([
@@ -380,6 +382,7 @@ export default function FichaCumples() {
         mensaje: reservaForm.mensaje || "",
         cumpleanero_nombre: reservaForm.cumpleanero_nombre || "",
         cumpleanero_edad: reservaForm.cumpleanero_edad || null,
+        menu_opcion: reservaForm.menu_opcion || "",
         menu_especial: !!reservaForm.menu_especial,
         menu_especial_cantidad: reservaForm.menu_especial ? reservaForm.menu_especial_cantidad || null : null,
         monto_total: Number.isFinite(promoMonto) ? promoMonto : Number(precioCumple || 0),
@@ -404,6 +407,7 @@ export default function FichaCumples() {
         `Telefono: ${reservaForm.telefono}`,
         `Cumpleanero: ${reservaForm.cumpleanero_nombre || "-"}`,
         `Edad: ${reservaForm.cumpleanero_edad || "-"}`,
+        `Menu: ${reservaForm.menu_opcion || "-"}`,
         `Menu especial: ${menuEspecial}${menuCantidad}`,
         `Mensaje: ${reservaForm.mensaje || "-"}`,
       ].join("\n");
@@ -418,6 +422,7 @@ export default function FichaCumples() {
       mensaje: "",
       cumpleanero_nombre: "",
       cumpleanero_edad: "",
+      menu_opcion: "",
       menu_especial: false,
       menu_especial_cantidad: "",
     });
@@ -452,6 +457,7 @@ export default function FichaCumples() {
       mensaje: reserva?.mensaje || "",
       cumpleanero_nombre: reserva?.cumpleanero_nombre || "",
       cumpleanero_edad: reserva?.cumpleanero_edad ?? "",
+      menu_opcion: reserva?.menu_opcion || "",
       menu_especial: !!reserva?.menu_especial,
       menu_especial_cantidad: reserva?.menu_especial_cantidad ?? "",
       estado: reserva?.estado || "pendiente",
@@ -472,6 +478,7 @@ export default function FichaCumples() {
       mensaje: detalleForm?.mensaje || "",
       cumpleanero_nombre: detalleForm?.cumpleanero_nombre || "",
       cumpleanero_edad: detalleForm?.cumpleanero_edad || null,
+      menu_opcion: detalleForm?.menu_opcion || "",
       menu_especial: !!detalleForm?.menu_especial,
       menu_especial_cantidad: detalleForm?.menu_especial
         ? detalleForm?.menu_especial_cantidad || null
@@ -499,6 +506,10 @@ export default function FichaCumples() {
       "Content-Type": "application/json",
       Prefer: "return=representation",
     };
+    await fetch(`${config.supabaseUrl}/rest/v1/cumple_pagos?reserva_id=eq.${reservaDetalle.id}`, {
+      method: "DELETE",
+      headers: headersJson,
+    });
     await fetch(`${config.supabaseUrl}/rest/v1/cumple_reservas?id=eq.${reservaDetalle.id}`, {
       method: "DELETE",
       headers: headersJson,
@@ -506,6 +517,30 @@ export default function FichaCumples() {
     await cargarDatosMes();
     setReservaDetalle(null);
     setModoEditarDetalle(false);
+  };
+
+  const eliminarReserva = async (reserva) => {
+    if (!config || !reserva?.id) return;
+    const confirmar = confirm("Eliminar esta reserva?");
+    if (!confirmar) return;
+    const headersJson = {
+      ...headers,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    };
+    await fetch(`${config.supabaseUrl}/rest/v1/cumple_pagos?reserva_id=eq.${reserva.id}`, {
+      method: "DELETE",
+      headers: headersJson,
+    });
+    await fetch(`${config.supabaseUrl}/rest/v1/cumple_reservas?id=eq.${reserva.id}`, {
+      method: "DELETE",
+      headers: headersJson,
+    });
+    await cargarDatosMes();
+    if (reservaDetalle?.id === reserva.id) {
+      setReservaDetalle(null);
+      setModoEditarDetalle(false);
+    }
   };
 
   const slotsPorDia = useMemo(() => {
@@ -921,7 +956,22 @@ export default function FichaCumples() {
                           </select>
                         </div>
 
-                        <div className="mt-3 flex justify-end">
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            title="Eliminar cumple"
+                            aria-label="Eliminar cumple"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-red-600 hover:bg-red-50 transition"
+                            onClick={() => eliminarReserva(r)}
+                          >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M3 6h18" />
+                              <path d="M8 6V4h8v2" />
+                              <path d="M19 6l-1 14H6L5 6" />
+                              <path d="M10 11v6" />
+                              <path d="M14 11v6" />
+                            </svg>
+                          </button>
                           <button
                             className="text-emerald-700 hover:bg-emerald-50 rounded px-2 py-1 text-xs transition"
                             onClick={() => abrirDetalle(r)}
@@ -947,6 +997,21 @@ export default function FichaCumples() {
                           {formatFecha(reservaDetalle.fecha)} - {reservaDetalle.hora}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        title="Eliminar cumple"
+                        aria-label="Eliminar cumple"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-red-600 hover:bg-red-50 transition"
+                        onClick={eliminarDetalle}
+                      >
+                        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
 
@@ -1004,6 +1069,27 @@ export default function FichaCumples() {
                       setDetalleForm((p) => ({ ...p, cumpleanero_nombre: e.target.value }))
                     }
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-medium">Menu elegido</label>
+                  <div className="mt-1 grid grid-cols-1 gap-2">
+                    {MENU_OPTIONS.map((opcion) => {
+                      const isActive = detalleForm?.menu_opcion === opcion;
+                      const cls = isActive
+                        ? "bg-emerald-100 border-emerald-500 text-emerald-800 ring-2 ring-emerald-200 hover:bg-emerald-100"
+                        : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50";
+                      return (
+                        <button
+                          key={opcion}
+                          type="button"
+                          className={`w-full rounded-lg border px-3 py-2 text-sm text-left transition ${cls}`}
+                          onClick={() => setDetalleForm((p) => ({ ...p, menu_opcion: opcion }))}
+                        >
+                          {opcion}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-medium">Edad</label>
@@ -1076,6 +1162,7 @@ export default function FichaCumples() {
                         mensaje: reservaDetalle?.mensaje || "",
                         cumpleanero_nombre: reservaDetalle?.cumpleanero_nombre || "",
                         cumpleanero_edad: reservaDetalle?.cumpleanero_edad ?? "",
+                        menu_opcion: reservaDetalle?.menu_opcion || "",
                         menu_especial: !!reservaDetalle?.menu_especial,
                         menu_especial_cantidad: reservaDetalle?.menu_especial_cantidad ?? "",
                         estado: reservaDetalle?.estado || "pendiente",
@@ -1097,6 +1184,10 @@ export default function FichaCumples() {
                   <div className="text-gray-500 text-xs">Cumpleanero</div>
                   <div>{reservaDetalle.cumpleanero_nombre || "-"}</div>
                   <div>{reservaDetalle.cumpleanero_edad || "-"}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 text-xs">Menu elegido</div>
+                  <div>{reservaDetalle.menu_opcion || "-"}</div>
                 </div>
                 <div>
                   <div className="text-gray-500 text-xs">Menu especial</div>

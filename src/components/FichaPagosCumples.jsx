@@ -229,6 +229,53 @@ export default function FichaPagosCumples() {
     }
   };
 
+  const eliminarCumple = async (reserva) => {
+    if (!config || !reserva?.id) return;
+    const nombreCumple =
+      reserva.cumpleanero_nombre || `${reserva.nombre || ""} ${reserva.apellido || ""}`.trim();
+    const confirmar = confirm(`Eliminar el cumple de ${nombreCumple}?`);
+    if (!confirmar) return;
+
+    try {
+      setMensaje("");
+      const headersJson = {
+        ...headers,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      };
+
+      await fetch(`${config.supabaseUrl}/rest/v1/cumple_pagos?reserva_id=eq.${reserva.id}`, {
+        method: "DELETE",
+        headers: headersJson,
+      });
+
+      const resDelete = await fetch(`${config.supabaseUrl}/rest/v1/cumple_reservas?id=eq.${reserva.id}`, {
+        method: "DELETE",
+        headers: headersJson,
+      });
+
+      if (!resDelete.ok) {
+        const error = await resDelete.json().catch(() => null);
+        throw new Error(error?.message || "No se pudo eliminar el cumple.");
+      }
+
+      setReservas((prev) => prev.filter((item) => item.id !== reserva.id));
+      setPagosPorReserva((prev) => {
+        const next = { ...prev };
+        delete next[reserva.id];
+        return next;
+      });
+      setSelecciones((prev) => {
+        const next = { ...prev };
+        delete next[reserva.id];
+        return next;
+      });
+      setMensaje(`Se eliminó el cumple de ${nombreCumple}.`);
+    } catch (error) {
+      setMensaje(String(error?.message || "No se pudo eliminar el cumple."));
+    }
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto mt-8 px-4">
       <div className="max-w-5xl mx-auto flex items-center justify-between mb-6 gap-4">
@@ -312,9 +359,26 @@ export default function FichaPagosCumples() {
                         {reserva.telefono ? ` • ${reserva.telefono}` : ""}
                       </div>
                     </div>
-                    <span className="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700 border-gray-200 capitalize">
-                      {reserva.estado}
-                    </span>
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        title="Eliminar cumple"
+                        aria-label="Eliminar cumple"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-red-600 hover:bg-red-50 transition"
+                        onClick={() => eliminarCumple(reserva)}
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                        </svg>
+                      </button>
+                      <span className="text-xs px-2 py-1 rounded-full border bg-gray-50 text-gray-700 border-gray-200 capitalize">
+                        {reserva.estado}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
