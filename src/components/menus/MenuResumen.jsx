@@ -154,6 +154,7 @@ function PanelDiario() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [detalleAsistencia, setDetalleAsistencia] = useState(null);
 
   const [data, setData] = useState({
     asistencias: [],
@@ -174,7 +175,7 @@ function PanelDiario() {
         `${url}/rest/v1/asistencias?select=alumno_id,turno,sede,tipo,recuperada,fecha&fecha=gte.${desde}&fecha=lte.${hasta}`,
         { headers }
       );
-      const asistencias = await asRes.json();
+      let asistencias = await asRes.json();
 
       // 2) Pagos del día (todos: cuota e inscripción)
       const pgRes = await fetch(
@@ -185,7 +186,12 @@ function PanelDiario() {
 
       // Enriquecer pagos con nombre/apellido (1 sola consulta IN (...) a inscripciones)
       let pagos = pagosBase;
-      const alumnoIds = Array.from(new Set(pagosBase.map(p => p.alumno_id))).filter(Boolean);
+      const alumnoIds = Array.from(
+        new Set([
+          ...pagosBase.map((p) => p.alumno_id),
+          ...((Array.isArray(asistencias) ? asistencias : []).map((a) => a.alumno_id)),
+        ])
+      ).filter(Boolean);
       if (alumnoIds.length > 0) {
         const idsCsv = alumnoIds.join(",");
         const inscRes = await fetch(
@@ -194,6 +200,10 @@ function PanelDiario() {
         );
         const insc = await inscRes.json();
         const mapNombre = new Map(insc.map(a => [a.id, { nombre: a.nombre, apellido: a.apellido }]));
+        asistencias = (Array.isArray(asistencias) ? asistencias : []).map((a) => ({
+          ...a,
+          alumno: mapNombre.get(a.alumno_id) || null,
+        }));
         pagos = pagosBase.map(p => ({ 
           ...p, 
           alumno: mapNombre.get(p.alumno_id) || null 
@@ -231,6 +241,32 @@ function PanelDiario() {
   const gruposAsist = useMemo(() => {
     const grupos = agruparAsistencias(data.asistencias);
     return grupos.sort((a, b) => a.sede.localeCompare(b.sede) || a.turno.localeCompare(b.turno));
+  }, [data.asistencias]);
+
+  const detalleAsistenciasMap = useMemo(() => {
+    const grupos = new Map();
+    (Array.isArray(data.asistencias) ? data.asistencias : []).forEach((a) => {
+      const clave = `${a.turno || ""}__${a.sede || ""}`;
+      if (!grupos.has(clave)) {
+        grupos.set(clave, {
+          turno: a.turno || "",
+          sede: a.sede || "",
+          presentes: [],
+          ausentes: [],
+          recuperaciones: [],
+        });
+      }
+      const grupo = grupos.get(clave);
+      const nombre = [a.alumno?.nombre, a.alumno?.apellido].filter(Boolean).join(" ").trim() || `ID ${a.alumno_id}`;
+      const item = {
+        id: `${a.alumno_id || "sin-id"}-${a.tipo || "sin-tipo"}-${a.fecha || "sin-fecha"}`,
+        nombre,
+      };
+      if (a.tipo === "regular") grupo.presentes.push(item);
+      else if (a.tipo === "ausente" && !a.recuperada) grupo.ausentes.push(item);
+      else if (a.tipo === "recuperacion") grupo.recuperaciones.push(item);
+    });
+    return grupos;
   }, [data.asistencias]);
 
   return (
@@ -338,7 +374,19 @@ function PanelDiario() {
                     .filter((g) => g.sede === sede)
                     .map((g, idx) => (
                       <tr key={idx} className="border-t">
-                        <td className="px-3 py-2">{g.turno}</td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            className="rounded-md px-2 py-1 -mx-2 -my-1 text-left text-emerald-700 hover:bg-emerald-50 hover:text-emerald-700 transition font-medium"
+                            onClick={() =>
+                              setDetalleAsistencia(
+                                detalleAsistenciasMap.get(`${g.turno || ""}__${g.sede || ""}`) || null
+                              )
+                            }
+                          >
+                            {g.turno}
+                          </button>
+                        </td>
                         <td className="px-3 py-2 text-center">{g.regulares}</td>
                         <td className="px-3 py-2 text-center">{g.ausentes}</td>
                         <td className="px-3 py-2 text-center">{g.recuperaciones}</td>
@@ -359,6 +407,50 @@ function PanelDiario() {
         !data.inactivos.length && (
           <p className="text-gray-600">No se registraron eventos en esta fecha.</p>
         )}
+
+      {detalleAsistencia && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border border-emerald-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-emerald-50 to-white px-6 py-4 border-b border-emerald-100">
+              <div>
+                <h4 className="text-lg font-semibold">Detalle de asistencia</h4>
+                <p className="text-sm text-gray-600">{detalleAsistencia.sede} · {detalleAsistencia.turno}</p>
+                <p className="text-xs text-gray-500">{niceDate(fecha)}</p>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-4 max-h-[70vh] overflow-y-auto">
+              <DetalleListaAsistencia
+                titulo="Presentes"
+                color="emerald"
+                items={detalleAsistencia.presentes}
+                vacio="No hay presentes registrados."
+              />
+              <DetalleListaAsistencia
+                titulo="Ausentes"
+                color="red"
+                items={detalleAsistencia.ausentes}
+                vacio="No hay ausentes registrados."
+              />
+              <DetalleListaAsistencia
+                titulo="Recuperaron"
+                color="sky"
+                items={detalleAsistencia.recuperaciones}
+                vacio="No hay recuperos registrados."
+              />
+            </div>
+            <div className="px-6 pb-5 flex justify-center">
+              <button
+                type="button"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition"
+                onClick={() => setDetalleAsistencia(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -386,6 +478,37 @@ function agruparAsistencias(asistencias = []) {
     const horaB = (b.turno || "").split(" ").slice(1).join(" ");
     return horaA.localeCompare(horaB);
   });
+}
+
+function DetalleListaAsistencia({ titulo, color, items, vacio }) {
+  const colorMap = {
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    red: "border-red-100 bg-red-50 text-red-800",
+    sky: "border-sky-100 bg-sky-50 text-sky-800",
+  };
+
+  return (
+    <div className={`rounded-xl border p-4 ${colorMap[color] || "border-gray-100 bg-gray-50 text-gray-800"}`}>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="font-semibold">{titulo}</div>
+        <div className="text-xs font-medium">{items.length}</div>
+      </div>
+      {items.length === 0 ? (
+        <div className="text-sm opacity-80">{vacio}</div>
+      ) : (
+        <div className="space-y-2">
+          {items
+            .slice()
+            .sort((a, b) => a.nombre.localeCompare(b.nombre))
+            .map((item) => (
+              <div key={item.id} className="rounded-lg bg-white/80 px-3 py-2 text-sm text-gray-800 border border-black/5">
+                {item.nombre}
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function PagoItem({ pago, url, headers }) {
