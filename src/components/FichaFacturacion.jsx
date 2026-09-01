@@ -123,11 +123,30 @@ export default function FichaFacturacion() {
       const url = new URL(`${cfg.supabaseUrl}/rest/v1/pagos`);
       url.searchParams.set("select", select);
       url.searchParams.set("order", "creado_en.desc");
-      url.searchParams.set("limit", "200");
+      if (mesFiltro !== "todos" && mesFiltro !== "N/A") {
+        url.searchParams.set("mes", `eq.${mesFiltro}`);
+      } else if (mesFiltro === "N/A") {
+        url.searchParams.set("or", "(mes.is.null,mes.eq.)");
+      }
 
-      const response = await fetch(url.toString(), { headers: toHeaders(cfg) });
-      const data = await response.json();
-      setPagos(Array.isArray(data) ? data : []);
+      const batchSize = 1000;
+      let offset = 0;
+      let todosLosPagos = [];
+
+      while (true) {
+        url.searchParams.set("limit", String(batchSize));
+        url.searchParams.set("offset", String(offset));
+
+        const response = await fetch(url.toString(), { headers: toHeaders(cfg) });
+        const data = await response.json();
+        const lote = Array.isArray(data) ? data : [];
+        todosLosPagos = todosLosPagos.concat(lote);
+
+        if (lote.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      setPagos(todosLosPagos);
     } catch (err) {
       console.error("Error cargando pagos para facturacion", err);
       setMensaje(`Error cargando pagos: ${err}`);
@@ -139,7 +158,7 @@ export default function FichaFacturacion() {
 
   useEffect(() => {
     cargarPagos();
-  }, []);
+  }, [mesFiltro]);
 
   useEffect(() => {
     const cargarModo = async () => {

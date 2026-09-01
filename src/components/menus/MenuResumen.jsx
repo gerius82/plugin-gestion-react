@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCalendarDay, FaCalendarAlt, FaChartPie,FaCheckCircle, FaExclamationCircle, FaUserPlus, FaUsers,FaFileSignature, FaUserMinus, FaDollarSign, FaInfoCircle } from "react-icons/fa";
 
+const CUOTA_NORMAL_DEFAULT = 60000;
+const PROMO_DESCUENTO_DEFAULT = 10;
+
 
 export default function FichaResumenes() {
   const navigate = useNavigate();
@@ -580,6 +583,8 @@ function PanelMensual() {
     monto: 0,
     pagosNormal: 0,
     pagosPromo: 0,
+    pagosEfectivo: 0,
+    pagosTransferencia: 0,
     faltantesPromo: 0, 
     faltantesNormales: 0,
     activosNormal: 0,
@@ -588,7 +593,7 @@ function PanelMensual() {
     ingresoOptimistaPromo: 0,
     ingresoOptimistaTotal: 0,
     cuotaBase: 0,
-    promoDescuentoPct: 10
+    promoDescuentoPct: PROMO_DESCUENTO_DEFAULT
   });
 
   async function cargarMensual() {
@@ -600,7 +605,7 @@ function PanelMensual() {
 
       // 1) Pagos mensuales (activos). Incluye pago_antes si existe la columna.
       const pgRes = await fetch(
-        `${url}/rest/v1/pagos?select=alumno_id,monto_total,mes,pago_mes&mes=eq.${mesNombre}&pago_mes=eq.true`,
+        `${url}/rest/v1/pagos?select=alumno_id,monto_total,mes,pago_mes,medio_pago&mes=eq.${mesNombre}&pago_mes=eq.true`,
         { headers }
       );
       const pagosMensuales = await pgRes.json();
@@ -645,6 +650,20 @@ function PanelMensual() {
       const pagosAntes = pagosActivos.filter((p) => p.pago_antes === true).length;
       const pagosPromo = pagosActivos.filter((p) => promoMap.get(p.alumno_id) === true).length;
       const pagosNormal = Math.max(0, cantidadAlumnosQuePagaron - pagosPromo);
+      const pagosEfectivo = pagosActivos.reduce(
+        (acc, p) =>
+          String(p.medio_pago || "").toLowerCase() === "efectivo"
+            ? acc + (Number(p.monto_total) || 0)
+            : acc,
+        0
+      );
+      const pagosTransferencia = pagosActivos.reduce(
+        (acc, p) =>
+          String(p.medio_pago || "").toLowerCase() === "transferencia"
+            ? acc + (Number(p.monto_total) || 0)
+            : acc,
+        0
+      );
 
       // Precios por curso (ultimo curso activo por alumno)
       const cursoIds = Array.from(
@@ -665,9 +684,9 @@ function PanelMensual() {
           (Array.isArray(crData) ? crData : []).map((c) => [c.id, Number(c.precio_curso || 0)])
         );
       }
-      const fallbackCuota = 45000;
+      const fallbackCuota = CUOTA_NORMAL_DEFAULT;
 
-      const promoDescuentoPct = 10;
+      const promoDescuentoPct = PROMO_DESCUENTO_DEFAULT;
       const activosNormal = Math.max(0, pagosNormal + faltantesNormales);
       const activosPromo = Math.max(0, pagosPromo + faltantesPromo);
       let ingresoOptimistaNormal = 0;
@@ -722,6 +741,8 @@ function PanelMensual() {
         pagosAntes,
         pagosNormal,
         pagosPromo,
+        pagosEfectivo,
+        pagosTransferencia,
         faltantesPromo,
         faltantesNormales,
         activosNormal,
@@ -803,9 +824,11 @@ function PanelMensual() {
       {/* Desglose de pagos */}
       <div className="mt-6 border-t pt-4">
          <h3 className="font-semibold mb-3">Desglose del mes</h3>
-         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+         <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
            <KpiCard label="Cuota normal" value={totales.pagosNormal} color="green" />
            <KpiCard label="Con promo" value={totales.pagosPromo} color="green" />
+           <KpiCard label="Efectivo" value={`$${Number(totales.pagosEfectivo || 0).toLocaleString("es-AR")}`} color="green" />
+           <KpiCard label="Transferencia" value={`$${Number(totales.pagosTransferencia || 0).toLocaleString("es-AR")}`} color="green" />
            <KpiCard label="Faltantes normal" value={totales.faltantesNormales} color="amber" />
            <KpiCard label="Faltantes promo" value={totales.faltantesPromo} color="amber" />
          </div>
@@ -859,13 +882,13 @@ function PanelGastos() {
   const [ciclos, setCiclos] = useState([]);
   const [cicloSel, setCicloSel] = useState("");
   const [sedeSel, setSedeSel] = useState("");
-  const [valorTurno, setValorTurno] = useState(45000);
+  const [valorTurno, setValorTurno] = useState(CUOTA_NORMAL_DEFAULT);
   const [turnosProfes, setTurnosProfes] = useState([]);
   const [ingresos, setIngresos] = useState({
     real: 0,
     hipotetico: 0,
     cuotaBase: 0,
-    promoPct: 10,
+    promoPct: PROMO_DESCUENTO_DEFAULT,
     activosNormal: 0,
     activosPromo: 0,
   });
@@ -1007,8 +1030,8 @@ function PanelGastos() {
             (Array.isArray(crData) ? crData : []).map((c) => [c.id, Number(c.precio_curso || 0)])
           );
         }
-        const fallbackCuota = 45000;
-        const promoPct = 10;
+        const fallbackCuota = CUOTA_NORMAL_DEFAULT;
+        const promoPct = PROMO_DESCUENTO_DEFAULT;
         let hipotetico = 0;
         let sumaBase = 0;
         let cantBase = 0;
@@ -1069,10 +1092,10 @@ function PanelGastos() {
         if (val != null && !Number.isNaN(Number(val))) {
           setValorTurno(Number(val));
         } else {
-          setValorTurno(45000);
+          setValorTurno(CUOTA_NORMAL_DEFAULT);
         }
       } catch {
-        setValorTurno(45000);
+        setValorTurno(CUOTA_NORMAL_DEFAULT);
       }
     })();
   }, [url, headers, cicloSel]);
@@ -1617,7 +1640,7 @@ function PanelAsignacionProfes() {
   const [nuevoProfeTarifa, setNuevoProfeTarifa] = useState("");
   const [asignaciones, setAsignaciones] = useState({});
   const [asignacionesDb, setAsignacionesDb] = useState([]);
-  const [valorTurno, setValorTurno] = useState(45000);
+  const [valorTurno, setValorTurno] = useState(CUOTA_NORMAL_DEFAULT);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [errorAsign, setErrorAsign] = useState("");
@@ -1723,10 +1746,10 @@ function PanelAsignacionProfes() {
         if (val != null && !Number.isNaN(Number(val))) {
           setValorTurno(Number(val));
         } else {
-          setValorTurno(45000);
+          setValorTurno(CUOTA_NORMAL_DEFAULT);
         }
       } catch {
-        setValorTurno(45000);
+        setValorTurno(CUOTA_NORMAL_DEFAULT);
       }
     })();
   }, [url, headers, cicloSel]);
