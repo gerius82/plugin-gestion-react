@@ -235,9 +235,9 @@ export default function InfoCumples() {
           type="button"
           onClick={() => navigate(reservaHref)}
           aria-label="Avanzar para comenzar la reserva"
-          className="fixed bottom-5 right-5 z-[9999] flex items-center gap-2 rounded-full bg-sky-600 hover:bg-sky-700 text-white shadow-lg border border-sky-700 px-4 py-3"
+          className="fixed bottom-5 right-5 z-[9999] inline-flex w-auto max-w-[calc(100vw-2.5rem)] items-center justify-center gap-2 rounded-full bg-sky-600 hover:bg-sky-700 text-white shadow-lg border border-sky-700 px-4 py-3 whitespace-nowrap"
         >
-          <span className="text-sm font-semibold whitespace-nowrap">Avanzar reserva</span>
+          <span className="text-sm font-semibold">Reservar</span>
           <FaArrowRight className="text-lg" />
         </button>
       ) : (
