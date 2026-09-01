@@ -39,6 +39,7 @@ export default function FichaCumplesAlumnos() {
   const [alumnos, setAlumnos] = useState([]);
   const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth() + 1);
   const [diaSeleccionado, setDiaSeleccionado] = useState(null);
+  const [filtroEstado, setFiltroEstado] = useState("ambos");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -56,16 +57,39 @@ export default function FichaCumplesAlumnos() {
           apikey: config.supabaseKey,
           Authorization: `Bearer ${config.supabaseKey}`,
         };
-        const res = await fetch(
-          `${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido,telefono,fecha_nacimiento&order=nombre.asc`,
-          { headers }
-        );
-        if (!res.ok) throw new Error("No pude cargar alumnos");
-        const data = await res.json();
+        const [resAlumnos, resMatriculas] = await Promise.all([
+          fetch(
+            `${config.supabaseUrl}/rest/v1/inscripciones?select=id,nombre,apellido,telefono,fecha_nacimiento&order=nombre.asc`,
+            { headers }
+          ),
+          fetch(`${config.supabaseUrl}/rest/v1/matriculas?select=alumno_id,estado`, { headers }),
+        ]);
+        if (!resAlumnos.ok || !resMatriculas.ok) throw new Error("No pude cargar alumnos");
+        const data = await resAlumnos.json();
+        const matriculas = await resMatriculas.json();
+        const estadoPorAlumno = new Map();
+
+        (Array.isArray(matriculas) ? matriculas : []).forEach((m) => {
+          const alumnoId = String(m?.alumno_id || "");
+          const estado = String(m?.estado || "").toLowerCase();
+          if (!alumnoId) return;
+          const actual = estadoPorAlumno.get(alumnoId) || { activa: false, inactiva: false };
+          if (estado === "activa") actual.activa = true;
+          if (estado === "baja" || estado === "finalizada") actual.inactiva = true;
+          estadoPorAlumno.set(alumnoId, actual);
+        });
+
         const lista = (Array.isArray(data) ? data : [])
           .filter((a) => a?.fecha_nacimiento)
           .map((a) => {
             const f = parseFecha(a.fecha_nacimiento);
+            const estadoMatricula = estadoPorAlumno.get(String(a.id)) || {
+              activa: false,
+              inactiva: false,
+            };
+            let estadoAlumno = "sin_matricula";
+            if (estadoMatricula.activa) estadoAlumno = "activo";
+            else if (estadoMatricula.inactiva) estadoAlumno = "inactivo";
             return {
               id: a.id,
               nombre: (a.nombre || "").trim(),
@@ -74,9 +98,10 @@ export default function FichaCumplesAlumnos() {
               fecha_nacimiento: a.fecha_nacimiento,
               dia: f?.d || null,
               mes: f?.m || null,
+              estado: estadoAlumno,
             };
           })
-          .filter((a) => a.dia && a.mes);
+          .filter((a) => a.dia && a.mes && a.estado !== "sin_matricula");
         setAlumnos(lista);
       } catch {
         setError("No pude cargar los cumpleaños.");
@@ -84,9 +109,14 @@ export default function FichaCumplesAlumnos() {
     })();
   }, [config]);
 
+  const alumnosFiltrados = useMemo(() => {
+    if (filtroEstado === "ambos") return alumnos;
+    return alumnos.filter((a) => a.estado === filtroEstado);
+  }, [alumnos, filtroEstado]);
+
   const cumplePorDia = useMemo(() => {
     const map = new Map();
-    alumnos
+    alumnosFiltrados
       .filter((a) => a.mes === mesSeleccionado)
       .forEach((a) => {
         const key = String(a.dia);
@@ -94,7 +124,7 @@ export default function FichaCumplesAlumnos() {
         map.get(key).push(a);
       });
     return map;
-  }, [alumnos, mesSeleccionado]);
+  }, [alumnosFiltrados, mesSeleccionado]);
 
   const alumnosDia = useMemo(() => {
     if (!diaSeleccionado) return [];
@@ -139,7 +169,7 @@ export default function FichaCumplesAlumnos() {
       </div>
 
       <div className="bg-white rounded-xl shadow p-4 md:p-6">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center">
           <label className="text-sm font-medium">Mes:</label>
           <select
             className="border rounded px-3 py-2 text-sm"
@@ -154,6 +184,19 @@ export default function FichaCumplesAlumnos() {
                 {m}
               </option>
             ))}
+          </select>
+          <label className="text-sm font-medium md:ml-4">Estado:</label>
+          <select
+            className="border rounded px-3 py-2 text-sm"
+            value={filtroEstado}
+            onChange={(e) => {
+              setFiltroEstado(e.target.value);
+              setDiaSeleccionado(null);
+            }}
+          >
+            <option value="ambos">Activos e inactivos</option>
+            <option value="activo">Solo activos</option>
+            <option value="inactivo">Solo inactivos</option>
           </select>
         </div>
 
@@ -200,8 +243,19 @@ export default function FichaCumplesAlumnos() {
               {alumnosDia.map((a) => (
                 <div key={a.id} className="border rounded-lg px-3 py-2 bg-gray-50 text-sm">
                   <div className="font-medium flex items-center justify-between gap-2">
-                    <span>
-                      {a.nombre} {a.apellido}
+                    <span className="flex items-center gap-2">
+                      <span>
+                        {a.nombre} {a.apellido}
+                      </span>
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                          a.estado === "activo"
+                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                            : "border-amber-300 bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {a.estado === "activo" ? "Activo" : "Inactivo"}
+                      </span>
                     </span>
                     {a.telefono ? (
                       <a
