@@ -27,7 +27,7 @@ export default function FichaInactivos() {
 
     const [resInactivos, resActivas] = await Promise.all([
       fetch(
-        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,estado,ciclo_codigo,curso_nombre,sede,dia,hora,inscripciones(persona_id,nombre,apellido,telefono)&estado=not.ilike.activa`,
+        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,estado,ciclo_codigo,curso_nombre,sede,dia,hora,creado_en,inscripciones(persona_id,nombre,apellido,telefono)&estado=not.ilike.activa&order=creado_en.desc&order=id.desc`,
         { headers }
       ),
       fetch(
@@ -45,12 +45,19 @@ export default function FichaInactivos() {
       })
     );
 
-    const lista = (Array.isArray(dataInactivos) ? dataInactivos : []).map((m) => {
+    const lista = [];
+    const alumnosVistos = new Set();
+
+    (Array.isArray(dataInactivos) ? dataInactivos : []).forEach((m) => {
       const alumno = Array.isArray(m.inscripciones) ? m.inscripciones[0] : m.inscripciones || {};
-      return {
+      const personaId = String(alumno.persona_id || m.alumno_id || "");
+      if (!personaId || alumnosConActiva.has(personaId) || alumnosVistos.has(personaId)) return;
+
+      alumnosVistos.add(personaId);
+      lista.push({
         id: m.id,
         alumno_id: m.alumno_id,
-        persona_id: alumno.persona_id || m.alumno_id,
+        persona_id: personaId,
         nombre: alumno.nombre || "",
         apellido: alumno.apellido || "",
         telefono: alumno.telefono || "",
@@ -60,8 +67,9 @@ export default function FichaInactivos() {
         sede: m.sede || "",
         dia: m.dia || "",
         hora: m.hora || "",
-      };
-    }).filter((m) => !alumnosConActiva.has(String(m.persona_id || m.alumno_id)));
+      });
+    });
+
     lista.sort((a, b) => a.nombre.localeCompare(b.nombre));
     setAlumnos(lista);
   }
