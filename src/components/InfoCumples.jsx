@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaMoneyBillWave, FaWhatsapp } from "react-icons/fa";
+import { FaArrowRight, FaMoneyBillWave, FaWhatsapp } from "react-icons/fa";
 
 export default function InfoCumples() {
   const navigate = useNavigate();
@@ -68,6 +68,7 @@ export default function InfoCumples() {
   const whatsappHref = `https://wa.me/${telefonoWhatsapp}?text=${encodeURIComponent(
     mensajeWhatsapp
   )}`;
+  const reservaHref = `/cumples-reservas?from=${encodeURIComponent(from || "menu-padres")}&origin=info-cumples`;
 
   return (
     <div className="w-full mt-8 px-2 sm:px-4 lg:px-6">
@@ -229,15 +230,27 @@ export default function InfoCumples() {
         </div>
 
       </div>
-      <a
-        href={whatsappHref}
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Consultar por WhatsApp"
-        className="fixed bottom-5 right-5 z-[9999] h-14 w-14 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg border border-green-600 flex items-center justify-center"
-      >
-        <FaWhatsapp className="text-3xl" />
-      </a>
+      {mostrarPrecioInfo ? (
+        <button
+          type="button"
+          onClick={() => navigate(reservaHref)}
+          aria-label="Avanzar para comenzar la reserva"
+          className="fixed bottom-5 right-5 z-[9999] flex items-center gap-2 rounded-full bg-sky-600 hover:bg-sky-700 text-white shadow-lg border border-sky-700 px-4 py-3"
+        >
+          <span className="text-sm font-semibold whitespace-nowrap">Avanzar reserva</span>
+          <FaArrowRight className="text-lg" />
+        </button>
+      ) : (
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Consultar por WhatsApp"
+          className="fixed bottom-5 right-5 z-[9999] h-14 w-14 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg border border-green-600 flex items-center justify-center"
+        >
+          <FaWhatsapp className="text-3xl" />
+        </a>
+      )}
     </div>
   );
 }
