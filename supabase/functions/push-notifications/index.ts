@@ -111,6 +111,30 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       body: `${formatCurrency(eventPayload.amount)}${method ? ` en ${method}` : ""}${names.length ? ` — ${names.join(", ")}` : ""}${concepts.length ? ` — ${concepts.join(" e ")}` : ""}.`,
       url: "/pagos?from=pagos-menu",
     };
+  } else if (event.event_type === "attendance_recorded") {
+    const present = Number(eventPayload.present || 0);
+    const absent = Number(eventPayload.absent || 0);
+    notification = {
+      title: "Asistencia registrada",
+      body: `${eventPayload.site || "Sede"} · ${eventPayload.shift || "Turno"} — ${present} presente${present === 1 ? "" : "s"}, ${absent} ausente${absent === 1 ? "" : "s"}.`,
+      url: "/asistencias?from=asistencia-menu",
+    };
+  } else if (event.event_type === "daily_summary") {
+    const missingSessions = Array.isArray(eventPayload.missing_sessions)
+      ? eventPayload.missing_sessions
+      : [];
+    const visibleMissing = missingSessions
+      .slice(0, 5)
+      .map((item) => `${item.site || "Sede"} (${item.shift || "turno"})`);
+    const missingText = missingSessions.length
+      ? `Falta asistencia: ${visibleMissing.join(", ")}${missingSessions.length > visibleMissing.length ? ` y ${missingSessions.length - visibleMissing.length} más` : ""}.`
+      : "Asistencias completas.";
+    const paymentCount = Number(eventPayload.payments_count || 0);
+    notification = {
+      title: "Resumen del día",
+      body: `Pagos: ${paymentCount} por ${formatCurrency(eventPayload.payments_total)} (efectivo ${formatCurrency(eventPayload.cash_total)} · transferencias ${formatCurrency(eventPayload.transfer_total)}). ${missingText}`,
+      url: "/menu-resumen",
+    };
   } else {
     await fetch(`${supabaseUrl}/rest/v1/notification_events?id=eq.${event.id}`, {
       method: "PATCH",

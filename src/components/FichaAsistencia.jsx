@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+const fechaHoyArgentina = () => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+};
+
 const FichaAsistencia = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -133,7 +144,7 @@ const FichaAsistencia = () => {
   const cargarListaTurno = async () => {
     if (!config || !sede || !dia || !horario) return;
 
-    const fechaISO = fecha || new Date().toISOString().split("T")[0];
+    const fechaISO = fecha || fechaHoyArgentina();
     const headersAuth = {
       apikey: config.supabaseKey,
       Authorization: `Bearer ${config.supabaseKey}`,
@@ -246,7 +257,7 @@ const FichaAsistencia = () => {
 
     setGuardando(true);
 
-    const fechaISO = fecha || new Date().toISOString().split("T")[0];
+    const fechaISO = fecha || fechaHoyArgentina();
     const headersAuth = { apikey: config.supabaseKey, Authorization: `Bearer ${config.supabaseKey}` };
     const headersJson = { ...headersAuth, "Content-Type": "application/json" };
 
@@ -357,10 +368,38 @@ const FichaAsistencia = () => {
         );
       });
 
-      if (ops.length > 0) await Promise.all(ops);
+      if (ops.length > 0) {
+        const resultados = await Promise.all(ops);
+        if (resultados.some((resultado) => !resultado.ok)) {
+          throw new Error("No se pudieron guardar todos los registros de asistencia.");
+        }
+      }
 
       for (const alumnoRecupera of recuperacionesPresentes) {
         await marcarAusenciaRecuperada(headersAuth, headersJson, alumnoRecupera.alumno_id, fechaISO);
+      }
+
+      const sessionResponse = await fetch(
+        `${config.supabaseUrl}/rest/v1/attendance_sessions?on_conflict=attendance_date,site,shift`,
+        {
+          method: "POST",
+          headers: {
+            ...headersJson,
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify({
+            attendance_date: fechaISO,
+            site: sede,
+            shift: turnoCompleto,
+            present_count: presentes.length + recuperacionesPresentes.length,
+            absent_count: ausentes.length,
+            recovery_count: recuperacionesPresentes.length,
+            updated_at: new Date().toISOString(),
+          }),
+        }
+      );
+      if (!sessionResponse.ok) {
+        throw new Error("No se pudo cerrar la asistencia del turno.");
       }
 
       setMensaje("Asistencia guardada correctamente.");
