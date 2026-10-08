@@ -39,7 +39,9 @@ export default function InstalarApp() {
   }, []);
 
   useEffect(() => {
-    const result = new URLSearchParams(window.location.search).get("googleContacts");
+    const query = new URLSearchParams(window.location.search);
+    const result = query.get("googleContacts");
+    const reason = query.get("reason");
     if (result === "connected") {
       setMensaje("Google Contactos quedó conectado correctamente.");
       window.history.replaceState({}, "", "/instalar-app");
@@ -47,7 +49,15 @@ export default function InstalarApp() {
       setMensaje("La conexión debe hacerse con plugin.robotica@gmail.com.");
       window.history.replaceState({}, "", "/instalar-app");
     } else if (result === "error") {
-      setMensaje("No se pudo completar la conexión con Google Contactos.");
+      const details = {
+        invalid_client: "Las credenciales de Google no coinciden.",
+        invalid_grant: "Google rechazó o venció la autorización. Intentá conectarla nuevamente.",
+        "missing-refresh-token": "Google no entregó el permiso permanente. Intentá conectarla nuevamente.",
+        access_denied: "El permiso fue cancelado en Google.",
+      };
+      setMensaje(
+        `No se pudo completar la conexión con Google Contactos. ${details[reason] || "Intentá nuevamente."}`
+      );
       window.history.replaceState({}, "", "/instalar-app");
     }
 

@@ -9,6 +9,11 @@ const redirectUri =
 const appUrl = "https://gestionplugin2.netlify.app/instalar-app";
 const expectedEmail = "plugin.robotica@gmail.com";
 
+const oauthErrorReason = (value: unknown) => {
+  const reason = String(value || "").toLowerCase();
+  return /^[a-z0-9_-]{1,50}$/.test(reason) ? reason : "token-exchange";
+};
+
 const jsonResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
     status,
@@ -131,9 +136,16 @@ Deno.serve(async (request) => {
         }),
       });
       const tokenData = await tokenResponse.json();
-      if (!tokenResponse.ok || !tokenData.refresh_token || !tokenData.access_token) {
+      if (!tokenResponse.ok) {
         console.error("Google no devolvió tokens", tokenData);
-        return Response.redirect(`${appUrl}?googleContacts=error`, 302);
+        return Response.redirect(
+          `${appUrl}?googleContacts=error&reason=${encodeURIComponent(oauthErrorReason(tokenData.error))}`,
+          302,
+        );
+      }
+      if (!tokenData.refresh_token || !tokenData.access_token) {
+        console.error("Google no devolvió el refresh token requerido");
+        return Response.redirect(`${appUrl}?googleContacts=error&reason=missing-refresh-token`, 302);
       }
 
       const userResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
