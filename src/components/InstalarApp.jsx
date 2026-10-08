@@ -13,6 +13,7 @@ export default function InstalarApp() {
   const [mensaje, setMensaje] = useState("");
   const [codigoPrivado, setCodigoPrivado] = useState("");
   const [activandoNotificaciones, setActivandoNotificaciones] = useState(false);
+  const [enviandoPrueba, setEnviandoPrueba] = useState(false);
   const [notificacionesActivas, setNotificacionesActivas] = useState(
     () => typeof Notification !== "undefined" && Notification.permission === "granted"
   );
@@ -129,6 +130,30 @@ export default function InstalarApp() {
     }
   };
 
+  const enviarNotificacionPrueba = async () => {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      setMensaje("Primero tenés que activar las notificaciones en este celular.");
+      return;
+    }
+
+    try {
+      setEnviandoPrueba(true);
+      setMensaje("");
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification("PLUGIN Gestión", {
+        body: "¡La notificación de prueba funciona correctamente!",
+        icon: "/app-icon-192.png",
+        badge: "/notification-badge-96.png",
+        data: { url: "/menu-gestion" },
+      });
+      setMensaje("Notificación de prueba enviada.");
+    } catch (error) {
+      setMensaje(`No se pudo enviar la prueba: ${error.message || error}`);
+    } finally {
+      setEnviandoPrueba(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 text-center">
@@ -194,6 +219,16 @@ export default function InstalarApp() {
               ? "Registrar nuevamente y probar"
               : "Activar notificaciones"}
           </button>
+          {notificacionesActivas && (
+            <button
+              type="button"
+              onClick={enviarNotificacionPrueba}
+              disabled={enviandoPrueba}
+              className="w-full mt-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-semibold py-3 px-5 rounded-xl shadow"
+            >
+              {enviandoPrueba ? "Enviando prueba..." : "Enviar notificación de prueba"}
+            </button>
+          )}
         </div>
 
         <button
