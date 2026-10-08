@@ -46,6 +46,11 @@ const formatCurrency = (value: unknown) =>
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
 
+const formatDate = (value: unknown) => {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value || "");
+};
+
 const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
   if (typeof eventId !== "string" || !/^[0-9a-f-]{36}$/i.test(eventId)) {
     return jsonResponse(400, { ok: false, error: "Evento inválido" });
@@ -75,10 +80,27 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
   let notification: { title: string; body: string; url: string };
 
   if (event.event_type === "new_student") {
-    const details = [eventPayload.course, eventPayload.site, eventPayload.schedule].filter(Boolean);
+    const details: string[] = [];
+    const addDetail = (label: string, value: unknown) => {
+      const text = String(value ?? "").trim();
+      if (text) details.push(`${label}: ${text}`);
+    };
+    addDetail("Alumno", eventPayload.name);
+    addDetail("Nacimiento", formatDate(eventPayload.birth_date));
+    addDetail("Edad", eventPayload.age !== null && eventPayload.age !== undefined ? `${eventPayload.age} años` : "");
+    addDetail("Escuela", eventPayload.school);
+    addDetail("Responsable", eventPayload.responsible);
+    addDetail("Teléfono", eventPayload.phone);
+    addDetail("Email", eventPayload.email);
+    addDetail("Ciclo", eventPayload.cycle || eventPayload.enrollment_type);
+    addDetail("Curso", eventPayload.course);
+    addDetail("Sede", eventPayload.site);
+    addDetail("Turno", eventPayload.schedule);
+    addDetail("Estado", eventPayload.wait_list ? "Lista de espera" : "Inscripción confirmada");
+    addDetail("Comentarios", String(eventPayload.comments || "").slice(0, 500));
     notification = {
-      title: eventPayload.wait_list ? "Nuevo alumno en lista de espera" : "Nuevo alumno",
-      body: `${eventPayload.name || "Alumno"} se inscribió${details.length ? ` — ${details.join(" · ")}` : ""}.`,
+      title: eventPayload.wait_list ? "Nuevo alumno en lista de espera" : "Nuevo alumno inscripto",
+      body: details.join("\n"),
       url: `/ficha-alumno/${eventPayload.student_id}`,
     };
   } else if (event.event_type === "payment_received") {
