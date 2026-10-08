@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "PLUGIN Gestión",
+  "short_name": "PLUGIN",
+  "description": "Sistema de gestión de PLUGIN Robótica y Programación",
+  "lang": "es-AR",
+  "start_url": "/menu-gestion",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f3f4f6",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
