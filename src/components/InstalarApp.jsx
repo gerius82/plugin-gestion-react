@@ -54,7 +54,7 @@ export default function InstalarApp() {
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 text-center">
         <img
-          src="/app-icon.svg"
+          src="/app-icon-512.png"
           alt="Ícono de PLUGIN Gestión"
           className="w-24 h-24 mx-auto mb-4 rounded-2xl shadow"
         />
