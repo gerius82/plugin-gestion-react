@@ -403,37 +403,34 @@ export default function FichaPagos() {
         return;
       }
 
-      const results = await Promise.all(
-        payloads.map(async (body) => {
-          const res = await fetch(`${config.supabaseUrl}/rest/v1/pagos`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(body),
-          });
-          if (res.ok) return res;
+      let paymentResponse = await fetch(`${config.supabaseUrl}/rest/v1/pagos`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payloads),
+      });
 
-          const errTxt = await res.text();
-          const schemaError =
-            errTxt.includes("descuento_pct") || errTxt.includes("descuento_detalle");
+      if (!paymentResponse.ok) {
+        const errTxt = await paymentResponse.text();
+        const schemaError =
+          errTxt.includes("descuento_pct") || errTxt.includes("descuento_detalle");
 
-          if (!schemaError) {
-            return { ok: false, _errorText: errTxt };
-          }
+        if (!schemaError) {
+          setMensaje(`Error al registrar pago: ${errTxt || "Error"}`);
+          return;
+        }
 
-          const { descuento_pct, descuento_detalle, ...bodySinDescuento } = body;
-          const retry = await fetch(`${config.supabaseUrl}/rest/v1/pagos`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(bodySinDescuento),
-          });
-          if (retry.ok) return retry;
-          const retryErrTxt = await retry.text();
-          return { ok: false, _errorText: retryErrTxt };
-        })
-      );
-      const allOk = results.every((r) => r.ok);
-      if (!allOk) {
-        const errTxt = results.find((r) => !r.ok)?._errorText;
+        const payloadsSinDescuento = payloads.map(
+          ({ descuento_pct, descuento_detalle, ...bodySinDescuento }) => bodySinDescuento
+        );
+        paymentResponse = await fetch(`${config.supabaseUrl}/rest/v1/pagos`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payloadsSinDescuento),
+        });
+      }
+
+      if (!paymentResponse.ok) {
+        const errTxt = await paymentResponse.text();
         setMensaje(`Error al registrar pago: ${errTxt || "Error"}`);
         return;
       }
