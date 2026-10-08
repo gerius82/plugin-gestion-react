@@ -14,6 +14,8 @@ export default function InstalarApp() {
   const [codigoPrivado, setCodigoPrivado] = useState("");
   const [activandoNotificaciones, setActivandoNotificaciones] = useState(false);
   const [enviandoPrueba, setEnviandoPrueba] = useState(false);
+  const [conectandoGoogle, setConectandoGoogle] = useState(false);
+  const [googleContacts, setGoogleContacts] = useState({ connected: false, accountEmail: null });
   const [notificacionesActivas, setNotificacionesActivas] = useState(
     () => typeof Notification !== "undefined" && Notification.permission === "granted"
   );
@@ -34,6 +36,39 @@ export default function InstalarApp() {
       window.removeEventListener("plugin-install-available", habilitarInstalacion);
       window.removeEventListener("appinstalled", confirmarInstalacion);
     };
+  }, []);
+
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get("googleContacts");
+    if (result === "connected") {
+      setMensaje("Google Contactos quedó conectado correctamente.");
+      window.history.replaceState({}, "", "/instalar-app");
+    } else if (result === "wrong-account") {
+      setMensaje("La conexión debe hacerse con plugin.robotica@gmail.com.");
+      window.history.replaceState({}, "", "/instalar-app");
+    } else if (result === "error") {
+      setMensaje("No se pudo completar la conexión con Google Contactos.");
+      window.history.replaceState({}, "", "/instalar-app");
+    }
+
+    (async () => {
+      try {
+        const config = await (await fetch("/config.json")).json();
+        const response = await fetch(
+          `${config.supabaseUrl}/functions/v1/google-contacts-oauth?action=status`,
+          { headers: { apikey: config.supabaseKey } }
+        );
+        const data = await response.json();
+        if (response.ok) {
+          setGoogleContacts({
+            connected: !!data.connected,
+            accountEmail: data.accountEmail || null,
+          });
+        }
+      } catch {
+        setGoogleContacts({ connected: false, accountEmail: null });
+      }
+    })();
   }, []);
 
   const instalar = async () => {
@@ -154,6 +189,39 @@ export default function InstalarApp() {
     }
   };
 
+  const conectarGoogleContacts = async () => {
+    if (!codigoPrivado.trim()) {
+      setMensaje("Ingresá el código privado para conectar Google Contactos.");
+      return;
+    }
+
+    try {
+      setConectandoGoogle(true);
+      setMensaje("");
+      const config = await (await fetch("/config.json")).json();
+      const response = await fetch(
+        `${config.supabaseUrl}/functions/v1/google-contacts-oauth`,
+        {
+          method: "POST",
+          headers: {
+            apikey: config.supabaseKey,
+            "Content-Type": "application/json",
+            "x-admin-code": codigoPrivado.trim(),
+          },
+          body: JSON.stringify({ action: "start" }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok || !data.authorizationUrl) {
+        throw new Error(data?.error || "No se pudo iniciar la conexión");
+      }
+      window.location.assign(data.authorizationUrl);
+    } catch (error) {
+      setMensaje(`No se pudo conectar Google Contactos: ${error.message || error}`);
+      setConectandoGoogle(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 text-center">
@@ -229,6 +297,33 @@ export default function InstalarApp() {
               {enviandoPrueba ? "Enviando prueba..." : "Enviar notificación de prueba"}
             </button>
           )}
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-gray-200 text-left">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Google Contactos</h2>
+          <p className="text-sm text-gray-600 mb-3">
+            Guarda automáticamente el teléfono de cada familia en la cuenta institucional y agrupa hermanos que comparten número.
+          </p>
+          {googleContacts.connected && (
+            <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              Conectado con {googleContacts.accountEmail}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={conectarGoogleContacts}
+            disabled={conectandoGoogle}
+            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold py-3 px-5 rounded-xl shadow"
+          >
+            {conectandoGoogle
+              ? "Conectando..."
+              : googleContacts.connected
+              ? "Reconectar Google Contactos"
+              : "Conectar Google Contactos"}
+          </button>
+          <p className="mt-2 text-xs text-gray-500">
+            Utiliza el mismo código privado del registro de notificaciones.
+          </p>
         </div>
 
         <button

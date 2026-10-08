@@ -51,6 +51,174 @@ const formatDate = (value: unknown) => {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : String(value || "");
 };
 
+const fromBase64Url = (value: string) =>
+  Uint8Array.from(
+    atob(
+      value.replace(/-/g, "+").replace(/_/g, "/") +
+        "=".repeat((4 - value.length % 4) % 4),
+    ),
+    (character) => character.charCodeAt(0),
+  );
+
+const decryptGoogleRefreshToken = async (ciphertext: string, iv: string) => {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    Uint8Array.from(atob(requiredSecret("GOOGLE_CONTACTS_TOKEN_KEY")), (character) =>
+      character.charCodeAt(0)
+    ),
+    "AES-GCM",
+    false,
+    ["decrypt"],
+  );
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: fromBase64Url(iv) },
+    key,
+    fromBase64Url(ciphertext),
+  );
+  return new TextDecoder().decode(decrypted);
+};
+
+const joinNames = (names: string[]) => {
+  if (names.length < 2) return names[0] || "";
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} y ${names.at(-1)}`;
+};
+
+const syncStudentToGoogleContacts = async (
+  eventPayload: Record<string, unknown>,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+) => {
+  const normalizedPhone = String(eventPayload.phone || "").replace(/\D/g, "");
+  if (!normalizedPhone) return;
+
+  const connectionResponse = await fetch(
+    `${supabaseUrl}/rest/v1/google_contacts_connection?id=eq.1&select=refresh_token_ciphertext,refresh_token_iv`,
+    { headers: databaseHeaders(serviceRoleKey) },
+  );
+  if (!connectionResponse.ok) {
+    throw new Error("No se pudo consultar la conexión con Google Contactos");
+  }
+  const connectionRows = await connectionResponse.json();
+  const connection = Array.isArray(connectionRows) ? connectionRows[0] : null;
+  if (!connection) return;
+
+  const studentsResponse = await fetch(
+    `${supabaseUrl}/rest/v1/inscripciones?activo=eq.true&select=id,nombre,apellido,telefono,creado_en&order=creado_en.asc`,
+    { headers: databaseHeaders(serviceRoleKey) },
+  );
+  if (!studentsResponse.ok) throw new Error("No se pudieron buscar los hermanos");
+  const students = (await studentsResponse.json() as Array<Record<string, unknown>>)
+    .filter((student) => String(student.telefono || "").replace(/\D/g, "") === normalizedPhone);
+  if (!students.length) return;
+
+  const uniqueStudents = [...new Map(students.map((student) => [String(student.id), student])).values()];
+  const surnames = uniqueStudents.map((student) => String(student.apellido || "").trim()).filter(Boolean);
+  const sameSurname = surnames.length === uniqueStudents.length &&
+    surnames.every((surname) => surname.localeCompare(surnames[0], "es", { sensitivity: "base" }) === 0);
+  const givenNames = sameSurname
+    ? uniqueStudents.map((student) => String(student.nombre || "").trim()).filter(Boolean)
+    : uniqueStudents.map((student) =>
+      `${String(student.nombre || "").trim()} ${String(student.apellido || "").trim()}`.trim()
+    ).filter(Boolean);
+  const contactName = joinNames(givenNames);
+  const familyName = sameSurname ? surnames[0] : "";
+  if (!contactName) return;
+
+  const refreshToken = await decryptGoogleRefreshToken(
+    connection.refresh_token_ciphertext,
+    connection.refresh_token_iv,
+  );
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: requiredSecret("GOOGLE_CONTACTS_CLIENT_ID"),
+      client_secret: requiredSecret("GOOGLE_CONTACTS_CLIENT_SECRET"),
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  const tokenData = await tokenResponse.json();
+  if (!tokenResponse.ok || !tokenData.access_token) {
+    throw new Error("Google rechazó la renovación del acceso a Contactos");
+  }
+  const googleHeaders = {
+    Authorization: `Bearer ${tokenData.access_token}`,
+    "Content-Type": "application/json",
+  };
+
+  const linkResponse = await fetch(
+    `${supabaseUrl}/rest/v1/google_contact_links?normalized_phone=eq.${encodeURIComponent(normalizedPhone)}&select=resource_name`,
+    { headers: databaseHeaders(serviceRoleKey) },
+  );
+  const linkRows = linkResponse.ok ? await linkResponse.json() : [];
+  const linkedResource = Array.isArray(linkRows) ? linkRows[0]?.resource_name : null;
+
+  const personBody: Record<string, unknown> = {
+    names: [{ givenName: contactName, ...(familyName ? { familyName } : {}) }],
+    phoneNumbers: [{ value: normalizedPhone, type: "mobile" }],
+  };
+  let savedPerson: Record<string, unknown> | null = null;
+
+  if (linkedResource) {
+    const existingResponse = await fetch(
+      `https://people.googleapis.com/v1/${linkedResource}?personFields=names,phoneNumbers,metadata`,
+      { headers: googleHeaders },
+    );
+    if (existingResponse.ok) {
+      const existingPerson = await existingResponse.json();
+      const updateResponse = await fetch(
+        `https://people.googleapis.com/v1/${linkedResource}:updateContact?updatePersonFields=names,phoneNumbers&personFields=names,phoneNumbers,metadata`,
+        {
+          method: "PATCH",
+          headers: googleHeaders,
+          body: JSON.stringify({
+            ...personBody,
+            etag: existingPerson.etag,
+            metadata: existingPerson.metadata,
+          }),
+        },
+      );
+      if (!updateResponse.ok) {
+        throw new Error(`Google no pudo actualizar el contacto (${updateResponse.status})`);
+      }
+      savedPerson = await updateResponse.json();
+    } else if (existingResponse.status !== 404) {
+      throw new Error(`Google no pudo consultar el contacto (${existingResponse.status})`);
+    }
+  }
+
+  if (!savedPerson) {
+    const createResponse = await fetch(
+      "https://people.googleapis.com/v1/people:createContact?personFields=names,phoneNumbers,metadata",
+      { method: "POST", headers: googleHeaders, body: JSON.stringify(personBody) },
+    );
+    if (!createResponse.ok) {
+      throw new Error(`Google no pudo crear el contacto (${createResponse.status})`);
+    }
+    savedPerson = await createResponse.json();
+  }
+
+  const resourceName = String(savedPerson.resourceName || "");
+  if (!resourceName) throw new Error("Google no devolvió el identificador del contacto");
+  const saveLinkResponse = await fetch(
+    `${supabaseUrl}/rest/v1/google_contact_links?on_conflict=normalized_phone`,
+    {
+      method: "POST",
+      headers: databaseHeaders(serviceRoleKey, "resolution=merge-duplicates,return=minimal"),
+      body: JSON.stringify({
+        normalized_phone: normalizedPhone,
+        resource_name: resourceName,
+        etag: String(savedPerson.etag || ""),
+        display_name: `${contactName}${familyName ? ` ${familyName}` : ""}`,
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  );
+  if (!saveLinkResponse.ok) throw new Error("No se pudo guardar el vínculo del contacto");
+};
+
 const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
   if (typeof eventId !== "string" || !/^[0-9a-f-]{36}$/i.test(eventId)) {
     return jsonResponse(400, { ok: false, error: "Evento inválido" });
@@ -164,6 +332,14 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       body: JSON.stringify({ status: "failed", error: "Tipo de evento desconocido", processed_at: new Date().toISOString() }),
     });
     return jsonResponse(400, { ok: false, error: "Tipo de evento desconocido" });
+  }
+
+  if (event.event_type === "new_student") {
+    try {
+      await syncStudentToGoogleContacts(eventPayload, supabaseUrl, serviceRoleKey);
+    } catch (error) {
+      console.error("No se pudo sincronizar Google Contactos", error);
+    }
   }
 
   const subscriptionsResponse = await fetch(
