@@ -18,7 +18,7 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(payload.title || "PLUGIN Gestión", {
       body: payload.body || "Tenés una nueva notificación.",
       icon: "/app-icon-192.png",
-      badge: "/app-icon-192.png",
+      badge: "/notification-badge-96.png",
       data: { url: payload.url || "/menu-gestion" },
     })
   );
