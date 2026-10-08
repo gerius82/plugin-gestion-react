@@ -43,7 +43,7 @@ export default function FichaPagos() {
   const [grupoIntegrantes, setGrupoIntegrantes] = useState([]);
   const [grupoDescuento, setGrupoDescuento] = useState(null);
   const [promoDobleTurno, setPromoDobleTurno] = useState(false);
-  const [pagarGrupo, setPagarGrupo] = useState(false);
+  const [integrantesPagoIds, setIntegrantesPagoIds] = useState([]);
   const [pagarTodosLosTurnosCurso, setPagarTodosLosTurnosCurso] = useState(false);
   const [descuentoExtraPct, setDescuentoExtraPct] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -110,12 +110,26 @@ export default function FichaPagos() {
     setPagaMes(true);
     setPagaInscripcion(false);
     setMedioPago("transferencia");
-    setPagarGrupo(false);
+    setIntegrantesPagoIds(
+      matriculaSel?.alumno_id ? [String(matriculaSel.alumno_id)] : []
+    );
     setPagarTodosLosTurnosCurso(false);
     setPagaProporcional(false);
     setDescuentoExtraPct("");
     setPromoDobleTurno(false);
   }, [matriculaId]);
+
+  useEffect(() => {
+    if (grupoIntegrantes.length < 2 || !matriculaSel?.alumno_id) return;
+
+    const idsDisponibles = new Set(grupoIntegrantes.map((integrante) => String(integrante.id)));
+    const alumnoActualId = String(matriculaSel.alumno_id);
+    setIntegrantesPagoIds((anteriores) => {
+      const validos = anteriores.filter((id) => idsDisponibles.has(String(id)));
+      if (validos.length) return validos;
+      return idsDisponibles.has(alumnoActualId) ? [alumnoActualId] : [];
+    });
+  }, [grupoIntegrantes, matriculaSel?.alumno_id]);
 
   const normalizarDia = (v) =>
     String(v || "")
@@ -235,10 +249,10 @@ export default function FichaPagos() {
     const promoPct = aplicaPromo ? (aplicaGrupo ? Math.max(pctGrupo, pctDobleTurno) : pctDobleTurno) : 0;
     const factorPromo = 1 - promoPct / 100;
     const cantidad =
-      grupoIntegrantes.length >= 2 && pagarGrupo
-        ? grupoIntegrantes.length
-        : pagarTodosLosTurnosCurso
+      pagarTodosLosTurnosCurso
         ? Math.max(1, Number(matriculaSel?.cantidadTurnosMismoCurso || 1))
+        : grupoIntegrantes.length >= 2
+        ? integrantesPagoIds.length
         : 1;
     let monto = 0;
     if (pagaMes) {
@@ -322,11 +336,16 @@ export default function FichaPagos() {
       return;
     }
 
-    const total = calcularTotal();
     const idsGrupo =
-      grupoIntegrantes.length >= 2 && pagarGrupo
-        ? Array.from(new Set(grupoIntegrantes.map((g) => g.id).filter(Boolean)))
+      grupoIntegrantes.length >= 2
+        ? Array.from(new Set(integrantesPagoIds.filter(Boolean)))
         : [matriculaSel.alumno_id];
+    if (!idsGrupo.length) {
+      setMensaje("Seleccioná al menos un alumno para registrar el pago.");
+      return;
+    }
+
+    const total = calcularTotal();
     const { descuentoPct, descuentoDetalle } = construirDescuentoPago();
     const payloads = idsGrupo.map((alumnoId) => ({
       alumno_id: alumnoId,
@@ -533,7 +552,9 @@ export default function FichaPagos() {
                       checked={pagarTodosLosTurnosCurso}
                       onChange={(e) => {
                         setPagarTodosLosTurnosCurso(e.target.checked);
-                        if (e.target.checked) setPagarGrupo(false);
+                        if (e.target.checked && matriculaSel?.alumno_id) {
+                          setIntegrantesPagoIds([String(matriculaSel.alumno_id)]);
+                        }
                       }}
                     />
                     <span>
@@ -543,20 +564,69 @@ export default function FichaPagos() {
                 )}
 
                 {grupoIntegrantes.length >= 2 && (
-                  <label className="flex items-center gap-2 text-sm mt-2">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4"
-                      checked={pagarGrupo}
-                      onChange={(e) => {
-                        setPagarGrupo(e.target.checked);
-                        if (e.target.checked) setPagarTodosLosTurnosCurso(false);
-                      }}
-                    />
-                    <span>
-                      Pagar grupo completo ({grupoIntegrantes.length} alumnos)
-                    </span>
-                  </label>
+                  <div className="mt-3 rounded-lg border border-green-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="font-semibold text-gray-800">Alumnos incluidos en este pago</span>
+                      <span className="text-xs text-green-700 font-medium">
+                        {integrantesPagoIds.length} de {grupoIntegrantes.length}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {grupoIntegrantes.map((integrante) => {
+                        const integranteId = String(integrante.id);
+                        const seleccionado = integrantesPagoIds.includes(integranteId);
+                        const esUltimoSeleccionado = seleccionado && integrantesPagoIds.length === 1;
+                        return (
+                          <label
+                            key={integrante.id}
+                            className="flex items-center gap-2 text-sm cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4"
+                              checked={seleccionado}
+                              disabled={esUltimoSeleccionado}
+                              onChange={(e) => {
+                                setIntegrantesPagoIds((anteriores) =>
+                                  e.target.checked
+                                    ? Array.from(new Set([...anteriores, integranteId]))
+                                    : anteriores.filter((id) => id !== integranteId)
+                                );
+                                if (e.target.checked) setPagarTodosLosTurnosCurso(false);
+                              }}
+                            />
+                            <span>
+                              {`${integrante.nombre || ""} ${integrante.apellido || ""}`.trim()}
+                              {integranteId === String(matriculaSel.alumno_id) ? " (seleccionado)" : ""}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 text-xs rounded border border-gray-300 hover:bg-gray-100"
+                        onClick={() => {
+                          setIntegrantesPagoIds([String(matriculaSel.alumno_id)]);
+                        }}
+                      >
+                        Solo este alumno
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 text-xs rounded border border-green-300 text-green-700 hover:bg-green-50"
+                        onClick={() => {
+                          setIntegrantesPagoIds(grupoIntegrantes.map((integrante) => String(integrante.id)));
+                          setPagarTodosLosTurnosCurso(false);
+                        }}
+                      >
+                        Seleccionar grupo completo
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 
