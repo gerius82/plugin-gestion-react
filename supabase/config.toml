@@ -389,6 +389,9 @@ verify_jwt = false
 [functions.google-contacts-oauth]
 verify_jwt = false
 
+[functions.whatsapp-webhook]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
