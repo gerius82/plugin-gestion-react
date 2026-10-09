@@ -310,19 +310,32 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       url: "/asistencias?from=asistencia-menu",
     };
   } else if (event.event_type === "daily_summary") {
-    const missingSessions = Array.isArray(eventPayload.missing_sessions)
-      ? eventPayload.missing_sessions
+    const attendanceSessions = Array.isArray(eventPayload.attendance_sessions)
+      ? eventPayload.attendance_sessions
       : [];
-    const visibleMissing = missingSessions
-      .slice(0, 5)
-      .map((item) => `${item.site || "Sede"} (${item.shift || "turno"})`);
-    const missingText = missingSessions.length
-      ? `Falta asistencia: ${visibleMissing.join(", ")}${missingSessions.length > visibleMissing.length ? ` y ${missingSessions.length - visibleMissing.length} más` : ""}.`
-      : "Asistencias completas.";
-    const paymentCount = Number(eventPayload.payments_count || 0);
+    const attendanceLines: string[] = [];
+    let currentSite = "";
+    for (const session of attendanceSessions) {
+      const site = String(session.site || "Sede");
+      if (site !== currentSite) {
+        attendanceLines.push(`${site}:`);
+        currentSite = site;
+      }
+      const shift = String(session.shift || "turno").replace(/^\S+\s+/, "");
+      if (session.recorded) {
+        attendanceLines.push(
+          `Turno ${shift}: ${Number(session.present || 0)} asistentes, ${Number(session.absent || 0)} ausentes`,
+        );
+      } else {
+        attendanceLines.push(`Turno ${shift}: no se registró`);
+      }
+    }
+    if (!attendanceLines.length) attendanceLines.push("No había turnos programados.");
+    const cashCount = Number(eventPayload.cash_count || 0);
+    const transferCount = Number(eventPayload.transfer_count || 0);
     notification = {
-      title: "Resumen del día",
-      body: `Pagos: ${paymentCount} por ${formatCurrency(eventPayload.payments_total)} (efectivo ${formatCurrency(eventPayload.cash_total)} · transferencias ${formatCurrency(eventPayload.transfer_total)}). ${missingText}`,
+      title: `Resumen del ${formatDate(eventPayload.date)}`,
+      body: `${attendanceLines.join("\n")}\nPagos:\n${cashCount} en efectivo (${formatCurrency(eventPayload.cash_total)})\n${transferCount} por transferencia (${formatCurrency(eventPayload.transfer_total)})`,
       url: "/menu-resumen",
     };
   } else {
@@ -457,6 +470,25 @@ Deno.serve(async (request) => {
         return jsonResponse(404, { ok: false, error: "No se encontró el evento" });
       }
       return await dispatchEvent(eventId, vapidPublicKey);
+    }
+
+    if (payload?.action === "rebuild_daily_summary") {
+      const summaryDate = String(payload.summaryDate || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(summaryDate)) {
+        return jsonResponse(400, { ok: false, error: "Fecha inválida" });
+      }
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const rebuildResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/queue_daily_summary`, {
+        method: "POST",
+        headers: databaseHeaders(serviceRoleKey),
+        body: JSON.stringify({ summary_date: summaryDate, force_resend: true }),
+      });
+      if (!rebuildResponse.ok) {
+        console.error("No se pudo reconstruir el resumen", await rebuildResponse.text());
+        return jsonResponse(500, { ok: false, error: "No se pudo reconstruir el resumen" });
+      }
+      return jsonResponse(200, { ok: true, queued: true, summaryDate });
     }
 
     if (payload?.action === "diagnostics") {
