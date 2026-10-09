@@ -323,8 +323,9 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       }
       const shift = String(session.shift || "turno").replace(/^\S+\s+/, "");
       if (session.recorded) {
+        const recoveries = Number(session.recoveries || 0);
         attendanceLines.push(
-          `Turno ${shift}: ${Number(session.present || 0)} asistentes, ${Number(session.absent || 0)} ausentes`,
+          `Turno ${shift}: ${Number(session.present || 0)} asistentes, ${Number(session.absent || 0)} ausentes${recoveries ? `, ${recoveries} recuperando` : ""}`,
         );
       } else {
         attendanceLines.push(`Turno ${shift}: no se registró`);
