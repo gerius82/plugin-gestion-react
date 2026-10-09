@@ -116,8 +116,9 @@ const normalizeText = (txt = "") =>
 
 const PLANTILLA_BIENVENIDA_FALLBACK =
   "Hola {nombre} {apellido}! \uD83C\uDF89\n" +
-  "Bienvenido al {ciclo}.\n" +
+  "Bienvenido a Plugin Robótica.\n" +
   "El cursado es en el turno de los {dia} de {hora}hs.\n" +
+  "Esperamos que lo disfrutes mucho!\n" +
   "\uD83E\uDD16 Cualquier duda, escribinos.";
 
 export default function FichaAlumno() {

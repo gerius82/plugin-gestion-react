@@ -30,8 +30,9 @@ export default function FichaAvisosAlumnos() {
       label: "Bienvenida",
       text:
         "Hola {nombre} {apellido}! 🎉\n" +
-        "Bienvenido al {ciclo}.\n" +
+        "Bienvenido a Plugin Robótica.\n" +
         "El cursado es en el turno de los {dia} de {hora}hs.\n" +
+        "Esperamos que lo disfrutes mucho!\n" +
         "🤖 Cualquier duda, escribinos.",
     },
     {
