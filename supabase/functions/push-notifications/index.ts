@@ -244,6 +244,20 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
     return jsonResponse(200, { ok: true, ignored: true });
   }
 
+  const settingResponse = await fetch(
+    `${supabaseUrl}/rest/v1/notification_type_settings?event_type=eq.${encodeURIComponent(event.event_type)}&select=enabled&limit=1`,
+    { headers: databaseHeaders(serviceRoleKey) },
+  );
+  const settings = settingResponse.ok ? await settingResponse.json() : [];
+  if (Array.isArray(settings) && settings[0]?.enabled === false) {
+    await fetch(`${supabaseUrl}/rest/v1/notification_events?id=eq.${event.id}`, {
+      method: "PATCH",
+      headers: databaseHeaders(serviceRoleKey),
+      body: JSON.stringify({ status: "skipped", error: null, processed_at: new Date().toISOString() }),
+    });
+    return jsonResponse(200, { ok: true, skipped: true, eventType: event.event_type });
+  }
+
   const eventPayload = event.payload || {};
   let notification: {
     title: string;
@@ -504,33 +518,55 @@ Deno.serve(async (request) => {
     if (payload?.action === "notification_history") {
       const supabaseUrl = requiredSecret("SUPABASE_URL");
       const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
-      const historyResponse = await fetch(
-        `${supabaseUrl}/rest/v1/notification_events?select=id,event_type,payload,status,error,created_at,processed_at&order=created_at.desc&limit=100`,
-        { headers: databaseHeaders(serviceRoleKey) },
-      );
-      if (!historyResponse.ok) {
+      const [historyResponse, settingsResponse] = await Promise.all([
+        fetch(
+          `${supabaseUrl}/rest/v1/notification_events?select=id,event_type,payload,status,error,created_at,processed_at&order=created_at.desc&limit=100`,
+          { headers: databaseHeaders(serviceRoleKey) },
+        ),
+        fetch(
+          `${supabaseUrl}/rest/v1/notification_type_settings?select=event_type,label,description,enabled,updated_at&order=sort_order.asc`,
+          { headers: databaseHeaders(serviceRoleKey) },
+        ),
+      ]);
+      if (!historyResponse.ok || !settingsResponse.ok) {
         return jsonResponse(500, { ok: false, error: "No se pudo cargar el historial" });
       }
       const events = await historyResponse.json();
-      return jsonResponse(200, { ok: true, events: Array.isArray(events) ? events : [] });
+      const notificationSettings = await settingsResponse.json();
+      return jsonResponse(200, {
+        ok: true,
+        events: Array.isArray(events) ? events : [],
+        settings: Array.isArray(notificationSettings) ? notificationSettings : [],
+      });
     }
 
-    if (payload?.action === "delete_notification_event") {
-      const eventId = String(payload.eventId || "");
-      if (!/^[0-9a-f-]{36}$/i.test(eventId)) {
-        return jsonResponse(400, { ok: false, error: "Notificación inválida" });
+    if (payload?.action === "update_notification_setting") {
+      const eventType = String(payload.eventType || "");
+      const allowedTypes = [
+        "new_student",
+        "payment_received",
+        "attendance_recorded",
+        "daily_summary",
+        "birthday_summary",
+      ];
+      if (!allowedTypes.includes(eventType) || typeof payload.enabled !== "boolean") {
+        return jsonResponse(400, { ok: false, error: "Tipo de notificación inválido" });
       }
       const supabaseUrl = requiredSecret("SUPABASE_URL");
       const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
-      const deleteResponse = await fetch(
-        `${supabaseUrl}/rest/v1/notification_events?id=eq.${encodeURIComponent(eventId)}`,
-        { method: "DELETE", headers: databaseHeaders(serviceRoleKey, "return=representation") },
+      const updateResponse = await fetch(
+        `${supabaseUrl}/rest/v1/notification_type_settings?event_type=eq.${encodeURIComponent(eventType)}`,
+        {
+          method: "PATCH",
+          headers: databaseHeaders(serviceRoleKey, "return=representation"),
+          body: JSON.stringify({ enabled: payload.enabled, updated_at: new Date().toISOString() }),
+        },
       );
-      const deleted = deleteResponse.ok ? await deleteResponse.json() : [];
-      if (!deleteResponse.ok || !Array.isArray(deleted) || deleted.length === 0) {
-        return jsonResponse(404, { ok: false, error: "No se encontró la notificación" });
+      const updated = updateResponse.ok ? await updateResponse.json() : [];
+      if (!updateResponse.ok || !Array.isArray(updated) || updated.length === 0) {
+        return jsonResponse(404, { ok: false, error: "No se encontró el tipo de notificación" });
       }
-      return jsonResponse(200, { ok: true, deleted: eventId });
+      return jsonResponse(200, { ok: true, setting: updated[0] });
     }
 
     if (payload?.action === "send_custom_notification") {

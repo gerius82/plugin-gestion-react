@@ -52,6 +52,7 @@ export default function FichaNotificaciones() {
   const [codigo, setCodigo] = useState(() => sessionStorage.getItem("plugin-notifications-code") || "");
   const [autorizado, setAutorizado] = useState(false);
   const [eventos, setEventos] = useState([]);
+  const [tipos, setTipos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [form, setForm] = useState({
@@ -98,6 +99,7 @@ export default function FichaNotificaciones() {
     try {
       const data = await ejecutar({ action: "notification_history" });
       setEventos(data.events || []);
+      setTipos(data.settings || []);
       setAutorizado(true);
       sessionStorage.setItem("plugin-notifications-code", codigo.trim());
     } catch (error) {
@@ -130,14 +132,26 @@ export default function FichaNotificaciones() {
     }
   };
 
-  const eliminar = async (evento) => {
-    if (!confirm("¿Eliminar esta notificación del historial?")) return;
+  const cambiarTipo = async (tipo) => {
+    const habilitar = !tipo.enabled;
     setCargando(true);
     setMensaje("");
     try {
-      await ejecutar({ action: "delete_notification_event", eventId: evento.id });
-      setEventos((actuales) => actuales.filter((item) => item.id !== evento.id));
-      setMensaje("Notificación eliminada del historial.");
+      await ejecutar({
+        action: "update_notification_setting",
+        eventType: tipo.event_type,
+        enabled: habilitar,
+      });
+      setTipos((actuales) =>
+        actuales.map((item) =>
+          item.event_type === tipo.event_type ? { ...item, enabled: habilitar } : item
+        )
+      );
+      setMensaje(
+        habilitar
+          ? `Se activaron las notificaciones de ${tipo.label.toLowerCase()}.`
+          : `Se desactivaron las notificaciones de ${tipo.label.toLowerCase()}.`
+      );
     } catch (error) {
       setMensaje(error.message);
     } finally {
@@ -179,9 +193,39 @@ export default function FichaNotificaciones() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6">
+        <div className="space-y-6">
+          <section className="bg-white rounded-xl shadow p-5">
+            <h2 className="text-lg font-semibold">Tipos de notificaciones automáticas</h2>
+            <p className="text-sm text-gray-600 mt-1 mb-4">
+              Desactivá un tipo para dejar de recibirlo. Podés volver a activarlo cuando quieras.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {tipos.map((tipo) => (
+                <div key={tipo.event_type} className="border rounded-lg p-3 flex items-center justify-between gap-4 bg-gray-50">
+                  <div>
+                    <div className="font-semibold text-sm">{tipo.label}</div>
+                    <div className="text-xs text-gray-600 mt-1">{tipo.description}</div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={tipo.enabled}
+                    onClick={() => cambiarTipo(tipo)}
+                    disabled={cargando}
+                    className={`relative w-12 h-7 rounded-full transition flex-none ${tipo.enabled ? "bg-green-500" : "bg-gray-300"}`}
+                    title={tipo.enabled ? "Desactivar" : "Activar"}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all ${tipo.enabled ? "left-6" : "left-1"}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6">
           <form onSubmit={enviar} className="bg-white rounded-xl shadow p-5 h-fit">
-            <h2 className="text-lg font-semibold mb-4">Crear notificación</h2>
+            <h2 className="text-lg font-semibold mb-1">Enviar aviso manual</h2>
+            <p className="text-xs text-gray-500 mb-4">Para enviar ahora un mensaje que no depende de una automatización.</p>
             <label className="block text-sm font-medium mb-1">Título</label>
             <input
               required
@@ -239,30 +283,20 @@ export default function FichaNotificaciones() {
                 Actualizar
               </button>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
-              Eliminar quita el registro del historial, pero no una notificación que Android ya mostró.
-            </p>
             <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
               {eventos.length === 0 && <p className="text-sm text-gray-500">No hay notificaciones registradas.</p>}
               {eventos.map((evento) => (
                 <article key={evento.id} className="border rounded-lg p-3 bg-gray-50">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
                     <div className="min-w-0">
                       <div className="font-semibold text-sm">{evento.payload?.title || ETIQUETAS[evento.event_type] || evento.event_type}</div>
                       <div className="text-sm text-gray-700 whitespace-pre-line break-words mt-1">{resumenEvento(evento)}</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => eliminar(evento)}
-                      className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 flex-none"
-                    >
-                      Eliminar
-                    </button>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-gray-500">
                     <span>{fechaHora(evento.created_at)}</span>
                     <span className={`px-2 py-0.5 rounded-full border ${evento.status === "sent" ? "bg-green-50 border-green-200 text-green-700" : evento.status === "failed" ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
-                      {evento.status === "sent" ? "Enviada" : evento.status === "failed" ? "Fallida" : "Pendiente"}
+                      {evento.status === "sent" ? "Enviada" : evento.status === "failed" ? "Fallida" : evento.status === "skipped" ? "Desactivada" : "Pendiente"}
                     </span>
                     {evento.error && <span className="text-red-600">{evento.error}</span>}
                   </div>
@@ -270,6 +304,7 @@ export default function FichaNotificaciones() {
               ))}
             </div>
           </section>
+          </div>
         </div>
       )}
 
