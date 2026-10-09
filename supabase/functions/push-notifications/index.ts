@@ -451,6 +451,27 @@ Deno.serve(async (request) => {
       return jsonResponse(401, { ok: false, error: "Código privado incorrecto" });
     }
 
+    if (payload?.action === "google_contact_status") {
+      const normalizedPhone = String(payload.phone || "").replace(/\D/g, "");
+      if (!normalizedPhone) {
+        return jsonResponse(400, { ok: false, error: "Teléfono inválido" });
+      }
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const contactResponse = await fetch(
+        `${supabaseUrl}/rest/v1/google_contact_links?normalized_phone=eq.${encodeURIComponent(normalizedPhone)}&select=display_name,updated_at`,
+        { headers: databaseHeaders(serviceRoleKey) },
+      );
+      const contacts = contactResponse.ok ? await contactResponse.json() : [];
+      const contact = Array.isArray(contacts) ? contacts[0] : null;
+      return jsonResponse(200, {
+        ok: true,
+        exists: !!contact,
+        displayName: contact?.display_name || null,
+        updatedAt: contact?.updated_at || null,
+      });
+    }
+
     if (payload?.action === "retry_event") {
       const eventId = String(payload.eventId || "");
       if (!/^[0-9a-f-]{36}$/i.test(eventId)) {
