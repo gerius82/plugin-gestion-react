@@ -114,6 +114,12 @@ const normalizeText = (txt = "") =>
     .trim()
     .replace(/\s+/g, " ");
 
+const PLANTILLA_BIENVENIDA_FALLBACK =
+  "Hola {nombre} {apellido}! \uD83C\uDF89\n" +
+  "Bienvenido al {ciclo}.\n" +
+  "El cursado es en el turno de los {dia} de {hora}hs.\n" +
+  "\uD83E\uDD16 Cualquier duda, escribinos.";
+
 export default function FichaAlumno() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -122,6 +128,9 @@ export default function FichaAlumno() {
   const headers = useMemo(() => headersFrom(config), [config]);
 
   const [mensaje, setMensaje] = useState("");
+  const [plantillaBienvenida, setPlantillaBienvenida] = useState(
+    PLANTILLA_BIENVENIDA_FALLBACK
+  );
 
 const [cargandoAlumnos, setCargandoAlumnos] = useState(false);
 const [alumnos, setAlumnos] = useState([]);
@@ -165,6 +174,39 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
       setConfig(cfg);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!config) return;
+
+    (async () => {
+      const cargar = async (conModulo) => {
+        const filtroModulo = conModulo ? "&modulo=eq.avisos" : "";
+        const res = await fetch(
+          `${config.supabaseUrl}/rest/v1/avisos_plantillas?select=id,label,text,activo${filtroModulo}&order=orden.asc`,
+          { headers }
+        );
+        if (!res.ok) throw new Error("No pude cargar las plantillas de avisos.");
+        const data = await res.json();
+        return (Array.isArray(data) ? data : []).find(
+          (p) =>
+            p.activo !== false &&
+            (String(p.id) === "bienvenida" || normalizeText(p.label) === "bienvenida")
+        );
+      };
+
+      try {
+        const plantilla = (await cargar(true)) || (await cargar(false));
+        if (plantilla?.text) setPlantillaBienvenida(plantilla.text);
+      } catch {
+        try {
+          const plantilla = await cargar(false);
+          if (plantilla?.text) setPlantillaBienvenida(plantilla.text);
+        } catch {
+          // Conserva la plantilla local si la tabla no esta disponible.
+        }
+      }
+    })();
+  }, [config, headers]);
 
   // ----------------------------
   // Cargar alumnos
@@ -1241,6 +1283,30 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
       .trim();
     return `https://wa.me/54${telefono}?text=${encodeURIComponent(texto)}`;
   };
+
+  const buildWhatsappBienvenidaLink = (alumno) => {
+    const telefono = String(alumno?.telefono || "").replace(/\D/g, "");
+    if (!telefono) return "";
+
+    const codigoCiclo = matriculaSeleccionada?.ciclo_codigo || "";
+    const ciclo =
+      ciclosDisponibles.find((item) => item.codigo === codigoCiclo)?.nombre_publico ||
+      codigoCiclo;
+    const reemplazos = {
+      "{nombre}": String(alumno?.nombre || "").trim(),
+      "{apellido}": String(alumno?.apellido || "").trim(),
+      "{sede}": matriculaSeleccionada?.sede || alumno?.sede || "",
+      "{dia}": matriculaSeleccionada?.dia || "",
+      "{hora}": matriculaSeleccionada?.hora || "",
+      "{ciclo}": ciclo,
+    };
+    const texto = Object.entries(reemplazos).reduce(
+      (resultado, [variable, valor]) => resultado.split(variable).join(valor),
+      plantillaBienvenida
+    );
+
+    return `https://wa.me/54${telefono}?text=${encodeURIComponent(texto)}`;
+  };
   const inscripcionPaga = !!(
     alumnoSeleccionado &&
     Array.isArray(pagosAlumno) &&
@@ -2018,16 +2084,29 @@ const renderEditorMatricula = () => (
           
         </>
       )}
-      {alumnoSeleccionado && alumnoSeleccionado.telefono && !inscripcionPaga && (
-        <a
-          href={buildWhatsappPagoInscripcionLink(alumnoSeleccionado)}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Enviar datos de pago por WhatsApp"
-          className="fixed bottom-5 right-5 z-[9999] rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg border border-green-600 px-4 py-2 text-sm font-semibold"
-        >
-          Inscripción
-        </a>
+      {alumnoSeleccionado && alumnoSeleccionado.telefono && (
+        <div className="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-2">
+          <a
+            href={buildWhatsappBienvenidaLink(alumnoSeleccionado)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Enviar mensaje de bienvenida por WhatsApp"
+            className="rounded-full bg-orange-200 hover:bg-orange-300 text-orange-900 shadow-lg border border-orange-300 px-4 py-2 text-sm font-semibold"
+          >
+            Bienvenida
+          </a>
+          {!inscripcionPaga && (
+            <a
+              href={buildWhatsappPagoInscripcionLink(alumnoSeleccionado)}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Enviar datos de pago por WhatsApp"
+              className="rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg border border-green-600 px-4 py-2 text-sm font-semibold"
+            >
+              Inscripción
+            </a>
+          )}
+        </div>
       )}
     </div>
   );
