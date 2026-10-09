@@ -9,6 +9,7 @@ import {
   FaCog,
   FaClock,
   FaBirthdayCake,
+  FaBell,
   FaCalendarAlt,
   FaFileInvoiceDollar
 } from "react-icons/fa";
@@ -119,6 +120,14 @@ export default function MenuGestion() {
         >
           <FaBirthdayCake className="text-pink-500 text-3xl" />
           <span className="font-semibold text-lg">Festeja tu cumple</span>
+        </Link>
+
+        <Link
+          to="/notificaciones"
+          className="bg-white rounded-xl border-l-8 border-orange-400 p-4 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaBell className="text-orange-500 text-3xl" />
+          <span className="font-semibold text-lg">Notificaciones</span>
         </Link>
 
 

@@ -361,6 +361,13 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       url: `/cumples-alumnos?mes=${month}&dia=${day}`,
       actions: [{ action: "open-birthdays", title: "Ver cumpleaños" }],
     };
+  } else if (event.event_type === "custom_notification") {
+    notification = {
+      title: String(eventPayload.title || "PLUGIN Gestión").slice(0, 80),
+      body: String(eventPayload.body || "Tenés una nueva notificación.").slice(0, 500),
+      url: String(eventPayload.url || "/menu-gestion"),
+      actions: [{ action: "open-custom", title: String(eventPayload.action_title || "Abrir").slice(0, 30) }],
+    };
   } else {
     await fetch(`${supabaseUrl}/rest/v1/notification_events?id=eq.${event.id}`, {
       method: "PATCH",
@@ -492,6 +499,68 @@ Deno.serve(async (request) => {
         displayName: contact?.display_name || null,
         updatedAt: contact?.updated_at || null,
       });
+    }
+
+    if (payload?.action === "notification_history") {
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const historyResponse = await fetch(
+        `${supabaseUrl}/rest/v1/notification_events?select=id,event_type,payload,status,error,created_at,processed_at&order=created_at.desc&limit=100`,
+        { headers: databaseHeaders(serviceRoleKey) },
+      );
+      if (!historyResponse.ok) {
+        return jsonResponse(500, { ok: false, error: "No se pudo cargar el historial" });
+      }
+      const events = await historyResponse.json();
+      return jsonResponse(200, { ok: true, events: Array.isArray(events) ? events : [] });
+    }
+
+    if (payload?.action === "delete_notification_event") {
+      const eventId = String(payload.eventId || "");
+      if (!/^[0-9a-f-]{36}$/i.test(eventId)) {
+        return jsonResponse(400, { ok: false, error: "Notificación inválida" });
+      }
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const deleteResponse = await fetch(
+        `${supabaseUrl}/rest/v1/notification_events?id=eq.${encodeURIComponent(eventId)}`,
+        { method: "DELETE", headers: databaseHeaders(serviceRoleKey, "return=representation") },
+      );
+      const deleted = deleteResponse.ok ? await deleteResponse.json() : [];
+      if (!deleteResponse.ok || !Array.isArray(deleted) || deleted.length === 0) {
+        return jsonResponse(404, { ok: false, error: "No se encontró la notificación" });
+      }
+      return jsonResponse(200, { ok: true, deleted: eventId });
+    }
+
+    if (payload?.action === "send_custom_notification") {
+      const title = String(payload.title || "").trim().slice(0, 80);
+      const body = String(payload.body || "").trim().slice(0, 500);
+      const url = String(payload.url || "/menu-gestion").trim();
+      const actionTitle = String(payload.actionTitle || "Abrir").trim().slice(0, 30);
+      if (!title || !body) {
+        return jsonResponse(400, { ok: false, error: "Completá el título y el mensaje" });
+      }
+      if (!/^\/[a-z0-9/?=&._%-]*$/i.test(url)) {
+        return jsonResponse(400, { ok: false, error: "La página de destino no es válida" });
+      }
+
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const createResponse = await fetch(`${supabaseUrl}/rest/v1/notification_events`, {
+        method: "POST",
+        headers: databaseHeaders(serviceRoleKey, "return=representation"),
+        body: JSON.stringify({
+          event_type: "custom_notification",
+          payload: { title, body, url, action_title: actionTitle || "Abrir" },
+        }),
+      });
+      const created = createResponse.ok ? await createResponse.json() : [];
+      const eventId = Array.isArray(created) ? created[0]?.id : null;
+      if (!createResponse.ok || !eventId) {
+        return jsonResponse(500, { ok: false, error: "No se pudo crear la notificación" });
+      }
+      return await dispatchEvent(eventId, vapidPublicKey);
     }
 
     if (payload?.action === "retry_event") {

@@ -39,6 +39,7 @@ import CumplesMenu from "./components/menus/CumplesMenu";
 import FichaContactoAlumnosProfes from "./components/FichaContactoAlumnosProfes";
 import FichaUrgenciasProfes from "./components/FichaUrgenciasProfes";
 import InstalarApp from "./components/InstalarApp";
+import FichaNotificaciones from "./components/FichaNotificaciones";
 
 
 
@@ -94,6 +95,7 @@ function App() {
           <Route path="/cumples-reservas" element={<FichaCumplesPadres />} />
           <Route path="/cumples-pagos" element={<FichaPagosCumples />} />
           <Route path="/instalar-app" element={<InstalarApp />} />
+          <Route path="/notificaciones" element={<FichaNotificaciones />} />
 
           
 
