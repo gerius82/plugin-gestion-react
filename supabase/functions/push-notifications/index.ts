@@ -437,6 +437,28 @@ Deno.serve(async (request) => {
       return jsonResponse(401, { ok: false, error: "Código privado incorrecto" });
     }
 
+    if (payload?.action === "retry_event") {
+      const eventId = String(payload.eventId || "");
+      if (!/^[0-9a-f-]{36}$/i.test(eventId)) {
+        return jsonResponse(400, { ok: false, error: "Evento inválido" });
+      }
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const resetResponse = await fetch(
+        `${supabaseUrl}/rest/v1/notification_events?id=eq.${encodeURIComponent(eventId)}&select=id`,
+        {
+          method: "PATCH",
+          headers: databaseHeaders(serviceRoleKey, "return=representation"),
+          body: JSON.stringify({ status: "queued", error: null, processed_at: null }),
+        },
+      );
+      const resetEvents = resetResponse.ok ? await resetResponse.json() : [];
+      if (!resetResponse.ok || !Array.isArray(resetEvents) || !resetEvents.length) {
+        return jsonResponse(404, { ok: false, error: "No se encontró el evento" });
+      }
+      return await dispatchEvent(eventId, vapidPublicKey);
+    }
+
     if (payload?.action === "diagnostics") {
       const supabaseUrl = requiredSecret("SUPABASE_URL");
       const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
