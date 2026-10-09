@@ -351,6 +351,19 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
   }
   const subscriptions = await subscriptionsResponse.json();
 
+  if (!Array.isArray(subscriptions) || subscriptions.length === 0) {
+    await fetch(`${supabaseUrl}/rest/v1/notification_events?id=eq.${event.id}`, {
+      method: "PATCH",
+      headers: databaseHeaders(serviceRoleKey),
+      body: JSON.stringify({
+        status: "failed",
+        error: "No hay celulares registrados para recibir notificaciones",
+        processed_at: new Date().toISOString(),
+      }),
+    });
+    return jsonResponse(200, { ok: false, delivered: 0, failed: 0, noSubscriptions: true });
+  }
+
   webpush.setVapidDetails(
     requiredSecret("VAPID_SUBJECT"),
     vapidPublicKey,
@@ -422,6 +435,31 @@ Deno.serve(async (request) => {
     const adminCode = requiredSecret("PUSH_ADMIN_CODE");
     if (request.headers.get("x-admin-code")?.trim() !== adminCode) {
       return jsonResponse(401, { ok: false, error: "Código privado incorrecto" });
+    }
+
+    if (payload?.action === "diagnostics") {
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const [subscriptionsResponse, eventsResponse] = await Promise.all([
+        fetch(
+          `${supabaseUrl}/rest/v1/push_subscriptions?select=id,enabled,device_name,updated_at&order=updated_at.desc`,
+          { headers: databaseHeaders(serviceRoleKey) },
+        ),
+        fetch(
+          `${supabaseUrl}/rest/v1/notification_events?select=id,event_type,status,error,created_at,processed_at&order=created_at.desc&limit=20`,
+          { headers: databaseHeaders(serviceRoleKey) },
+        ),
+      ]);
+      if (!subscriptionsResponse.ok || !eventsResponse.ok) {
+        return jsonResponse(500, { ok: false, error: "No se pudo obtener el diagnóstico" });
+      }
+      const subscriptions = await subscriptionsResponse.json();
+      const events = await eventsResponse.json();
+      return jsonResponse(200, {
+        ok: true,
+        subscriptions: Array.isArray(subscriptions) ? subscriptions : [],
+        events: Array.isArray(events) ? events : [],
+      });
     }
 
     if (payload?.action !== "register_and_test" || !validSubscription(payload.subscription)) {

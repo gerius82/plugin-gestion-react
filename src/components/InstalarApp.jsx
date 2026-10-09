@@ -139,12 +139,13 @@ export default function InstalarApp() {
 
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: convertirClave(publicKeyData.publicKey),
-        });
+      if (subscription) {
+        await subscription.unsubscribe();
       }
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertirClave(publicKeyData.publicKey),
+      });
 
       const registerResponse = await fetch(functionUrl, {
         method: "POST",
