@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const MESES = [
   "Enero",
@@ -35,10 +35,17 @@ const formatFecha = (valor) => {
 
 export default function FichaCumplesAlumnos() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
-  const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth() + 1);
-  const [diaSeleccionado, setDiaSeleccionado] = useState(null);
+  const [mesSeleccionado, setMesSeleccionado] = useState(() => {
+    const mes = Number(searchParams.get("mes"));
+    return mes >= 1 && mes <= 12 ? mes : new Date().getMonth() + 1;
+  });
+  const [diaSeleccionado, setDiaSeleccionado] = useState(() => {
+    const dia = Number(searchParams.get("dia"));
+    return dia >= 1 && dia <= 31 ? dia : null;
+  });
   const [filtroEstado, setFiltroEstado] = useState("ambos");
   const [error, setError] = useState("");
 

@@ -345,6 +345,22 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       body: `${attendanceLines.join("\n")}\nPagos:\n${cashCount} en efectivo (${formatCurrency(eventPayload.cash_total)})\n${transferCount} por transferencia (${formatCurrency(eventPayload.transfer_total)})`,
       url: "/menu-resumen",
     };
+  } else if (event.event_type === "birthday_summary") {
+    const birthdays = Array.isArray(eventPayload.birthdays) ? eventPayload.birthdays : [];
+    const month = Number(String(eventPayload.date || "").slice(5, 7));
+    const day = Number(String(eventPayload.date || "").slice(8, 10));
+    const lines = birthdays.map((birthday) => {
+      const age = Number(birthday.age || 0);
+      return `• ${birthday.name}${age ? ` (${age} años)` : ""}`;
+    });
+    notification = {
+      title: birthdays.length === 1 ? "Cumpleaños de hoy 🎂" : "Cumpleaños de hoy 🎉",
+      body: lines.length
+        ? `Hoy ${birthdays.length === 1 ? "cumple" : "cumplen"}:\n${lines.join("\n")}`
+        : "Hoy no hay alumnos que cumplan años.",
+      url: `/cumples-alumnos?mes=${month}&dia=${day}`,
+      actions: [{ action: "open-birthdays", title: "Ver cumpleaños" }],
+    };
   } else {
     await fetch(`${supabaseUrl}/rest/v1/notification_events?id=eq.${event.id}`, {
       method: "PATCH",
