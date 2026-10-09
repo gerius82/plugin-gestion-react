@@ -20,6 +20,9 @@ self.addEventListener("push", (event) => {
       icon: "/app-icon-192.png",
       badge: "/notification-badge-96.png",
       data: { url: payload.url || "/menu-gestion" },
+      ...(Array.isArray(payload.actions) && payload.actions.length
+        ? { actions: payload.actions.slice(0, 2) }
+        : {}),
     })
   );
 });

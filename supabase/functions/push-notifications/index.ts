@@ -245,7 +245,12 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
   }
 
   const eventPayload = event.payload || {};
-  let notification: { title: string; body: string; url: string };
+  let notification: {
+    title: string;
+    body: string;
+    url: string;
+    actions?: Array<{ action: string; title: string }>;
+  };
 
   if (event.event_type === "new_student") {
     const details: string[] = [];
@@ -270,6 +275,7 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       title: eventPayload.wait_list ? "Nuevo alumno en lista de espera" : "Nuevo alumno inscripto",
       body: details.join("\n"),
       url: `/ficha-alumno/${eventPayload.student_id}`,
+      actions: [{ action: "open-student", title: "Abrir ficha" }],
     };
   } else if (event.event_type === "payment_received") {
     const studentIds = Array.isArray(eventPayload.student_ids)
