@@ -6,7 +6,7 @@ const corsHeaders = {
 
 const redirectUri =
   "https://cvogoablzgymmodegfft.supabase.co/functions/v1/google-contacts-oauth/callback";
-const appUrl = "https://gestionplugin2.netlify.app/instalar-app";
+const appUrl = "https://gestion.plugin.ar/instalar-app";
 const expectedEmail = "plugin.robotica@gmail.com";
 
 const oauthErrorReason = (value: unknown) => {

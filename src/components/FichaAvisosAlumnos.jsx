@@ -53,7 +53,7 @@ export default function FichaAvisosAlumnos() {
         "Hola {nombre} {apellido}!\n" +
         "Queremos invitarte al Ciclo 2026 de Robótica y Programación.\n" +
         "Si tu hijo participó del Taller de Verano, la inscripción es gratuita.\n" +
-        "Link para inscribirse: https://gestionplugin2.netlify.app/menu-padres\n" +
+        "Link para inscribirse: https://gestion.plugin.ar/menu-padres\n" +
         "Cualquier duda, escribinos.",
     },
   ];
