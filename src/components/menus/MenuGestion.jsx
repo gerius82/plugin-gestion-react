@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useGestionAuth } from "../GestionAuth";
 import {
   FaUserEdit,
   FaClipboardList,
@@ -11,13 +12,42 @@ import {
   FaBirthdayCake,
   FaBell,
   FaCalendarAlt,
-  FaFileInvoiceDollar
+  FaFileInvoiceDollar,
+  FaKey,
+  FaSignOutAlt
 } from "react-icons/fa";
 
 export default function MenuGestion() {
+  const navigate = useNavigate();
+  const { salir } = useGestionAuth();
+
+  const cerrarSesion = async () => {
+    await salir();
+    navigate("/acceso-gestion", { replace: true });
+  };
+
   return (
     <div className="max-w-4xl mx-auto mt-8">
-      <h1 className="text-2xl font-bold mb-6 text-center">Menú de Gestión</h1>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-bold">Menú de Gestión</h1>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Link
+            to="/seguridad-gestion"
+            className="flex items-center gap-2 rounded-lg border border-orange-300 bg-white px-4 py-2 text-sm font-semibold text-orange-700 shadow-sm hover:bg-orange-50"
+          >
+            <FaKey />
+            Cambiar contraseña
+          </Link>
+          <button
+            type="button"
+            onClick={cerrarSesion}
+            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+          >
+            <FaSignOutAlt />
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
