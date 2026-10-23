@@ -28,23 +28,25 @@ export default function MenuGestion() {
 
   return (
     <div className="max-w-4xl mx-auto mt-8">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold">Menú de Gestión</h1>
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Link
             to="/seguridad-gestion"
-            className="flex items-center gap-2 rounded-lg border border-orange-300 bg-white px-4 py-2 text-sm font-semibold text-orange-700 shadow-sm hover:bg-orange-50"
+            aria-label="Cambiar contraseña"
+            title="Cambiar contraseña"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-orange-300 bg-white text-orange-700 shadow-sm transition hover:bg-orange-50"
           >
             <FaKey />
-            Cambiar contraseña
           </Link>
           <button
             type="button"
             onClick={cerrarSesion}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50"
           >
             <FaSignOutAlt />
-            Cerrar sesión
           </button>
         </div>
       </div>
