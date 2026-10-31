@@ -130,7 +130,7 @@ Deno.serve(async (request) => {
             apikey: serviceRoleKey,
             Authorization: `Bearer ${serviceRoleKey}`,
             "Content-Type": "application/json",
-            Prefer: "resolution=ignore-duplicates,return=minimal",
+            Prefer: "resolution=ignore-duplicates,return=representation",
           },
           body: JSON.stringify(records),
         },
@@ -138,6 +138,27 @@ Deno.serve(async (request) => {
       if (!saveResponse.ok) {
         console.error("No se pudieron guardar los mensajes", await saveResponse.text());
         return jsonResponse(500, { ok: false, error: "No se pudieron guardar los mensajes" });
+      }
+
+      const savedRecords = await saveResponse.json();
+      for (const record of savedRecords) {
+        const conversationResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/record_whatsapp_inbound`, {
+          method: "POST",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            p_phone: record.from_phone,
+            p_contact_name: record.contact_name,
+            p_received_at: record.received_at,
+            p_preview: record.text_body || `[${record.message_type}]`,
+          }),
+        });
+        if (!conversationResponse.ok) {
+          console.error("No se pudo actualizar la conversación", await conversationResponse.text());
+        }
       }
     }
 

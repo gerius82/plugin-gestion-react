@@ -14,7 +14,8 @@ import {
   FaCalendarAlt,
   FaFileInvoiceDollar,
   FaKey,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaWhatsapp
 } from "react-icons/fa";
 
 export default function MenuGestion() {
@@ -160,6 +161,17 @@ export default function MenuGestion() {
         >
           <FaBell className="text-orange-500 text-3xl" />
           <span className="font-semibold text-lg">Notificaciones</span>
+        </Link>
+
+        <Link
+          to="/whatsapp-centro"
+          className="bg-white rounded-xl border-l-8 border-green-500 p-4 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaWhatsapp className="text-green-600 text-3xl" />
+          <div>
+            <span className="block font-semibold text-lg">Centro de WhatsApp</span>
+            <span className="block text-sm text-gray-500">Bandeja y simulador del bot</span>
+          </div>
         </Link>
 
 

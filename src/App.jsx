@@ -41,6 +41,7 @@ import MenuPadres from "./components/menus/MenuPadres";
 import MenuProfes from "./components/menus/MenuProfes";
 import MenuResumen from "./components/menus/MenuResumen";
 import PagosMenu from "./components/menus/PagosMenu";
+import WhatsAppCentro from "./components/WhatsAppCentro";
 
 function App() {
   return (
@@ -104,6 +105,7 @@ function App() {
               <Route path="/cumples-pagos" element={<CumplesPagos />} />
               <Route path="/instalar-app" element={<InstalarApp />} />
               <Route path="/notificaciones" element={<Notificaciones />} />
+              <Route path="/whatsapp-centro" element={<WhatsAppCentro />} />
             </Route>
           </Routes>
         </div>
