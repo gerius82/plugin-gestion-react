@@ -199,51 +199,58 @@ export default function WhatsAppCentro() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto mt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
+    <div className="w-full max-w-7xl mx-auto -mt-2 sm:mt-0">
+      <div className="mb-5 flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={() => navigate("/menu-gestion")}
-            className="rounded-full bg-white border p-3 text-gray-700 shadow-sm hover:bg-gray-50"
+            className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 !p-0 text-gray-700 transition hover:bg-gray-100"
             aria-label="Volver"
           >
             <FaArrowLeft />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FaWhatsapp className="text-green-600" /> Centro de WhatsApp
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-xl font-bold leading-tight text-gray-900 sm:text-2xl">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
+                <FaWhatsapp />
+              </span>
+              <span>Centro de WhatsApp</span>
             </h1>
-            <p className="text-sm text-gray-600">Bandeja protegida y laboratorio del bot</p>
+            <p className="mt-0.5 hidden text-sm text-gray-500 sm:block">Bandeja protegida y laboratorio del bot</p>
           </div>
         </div>
         <button
           type="button"
           onClick={loadInbox}
           disabled={loading}
-          className="flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
+          className="!flex !w-auto shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:px-4"
         >
-          <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualizar
+          <FaSyncAlt className={loading ? "animate-spin" : ""} />
+          <span className="hidden sm:inline">Actualizar</span>
         </button>
       </div>
 
-      <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        <strong>Modo seguro:</strong> los envíos reales están bloqueados. La bandeja solo lee y clasifica;
-        el laboratorio genera respuestas simuladas sin contactar a ninguna familia.
+      <div className="mb-5 flex gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950">
+        <span className="mt-0.5 shrink-0" aria-hidden="true">⚠️</span>
+        <p>
+          <strong>Modo seguro:</strong> los envíos reales están bloqueados. La bandeja solo lee y clasifica;
+          el laboratorio genera respuestas simuladas sin contactar a ninguna familia.
+        </p>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-200/70 p-1">
         <button
           type="button"
           onClick={() => setTab("inbox")}
-          className={`rounded-lg px-4 py-2 font-semibold ${tab === "inbox" ? "bg-green-600 text-white" : "bg-white border text-gray-700"}`}
+          className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "inbox" ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-700 hover:bg-white/70"}`}
         >
           <FaCommentDots className="inline mr-2" /> Bandeja
         </button>
         <button
           type="button"
           onClick={() => setTab("simulator")}
-          className={`rounded-lg px-4 py-2 font-semibold ${tab === "simulator" ? "bg-green-600 text-white" : "bg-white border text-gray-700"}`}
+          className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "simulator" ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-700 hover:bg-white/70"}`}
         >
           <FaRobot className="inline mr-2" /> Simulador del bot
         </button>
@@ -252,7 +259,7 @@ export default function WhatsAppCentro() {
       {error && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-red-700">{error}</div>}
 
       {tab === "inbox" && (
-        <div className="grid min-h-[560px] grid-cols-1 overflow-hidden rounded-2xl border bg-white shadow-sm lg:grid-cols-[340px_1fr]">
+        <div className="grid min-h-[560px] grid-cols-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm lg:grid-cols-[340px_minmax(0,1fr)]">
           <aside className="border-b lg:border-b-0 lg:border-r">
             <div className="p-3 border-b">
               <input
@@ -319,12 +326,12 @@ export default function WhatsAppCentro() {
                         <p className="mt-1 text-sm text-amber-700">Sin alumno asociado automáticamente</p>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                       <button
                         type="button"
                         onClick={markRead}
                         disabled={busy || selectedConversation.unread_count === 0}
-                        className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                        className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 sm:!w-auto"
                       >
                         <FaCheckDouble /> Marcar leídos
                       </button>
@@ -332,7 +339,7 @@ export default function WhatsAppCentro() {
                         value={selectedConversation.bot_mode}
                         onChange={(event) => setBotMode(event.target.value)}
                         disabled={busy}
-                        className="rounded-lg border px-3 py-2 text-sm"
+                        className="!w-full min-w-[180px] rounded-lg border px-3 py-2 text-sm sm:!w-auto"
                       >
                         <option value="active">Bot activo</option>
                         <option value="paused">Bot pausado</option>
@@ -377,7 +384,7 @@ export default function WhatsAppCentro() {
               type="button"
               onClick={startSimulation}
               disabled={busy || !simPhone.trim()}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+              className="mt-3 !flex !w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
             >
               <FaPlay /> Iniciar conversación
             </button>
@@ -425,7 +432,7 @@ export default function WhatsAppCentro() {
                       key={option.id}
                       onClick={() => simulate(option.id)}
                       disabled={busy}
-                      className="block w-full rounded-lg border border-green-200 bg-white px-4 py-2 text-left text-sm font-semibold text-green-700 shadow-sm hover:bg-green-50"
+                      className="block !w-full rounded-lg border border-green-200 bg-white px-4 py-2 text-left text-sm font-semibold text-green-700 shadow-sm hover:bg-green-50"
                     >
                       {option.id}. {option.label}
                     </button>
@@ -449,7 +456,7 @@ export default function WhatsAppCentro() {
               <button
                 type="submit"
                 disabled={busy || !simInput.trim()}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-green-600 text-white disabled:opacity-50"
+                className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full bg-green-600 !p-0 text-white disabled:opacity-50"
                 aria-label="Enviar en simulador"
               >
                 <FaPaperPlane />
