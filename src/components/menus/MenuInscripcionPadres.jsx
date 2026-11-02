@@ -17,6 +17,8 @@ const meses = [
   "diciembre",
 ];
 
+const CICLO_VERANO_ACTUAL = "TDV_2027";
+
 function formatearFechaLarga(iso) {
   if (!iso) return "";
   const [y, m, d] = iso.split("T")[0].split("-");
@@ -26,14 +28,14 @@ function formatearFechaLarga(iso) {
 }
 
 function getRutaFormulario(codigo) {
-  if (codigo === "TDV") {
+  if (codigo === CICLO_VERANO_ACTUAL) {
     return "/formulario-verano?origen=padres";
   }
   return `/menu-inscripcion-cursos?origen=padres&ciclo=${encodeURIComponent(codigo)}`;
 }
 
 function getIcono(codigo) {
-  if (codigo === "TDV") return <FaSun className="text-yellow-500 text-3xl" />;
+  if (codigo === CICLO_VERANO_ACTUAL) return <FaSun className="text-yellow-500 text-3xl" />;
   return <FaCalendarAlt className="text-gray-500 text-3xl" />;
 }
 
@@ -63,7 +65,7 @@ export default function MenuInscripcionPadres() {
         }
 
         const data = await resCiclos.json();
-        const lista = Array.isArray(data) ? data : [];
+        const lista = (Array.isArray(data) ? data : []).filter((ciclo) => ciclo.codigo !== "TDV");
 
         lista.sort((a, b) => {
           const prefA = a.codigo === "CICLO_2026" ? 0 : 1;
@@ -99,8 +101,8 @@ export default function MenuInscripcionPadres() {
     const descripcionVisible =
       c.codigo === "CICLO_2026"
         ? "Taller de robótica y programación para el ciclo 2026. Puede comenzar en cualquier momento del año."
-        : c.codigo === "TDV"
-        ? "Taller de verano para los meses de enero y febrero"
+        : c.codigo === CICLO_VERANO_ACTUAL
+        ? "Taller de verano para los meses de enero y febrero de 2027"
         : c.descripcion;
 
     const contenido = (
@@ -120,11 +122,11 @@ export default function MenuInscripcionPadres() {
               </h3>
               {!habilitado && (
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                  c.codigo === "TDV"
+                  c.codigo === CICLO_VERANO_ACTUAL
                     ? "bg-amber-100 text-amber-800 border border-amber-200"
                     : "bg-gray-300 text-gray-700"
                 }`}>
-                  {c.codigo === "TDV" ? "Próximamente" : "Terminado"}
+                  {c.codigo === CICLO_VERANO_ACTUAL ? "Próximamente" : "Terminado"}
                 </span>
               )}
             </div>
@@ -137,8 +139,8 @@ export default function MenuInscripcionPadres() {
 
             {!habilitado && (
               <p className="text-xs mt-1 text-gray-500">
-                {c.codigo === "TDV"
-                  ? "La inscripción comenzará el 1 de noviembre de 2026."
+                {c.codigo === CICLO_VERANO_ACTUAL
+                  ? `La inscripción abrirá el ${formatearFechaLarga(fechaIni)}.`
                   : fechaIni
                   ? `La inscripción abrirá el ${formatearFechaLarga(fechaIni)}.`
                   : ""}

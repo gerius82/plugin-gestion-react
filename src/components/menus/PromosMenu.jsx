@@ -59,12 +59,12 @@ export default function PromosMenu() {
                 <FaSun className="text-amber-600 text-xl" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-800">Taller de Verano</h3>
+                <h3 className="font-semibold text-gray-800">Taller de Verano 2027</h3>
                 <p className="text-xs text-amber-700 font-semibold">Inscripción Bonificada</p>
               </div>
             </div>
             <p className="text-sm text-gray-700">
-              Si realizaron Taller de Verano durante Enero y Febrero, no abonan inscripción al Ciclo 2026
+              Quienes realicen el Taller de Verano 2027 no abonan inscripción al Ciclo 2027.
             </p>
           </div>
 

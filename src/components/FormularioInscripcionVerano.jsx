@@ -16,11 +16,24 @@ const normalizarTextoComparacion = (valor = "") =>
 
 const normalizarTelefono = (valor = "") => String(valor || "").replace(/\D/g, "").slice(0, 10);
 const validarTelefonoArg = (valor = "") => /^[1-9]\d{9}$/.test(normalizarTelefono(valor));
+const CICLO_VERANO = "TDV_2027";
+
+const fechaActualArgentina = () => {
+  const parts = new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+};
 
 const FormularioInscripcionVerano = () => {
   const navigate = useNavigate();
   const [mensajeExito, setMensajeExito] = useState("");
   const [config, setConfig] = useState(null);
+  const [estadoInscripcion, setEstadoInscripcion] = useState({ cargando: true, abierta: false });
   //const [turnos, setTurnos] = useState({});
   const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
   const [telefonoValido, setTelefonoValido] = useState(true);
@@ -31,7 +44,7 @@ const FormularioInscripcionVerano = () => {
   const from = searchParams.get("from");
 
   const [ciclos, setCiclos] = useState([]);
-  const [cicloSel, setCicloSel] = useState("");      // ejemplo: "TDV" o "CICLO_2026"
+  const [cicloSel, setCicloSel] = useState("");
   const [cursos, setCursos] = useState([]);
   const [cursoSelId, setCursoSelId] = useState(null);
   const [turnosConfig, setTurnosConfig] = useState(null);
@@ -92,7 +105,7 @@ const FormularioInscripcionVerano = () => {
     comentarios: ""
   });
 
-  const TIPO_INSCRIPCION = "TDV";
+  const TIPO_INSCRIPCION = CICLO_VERANO;
 
   const supaHeaders = (cfg) => ({
     apikey: cfg.supabaseKey,
@@ -196,7 +209,7 @@ const FormularioInscripcionVerano = () => {
   const calcularDisponibilidadTurno = async () => {
     if (!config) return { cupo: null, anotados: 0, listaEspera: false };
 
-    const cicloCodigo = "TDV";
+    const cicloCodigo = CICLO_VERANO;
     const sede = formulario.sede;
     const dia = diaSel;
     const hora = horaSel;
@@ -223,7 +236,7 @@ const FormularioInscripcionVerano = () => {
       const urlTurnos =
         `${config.supabaseUrl}/rest/v1/turnos` +
         `?select=dia,hora,cupo_maximo` +
-        `&ciclo_codigo=eq.TDV` +
+        `&ciclo_codigo=eq.${encodeURIComponent(CICLO_VERANO)}` +
         `&sede=eq.${encodeURIComponent(sede)}` +
         `&activo=eq.true`;
 
@@ -236,7 +249,7 @@ const FormularioInscripcionVerano = () => {
         `${config.supabaseUrl}/rest/v1/matriculas` +
         `?select=dia,hora` +
         `&estado=eq.activa` +
-        `&ciclo_codigo=eq.TDV` +
+        `&ciclo_codigo=eq.${encodeURIComponent(CICLO_VERANO)}` +
         `&sede=eq.${encodeURIComponent(sede)}`;
 
       const resMats = await fetch(urlMats, {
@@ -346,12 +359,26 @@ const FormularioInscripcionVerano = () => {
   if (!config) return;
 
   (async () => {
-    // 1) Seteo ciclo fijo TDV
-    setCicloSel("TDV");
+    const resCiclo = await fetch(
+      `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,activo,fecha_inicio,fecha_fin&codigo=eq.${encodeURIComponent(CICLO_VERANO)}&limit=1`,
+      { headers: supaHeaders(config) }
+    );
+    const dataCiclo = resCiclo.ok ? await resCiclo.json() : [];
+    const ciclo = Array.isArray(dataCiclo) ? dataCiclo[0] : null;
+    const hoy = fechaActualArgentina();
+    const abierta = Boolean(
+      ciclo?.activo &&
+      (!ciclo.fecha_inicio || hoy >= ciclo.fecha_inicio) &&
+      (!ciclo.fecha_fin || hoy <= ciclo.fecha_fin)
+    );
+    setEstadoInscripcion({ cargando: false, abierta });
+    if (!abierta) return;
 
-    // 2) Traigo cursos activos del TDV (debería venir Robótica)
+    setCicloSel(CICLO_VERANO);
+
+    // Traigo los cursos activos del Taller de Verano 2027.
     const resCursos = await fetch(
-      `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,ciclo,turnos_config&ciclo=eq.TDV&activo=eq.true&order=nombre.asc`,
+      `${config.supabaseUrl}/rest/v1/cursos?select=id,nombre,ciclo,turnos_config&ciclo=eq.${encodeURIComponent(CICLO_VERANO)}&activo=eq.true&order=nombre.asc`,
       { headers: supaHeaders(config) }
     );
     const dataCursos = await resCursos.json();
@@ -400,7 +427,7 @@ const elegirDia = async (dia) => {
   setDiaSel(dia);
   const h = (turnosConfig?.[formulario.sede]?.[dia]) || [];
   const activos = await obtenerHorariosActivos({
-    cicloCodigo: "TDV",
+    cicloCodigo: CICLO_VERANO,
     sede: formulario.sede,
     dia,
   });
@@ -552,7 +579,7 @@ const elegirHorario = (hora) => {
     ...formulario,
     edad: parseInt(formulario.edad),
     activo: true,
-    tipo_inscripcion: TIPO_INSCRIPCION,  // TDV
+    tipo_inscripcion: TIPO_INSCRIPCION,
     curso: cursoNombre,                  // ? Rob?tica (no "Taller de Verano")
     turno_1: `${diaSel} ${horaSel}`,      // legacy
       lista_espera: listaEspera || false,
@@ -608,7 +635,7 @@ const elegirHorario = (hora) => {
       }
       const matriculaPayload = {
         alumno_id: personaFinal,
-        ciclo_codigo: "TDV",
+        ciclo_codigo: CICLO_VERANO,
         curso_id: Number(cursoSelId),
         curso_nombre: cursoNombre, // legacy opcional
         sede: formulario.sede,
@@ -620,7 +647,7 @@ const elegirHorario = (hora) => {
       };
       const resMat = await fetch(
         `${config.supabaseUrl}/rest/v1/matriculas?select=id&alumno_id=eq.${personaFinal}` +
-          `&ciclo_codigo=eq.TDV&curso_id=eq.${Number(cursoSelId)}` +
+          `&ciclo_codigo=eq.${encodeURIComponent(CICLO_VERANO)}&curso_id=eq.${Number(cursoSelId)}` +
           `&dia=eq.${encodeURIComponent(diaSel)}` +
           `&hora=eq.${encodeURIComponent(horaSel)}` +
           `&order=creado_en.desc&limit=1`,
@@ -681,6 +708,27 @@ const elegirHorario = (hora) => {
   }
 };
 
+  if (estadoInscripcion.cargando) {
+    return (
+      <div className="max-w-[700px] w-full mx-auto p-8 bg-white rounded-xl shadow-lg mt-8 text-center text-gray-600">
+        Comprobando la apertura de inscripciones…
+      </div>
+    );
+  }
+
+  if (!estadoInscripcion.abierta) {
+    return (
+      <div className="max-w-[700px] w-full mx-auto p-8 bg-white rounded-xl shadow-lg mt-8 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-3xl">☀️</div>
+        <h2 className="text-2xl font-bold text-gray-900">Taller de Verano 2027</h2>
+        <p className="mt-3 text-gray-600">Las inscripciones abrirán el <strong>8 de noviembre de 2026</strong>.</p>
+        <button type="button" onClick={() => navigate(rutaSalida)} className="mt-6 !w-auto rounded-lg bg-gray-700 px-5 py-2.5 font-semibold text-white hover:bg-gray-800">
+          Volver
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-[700px] w-full mx-auto p-8 bg-white rounded-xl shadow-lg mt-8">
 
@@ -724,7 +772,7 @@ const elegirHorario = (hora) => {
           {/* Información introductoria del taller */}
           <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg shadow-sm animate-fadeIn">
             <h3 className="text-xl font-semibold text-yellow-700 mb-2">
-              ☀️🤖¡Verano 2026 a pura creatividad con LEGO & Robótica!⚙️
+              ☀️🤖¡Verano 2027 a pura creatividad con LEGO & Robótica!⚙️
             </h3>
 
             <p className="text-sm text-gray-700 leading-relaxed">
@@ -742,7 +790,7 @@ const elegirHorario = (hora) => {
             {/* Duración, fechas, modalidad */}
             <ul className="mt-4 space-y-1 text-sm text-gray-800">
               <li>📅 <strong>Duración:</strong> 2 meses (8 clases)</li>
-              <li>🗓️ <strong>Inicio:</strong> Lunes 5 de enero</li>
+              <li>🗓️ <strong>Inicio:</strong> 5 de enero de 2027</li>
               <li>🧩 <strong>Modalidad:</strong> 1 clase por semana de 90 minutos cada una</li>
             </ul>
 
@@ -951,7 +999,7 @@ const elegirHorario = (hora) => {
                 Propuestas creativas de robótica y programación para pasar unas vacaciones diferentes.
                 </p>
                 <span className="text-xs text-green-700">
-                Taller de Verano
+                Taller de Verano 2027
                 </span>
             </div>
         </div>
