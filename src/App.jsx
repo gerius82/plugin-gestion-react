@@ -45,6 +45,8 @@ import PagosMenu from "./components/menus/PagosMenu";
 import WhatsAppCentro from "./components/WhatsAppCentro";
 import EncuestaColonia2027 from "./components/EncuestaColonia2027";
 import EncuestaColoniaResultados from "./components/EncuestaColoniaResultados";
+import ReservaVeranoResultado from "./components/ReservaVeranoResultado";
+import ReservasVerano from "./components/ReservasVerano";
 
 function App() {
   return (
@@ -78,6 +80,7 @@ function App() {
             <Route path="/asistencias" element={<FichaAsistencia />} />
             <Route path="/pagos" element={<Pagos />} />
             <Route path="/encuesta-colonia-2027" element={<EncuestaColonia2027 />} />
+            <Route path="/reserva-verano-resultado" element={<ReservaVeranoResultado />} />
 
             {/* Todo el sector de Gestión requiere sesión */}
             <Route element={<RequireGestionAuth />}>
@@ -112,6 +115,7 @@ function App() {
               <Route path="/notificaciones" element={<Notificaciones />} />
               <Route path="/whatsapp-centro" element={<WhatsAppCentro />} />
               <Route path="/encuesta-colonia-resultados" element={<EncuestaColoniaResultados />} />
+              <Route path="/reservas-verano" element={<ReservasVerano />} />
             </Route>
           </Routes>
         </div>

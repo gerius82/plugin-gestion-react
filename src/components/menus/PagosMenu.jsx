@@ -1,6 +1,6 @@
 // PagosMenu.jsx
 import { Link } from "react-router-dom";
-import { FaFileInvoiceDollar, FaChartBar } from "react-icons/fa";
+import { FaFileInvoiceDollar, FaChartBar, FaCreditCard } from "react-icons/fa";
 
 export default function PagosMenu() {
   return (
@@ -22,6 +22,17 @@ export default function PagosMenu() {
         >
           <FaChartBar className="text-orange-500 text-3xl" />
           <span className="font-semibold text-lg">Estadísticas</span>
+        </Link>
+
+        <Link
+          to="/reservas-verano"
+          className="bg-white rounded-xl border-l-8 border-sky-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <FaCreditCard className="text-sky-500 text-3xl" />
+          <div>
+            <span className="block font-semibold text-lg">Reservas Verano 2027</span>
+            <span className="block text-sm text-gray-500">Cobros por Mercado Pago</span>
+          </div>
         </Link>
       </div>
 

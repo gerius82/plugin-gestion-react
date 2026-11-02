@@ -32,6 +32,9 @@ const fechaActualArgentina = () => {
 const FormularioInscripcionVerano = () => {
   const navigate = useNavigate();
   const [mensajeExito, setMensajeExito] = useState("");
+  const [inscripcionFinalizada, setInscripcionFinalizada] = useState(null);
+  const [iniciandoPago, setIniciandoPago] = useState(false);
+  const [errorPago, setErrorPago] = useState("");
   const [config, setConfig] = useState(null);
   const [estadoInscripcion, setEstadoInscripcion] = useState({ cargando: true, abierta: false });
   //const [turnos, setTurnos] = useState({});
@@ -324,6 +327,42 @@ const FormularioInscripcionVerano = () => {
     setTurnoEnListaEspera(false);
     setCupoMaximo(null);
     setAnotadosTurno(0);
+    setInscripcionFinalizada(null);
+    setErrorPago("");
+  };
+
+  const iniciarPagoReserva = async () => {
+    if (!config || !inscripcionFinalizada?.alumnoId) return;
+    try {
+      setIniciandoPago(true);
+      setErrorPago("");
+      const response = await fetch(`${config.supabaseUrl}/functions/v1/mercadopago-reserva`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: config.supabaseKey,
+          Authorization: `Bearer ${config.supabaseKey}`,
+        },
+        body: JSON.stringify({
+          action: "create",
+          alumno_id: inscripcionFinalizada.alumnoId,
+          email: inscripcionFinalizada.email,
+          telefono: inscripcionFinalizada.telefono,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "No se pudo iniciar el pago.");
+      if (result.already_paid) {
+        setErrorPago("La reserva ya figura abonada.");
+        return;
+      }
+      if (!result.checkout_url) throw new Error("Mercado Pago no devolvió el enlace de pago.");
+      window.location.assign(result.checkout_url);
+    } catch (error) {
+      setErrorPago(error?.message || "No se pudo iniciar el pago. Probá nuevamente.");
+    } finally {
+      setIniciandoPago(false);
+    }
   };
 
   const mostrarResumenTurno = () => {
@@ -685,23 +724,32 @@ const elegirHorario = (hora) => {
         }
       }
 
-    // Email
-    await emailjs.send("service_efu6ess", "template_92ev0wo", {
-      nombre: formulario.nombre,
-      apellido: formulario.apellido,
-      edad: formulario.edad,
-      responsable: formulario.responsable,
-      telefono: formulario.telefono,
+    setInscripcionFinalizada({
+      alumnoId: personaFinal,
       email: formulario.email,
-      sede: formulario.sede,
-      curso: cursoNombre,
-      turno_1: `${diaSel} ${horaSel}`,
-      escuela: formulario.escuela,
-      comentarios: formulario.comentarios,
-        lista_espera: listaEspera ? "Sí" : "No",
+      telefono: formulario.telefono,
     });
 
-    setMensajeExito("✅ Inscripción enviada correctamente. También se envió un correo de confirmación.");
+    try {
+      await emailjs.send("service_efu6ess", "template_92ev0wo", {
+        nombre: formulario.nombre,
+        apellido: formulario.apellido,
+        edad: formulario.edad,
+        responsable: formulario.responsable,
+        telefono: formulario.telefono,
+        email: formulario.email,
+        sede: formulario.sede,
+        curso: cursoNombre,
+        turno_1: `${diaSel} ${horaSel}`,
+        escuela: formulario.escuela,
+        comentarios: formulario.comentarios,
+        lista_espera: listaEspera ? "Sí" : "No",
+      });
+      setMensajeExito("Inscripción enviada correctamente. También se envió un correo de confirmación.");
+    } catch (emailError) {
+      console.error("No se pudo enviar el correo de confirmación", emailError);
+      setMensajeExito("Inscripción enviada correctamente. Podés continuar con el pago de la reserva.");
+    }
   } catch (error) {
     console.error(error);
     setMensajeExito("❌ Error de conexión. Intenta nuevamente más tarde.");
@@ -739,6 +787,23 @@ const elegirHorario = (hora) => {
             ✅ ¡Inscripción completada con éxito!
           </h4>
           <p className="text-sm leading-relaxed">{mensajeExito}</p>
+          {inscripcionFinalizada && (
+            <div className="mt-5 rounded-xl border border-sky-200 bg-white p-4 text-center shadow-sm">
+              <p className="font-bold text-gray-900">Reservá el cupo con $10.000</p>
+              <p className="mt-1 text-sm text-gray-600">
+                El importe se descontará de la primera cuota mensual de $65.000.
+              </p>
+              <button
+                type="button"
+                onClick={iniciarPagoReserva}
+                disabled={iniciandoPago}
+                className="mt-4 !w-auto rounded-lg !bg-sky-500 px-6 py-3 font-bold text-white shadow transition hover:!bg-sky-600 disabled:cursor-wait disabled:opacity-60"
+              >
+                {iniciandoPago ? "Conectando con Mercado Pago…" : "Pagar $10.000 con Mercado Pago"}
+              </button>
+              {errorPago && <p className="mt-3 text-sm font-medium text-red-600">{errorPago}</p>}
+            </div>
+          )}
           <div className="mt-4 flex justify-center gap-4">
             <button
               type="button"

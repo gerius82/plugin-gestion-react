@@ -398,6 +398,12 @@ verify_jwt = true
 [functions.encuesta-colonia-2027]
 verify_jwt = false
 
+[functions.mercadopago-reserva]
+verify_jwt = false
+
+[functions.mercadopago-webhook]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
