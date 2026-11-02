@@ -106,6 +106,49 @@ export default function FichaAvisosAlumnos() {
   const filtrarActivas = (data) =>
     (Array.isArray(data) ? data : []).filter((p) => p.activo !== false);
 
+  const consolidarPorAlumno = (lista = []) => {
+    const prioridadEstado = {
+      activa: 5,
+      pausada: 4,
+      baja: 3,
+      finalizada: 2,
+      sin_matricula: 1,
+    };
+    const unicos = new Map();
+
+    lista.forEach((alumno) => {
+      const textoNormalizado = (valor = "") =>
+        String(valor)
+          .trim()
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+      const telefono = String(alumno.telefono || "").replace(/\D/g, "");
+      const identidadPorDatos = telefono && alumno.nombre && alumno.apellido
+        ? `${textoNormalizado(alumno.nombre)}|${textoNormalizado(alumno.apellido)}|${telefono}`
+        : "";
+      const clave = identidadPorDatos || String(alumno.persona_id || alumno.alumno_id || alumno.id || "");
+      if (!clave) return;
+
+      const anterior = unicos.get(clave);
+      if (!anterior) {
+        unicos.set(clave, alumno);
+        return;
+      }
+
+      const prioridadActual = prioridadEstado[alumno.estado_normalizado] || 0;
+      const prioridadAnterior = prioridadEstado[anterior.estado_normalizado] || 0;
+      const fechaActual = new Date(alumno.matricula_creada_en || 0).getTime() || 0;
+      const fechaAnterior = new Date(anterior.matricula_creada_en || 0).getTime() || 0;
+
+      if (prioridadActual > prioridadAnterior || (prioridadActual === prioridadAnterior && fechaActual > fechaAnterior)) {
+        unicos.set(clave, alumno);
+      }
+    });
+
+    return [...unicos.values()];
+  };
+
   const cargarPlantillas = async () => {
     try {
       const res = await fetch(
@@ -193,7 +236,7 @@ export default function FichaAvisosAlumnos() {
     setError("");
 
     try {
-      let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,inscripciones(id,persona_id,nombre,apellido,telefono)`;
+      let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,creado_en,inscripciones(id,persona_id,nombre,apellido,telefono)`;
 
       const filtros = [];
 
@@ -227,6 +270,7 @@ export default function FichaAvisosAlumnos() {
         return {
           id: `mat-${m.id}`,
           alumno_id: m.alumno_id,
+          persona_id: alumno.persona_id || alumno.id || m.alumno_id,
           nombre: (alumno.nombre || "").trimEnd(),
           apellido: (alumno.apellido || "").trimEnd(),
           telefono: alumno.telefono,
@@ -236,6 +280,7 @@ export default function FichaAvisosAlumnos() {
           estado_normalizado: estadoNormalizado,
           ciclo_codigo: m.ciclo_codigo,
           ciclo_nombre: ciclosMap.get(m.ciclo_codigo) || m.ciclo_codigo || "",
+          matricula_creada_en: m.creado_en || "",
         };
       });
 
@@ -272,6 +317,7 @@ export default function FichaAvisosAlumnos() {
             return {
               id: `insc-${i.id}`,
               alumno_id: i.persona_id || i.id,
+              persona_id: i.persona_id || i.id,
               nombre: (i.nombre || "").trimEnd(),
               apellido: (i.apellido || "").trimEnd(),
               telefono: i.telefono || "",
@@ -281,6 +327,7 @@ export default function FichaAvisosAlumnos() {
               estado_normalizado: "sin_matricula",
               ciclo_codigo: i.tipo_inscripcion || "",
               ciclo_nombre: ciclosMap.get(i.tipo_inscripcion) || i.tipo_inscripcion || "",
+              matricula_creada_en: "",
             };
           });
 
@@ -290,6 +337,11 @@ export default function FichaAvisosAlumnos() {
       if (filtroEstado === "sin_matricula") {
         listaBase = listaBase.filter((a) => a.estado_normalizado === "sin_matricula");
       }
+
+      // La consulta devuelve una fila por matrícula. Para los avisos necesitamos
+      // una sola fila por persona, aun cuando tenga matrículas activas, dadas de
+      // baja o finalizadas en distintos ciclos.
+      listaBase = consolidarPorAlumno(listaBase);
 
       // ordenar por nombre y apellido
       const listaFiltrada = [...listaBase].sort((a, b) => {
