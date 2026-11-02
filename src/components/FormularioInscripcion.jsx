@@ -807,12 +807,6 @@ const FormularioInscripcion = () => {
               <li>• 💰 <strong>Cuota mensual:</strong> {precioCuota}</li>
             </ul>
 
-            {esCiclo2027 && (
-              <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
-                <strong>🔄 Adhesión al cobro mensual:</strong> para completar la inscripción al Ciclo 2027, la familia deberá suscribirse al cobro automático de las cuotas mediante Mercado Pago. La adhesión se realizará en un paso posterior y no se efectuará ningún cobro en este formulario.
-              </div>
-            )}
-
             <p className="text-sm text-gray-700 mt-3">
               Queremos que cada familia pueda decidir con tranquilidad, priorizando siempre la experiencia, el aprendizaje y el bienestar de los chicos 🤍
             </p>
@@ -1159,12 +1153,6 @@ const FormularioInscripcion = () => {
               </div>
               )}
             </div>
-
-            {esCiclo2027 && (
-              <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-                <strong>Importante:</strong> luego de confirmar los datos, será necesario adherirse al cobro mensual automático de las cuotas mediante Mercado Pago para completar la inscripción.
-              </div>
-            )}
 
           <div className="flex justify-center gap-4 mt-6">
             <button
