@@ -808,21 +808,19 @@ const elegirHorario = (hora) => {
 
             <ul className="mt-1 text-sm text-gray-800 space-y-1">
               <li>
-                 🔒 <strong>Reserva de cupo:</strong> Inscripción mínima de <strong>$10.000</strong> para asegurar el lugar.
+                 🎉 <strong>Sin costo de inscripción.</strong>
               </li>
 
               <li>
-                 🎉 <strong>Primera clase de prueba:</strong> El taller se abona recién después de la primera clase, cuando el alumno ya vivió la experiencia y decide continuar.
+                 🔒 <strong>Reserva de cupo:</strong> <strong>$10.000</strong> para asegurar el lugar. Este importe se toma a cuenta de la primera cuota.
               </li>
 
               <li>
-                 💰 <strong>Opción 1 – Pago completo con descuento: </strong>  
-                Si abonás el taller completo al inicio (después de la clase de prueba), obtenés un <strong>5% de descuento</strong>, quedando en <strong>$95.000</strong>.
+                 💰 <strong>Valor mensual:</strong> <strong>$65.000 por mes</strong> durante enero y febrero.
               </li>
 
               <li>
-                 💸 <strong>Opción 2 – Pago en cuotas: </strong>  
-                $50.000 en enero y $50.000 en febrero.
+                 💸 Al descontar la reserva, quedarán <strong>$55.000</strong> por abonar de la primera cuota y <strong>$65.000</strong> de la segunda.
               </li>
             </ul>
 
@@ -1166,10 +1164,10 @@ const elegirHorario = (hora) => {
             <div className="mt-6 p-4 border-l-4 border-green-300 bg-green-50 rounded">
             <h4 className="text-lg font-semibold text-green-800 mb-2">📌 Información importante</h4>
             <p className="text-gray-700 text-sm leading-relaxed">
-                Nos comunicamos telefónicamente con todos los inscriptos. Recibirán un mensaje de Whatsapp para el abono de la inscripción y concretar la reserva de banco.
+                Nos comunicamos telefónicamente con todos los inscriptos. Recibirán un mensaje de WhatsApp para abonar la reserva de cupo de <strong>$10.000</strong>.
             </p>
             <p className="mt-2 text-gray-700 text-sm leading-relaxed">
-                Luego, si el nene/nena realiza la primer clase y decide no continuar, <strong>NO se debe abonar el mes</strong>. Si decide continuar, se deberá abonar la cuota correspondiente.
+                La reserva se descontará de la primera cuota mensual de <strong>$65.000</strong>, por lo que quedarán <strong>$55.000</strong> por abonar ese mes.
             </p>
             </div>
 
