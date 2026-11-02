@@ -166,6 +166,7 @@ const createCheckout = async (body: Record<string, any>) => {
       alumno_id: body.alumno_id,
       matricula_id: enrollments[0].id,
       monto: 10000,
+      ambiente: accessToken().startsWith("TEST-") ? "prueba" : "produccion",
       external_reference: externalReference,
       idempotency_key: idempotencyKey,
       payer_email: email,
@@ -223,7 +224,7 @@ const createCheckout = async (body: Record<string, any>) => {
 const adminList = async (request: Request) => {
   if (!(await verifyAdmin(request))) return jsonResponse(401, { ok: false, error: "Acceso no autorizado." });
   const reservations = await rest(
-    "reservas_mercadopago?select=id,alumno_id,matricula_id,ciclo_codigo,concepto,monto,moneda,estado,detalle_estado,mp_order_id,mp_payment_id,pagado_en,creado_en,actualizado_en&order=creado_en.desc&limit=500",
+    "reservas_mercadopago?select=id,alumno_id,matricula_id,ciclo_codigo,concepto,monto,moneda,ambiente,estado,detalle_estado,mp_order_id,mp_payment_id,pagado_en,creado_en,actualizado_en&order=creado_en.desc&limit=500",
   );
   const ids = [...new Set((reservations || []).map((item: Record<string, any>) => item.alumno_id).filter(Boolean))];
   const students = ids.length

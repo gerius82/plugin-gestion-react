@@ -60,7 +60,9 @@ export default function ReservasVerano() {
   useEffect(() => { if (config) load(); }, [config]);
 
   const filtered = useMemo(() => rows.filter((row) => !filter || row.estado === filter), [filter, rows]);
-  const approved = rows.filter((row) => row.estado === "aprobado");
+  const productionRows = rows.filter((row) => row.ambiente !== "prueba");
+  const approved = productionRows.filter((row) => row.estado === "aprobado");
+  const testRows = rows.filter((row) => row.ambiente === "prueba");
   const total = approved.reduce((sum, row) => sum + Number(row.monto || 0), 0);
 
   return (
@@ -74,6 +76,7 @@ export default function ReservasVerano() {
       </header>
 
       {!configured && !loading && <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900"><strong>Integración preparada.</strong> Falta conectar las credenciales de Mercado Pago para habilitar los cobros.</div>}
+      {testRows.length > 0 && <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900"><strong>Entorno de prueba:</strong> hay {testRows.length} movimiento{testRows.length === 1 ? "" : "s"} de validación que no se incluye{testRows.length === 1 ? "" : "n"} en los totales reales.</div>}
       {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>}
 
       <section className="mb-5 grid gap-4 sm:grid-cols-3">
@@ -85,7 +88,7 @@ export default function ReservasVerano() {
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4"><h2 className="font-bold">Movimientos</h2><select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-lg border px-3 py-2 text-sm"><option value="">Todos los estados</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
         {loading ? <p className="p-6 text-gray-500">Cargando reservas…</p> : !filtered.length ? <p className="p-6 text-gray-500">Todavía no hay reservas para mostrar.</p> : (
-          <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-sm"><thead className="bg-gray-50 text-left text-gray-600"><tr>{["Fecha", "Alumno", "Responsable", "Contacto", "Importe", "Estado", "Pago MP"].map((title) => <th key={title} className="px-4 py-3">{title}</th>)}</tr></thead><tbody>{filtered.map((row) => <tr key={row.id} className="border-t"><td className="whitespace-nowrap px-4 py-3">{dateTime(row.creado_en)}</td><td className="px-4 py-3 font-semibold">{row.alumno ? `${row.alumno.nombre} ${row.alumno.apellido}` : "—"}</td><td className="px-4 py-3">{row.alumno?.responsable || "—"}</td><td className="px-4 py-3"><div>{row.alumno?.telefono || "—"}</div><div className="text-xs text-gray-500">{row.alumno?.email || ""}</div></td><td className="px-4 py-3 font-semibold">{money.format(Number(row.monto || 0))}</td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${badge[row.estado] || badge.error}`}>{labels[row.estado] || row.estado}</span></td><td className="px-4 py-3 font-mono text-xs">{row.mp_payment_id || row.mp_order_id || "—"}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[940px] text-sm"><thead className="bg-gray-50 text-left text-gray-600"><tr>{["Fecha", "Alumno", "Responsable", "Contacto", "Importe", "Ambiente", "Estado", "Pago MP"].map((title) => <th key={title} className="px-4 py-3">{title}</th>)}</tr></thead><tbody>{filtered.map((row) => <tr key={row.id} className="border-t"><td className="whitespace-nowrap px-4 py-3">{dateTime(row.creado_en)}</td><td className="px-4 py-3 font-semibold">{row.alumno ? `${row.alumno.nombre} ${row.alumno.apellido}` : "—"}</td><td className="px-4 py-3">{row.alumno?.responsable || "—"}</td><td className="px-4 py-3"><div>{row.alumno?.telefono || "—"}</div><div className="text-xs text-gray-500">{row.alumno?.email || ""}</div></td><td className="px-4 py-3 font-semibold">{money.format(Number(row.monto || 0))}</td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${row.ambiente === "prueba" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"}`}>{row.ambiente === "prueba" ? "Prueba" : "Producción"}</span></td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${badge[row.estado] || badge.error}`}>{labels[row.estado] || row.estado}</span></td><td className="px-4 py-3 font-mono text-xs">{row.mp_payment_id || row.mp_order_id || "—"}</td></tr>)}</tbody></table></div>
         )}
       </section>
     </main>
