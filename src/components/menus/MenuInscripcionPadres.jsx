@@ -119,8 +119,12 @@ export default function MenuInscripcionPadres() {
                 {c.nombre_publico || c.codigo}
               </h3>
               {!habilitado && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-300 text-gray-700">
-                  Terminado
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                  c.codigo === "TDV"
+                    ? "bg-amber-100 text-amber-800 border border-amber-200"
+                    : "bg-gray-300 text-gray-700"
+                }`}>
+                  {c.codigo === "TDV" ? "Próximamente" : "Terminado"}
                 </span>
               )}
             </div>
