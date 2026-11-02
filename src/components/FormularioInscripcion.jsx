@@ -582,6 +582,9 @@ const FormularioInscripcion = () => {
       : formulario.curso.toLowerCase().includes("arduino")
       ? "$50.000"
       : "$48.000";
+  const cicloSeleccionado = ciclos.find((c) => c.codigo === cicloSel);
+  const nombreCiclo = cicloSeleccionado?.nombre_publico || cicloSel || "Ciclo de talleres";
+  const esCiclo2027 = /2027/.test(`${cicloSel} ${nombreCiclo}`);
 
   const confirmarEnvio = async () => {
     setMostrarResumen(false);
@@ -777,7 +780,7 @@ const FormularioInscripcion = () => {
 
           <div className="mb-6 p-4 bg-emerald-50 border-l-4 border-emerald-400 rounded-lg shadow-sm animate-fadeIn">
             <h3 className="text-xl font-semibold text-emerald-700 mb-2">
-              🤖🚀 ¡Ciclo 2026 de Robótica y Programación en Plugin! ⚙️
+              🤖🚀 ¡{nombreCiclo} de Robótica y Programación en Plugin! ⚙️
             </h3>
             <p className="text-sm text-gray-700 leading-relaxed">
               No hace falta experiencia previa: solo ganas de aprender y disfrutar.
@@ -791,7 +794,7 @@ const FormularioInscripcion = () => {
 
             <ul className="mt-4 space-y-1 text-sm text-gray-800">
               <li>📅 <strong>Duración:</strong> de marzo a diciembre</li>
-              <li>🗓️ <strong>Inicio:</strong> Lunes 2 de marzo de 2026</li>
+              <li>🗓️ <strong>Inicio:</strong> {esCiclo2027 ? "marzo de 2027" : "Lunes 2 de marzo de 2026"}</li>
               <li>🧩 <strong>Modalidad:</strong> 1 clase semanal de 90 minutos</li>
             </ul>
 
@@ -803,6 +806,12 @@ const FormularioInscripcion = () => {
               )}
               <li>• 💰 <strong>Cuota mensual:</strong> {precioCuota}</li>
             </ul>
+
+            {esCiclo2027 && (
+              <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+                <strong>🔄 Adhesión al cobro mensual:</strong> para completar la inscripción al Ciclo 2027, la familia deberá suscribirse al cobro automático de las cuotas mediante Mercado Pago. La adhesión se realizará en un paso posterior y no se efectuará ningún cobro en este formulario.
+              </div>
+            )}
 
             <p className="text-sm text-gray-700 mt-3">
               Queremos que cada familia pueda decidir con tranquilidad, priorizando siempre la experiencia, el aprendizaje y el bienestar de los chicos 🤍
@@ -1148,8 +1157,14 @@ const FormularioInscripcion = () => {
                 <h4 className="font-semibold text-gray-700 mb-2">Comentarios adicionales</h4>
                 <p>{formulario.comentarios}</p>
               </div>
+              )}
+            </div>
+
+            {esCiclo2027 && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
+                <strong>Importante:</strong> luego de confirmar los datos, será necesario adherirse al cobro mensual automático de las cuotas mediante Mercado Pago para completar la inscripción.
+              </div>
             )}
-          </div>
 
           <div className="flex justify-center gap-4 mt-6">
             <button
