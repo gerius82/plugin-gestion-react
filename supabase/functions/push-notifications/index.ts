@@ -375,6 +375,39 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
       url: `/cumples-alumnos?mes=${month}&dia=${day}`,
       actions: [{ action: "open-birthdays", title: "Ver cumpleaños" }],
     };
+  } else if (event.event_type === "survey_response") {
+    const intentionLabels: Record<string, string> = {
+      definitivamente: "Definitivamente sí",
+      probablemente: "Probablemente sí",
+      tal_vez: "Tal vez",
+      no: "No",
+    };
+    const siteLabels: Record<string, string> = {
+      centro: "Centro",
+      fisherton: "Fisherton",
+      cualquiera: "Cualquiera",
+    };
+    const periodLabels: Record<string, string> = {
+      enero: "Enero",
+      febrero: "Febrero",
+      ambos: "Enero y febrero",
+      no_sabe: "Aún no sabe",
+    };
+    const contactName = String(eventPayload.contact_name || "").trim();
+    const details = [
+      `Intención: ${intentionLabels[String(eventPayload.intention || "")] || eventPayload.intention || "Sin dato"}`,
+      `Sede: ${siteLabels[String(eventPayload.site || "")] || eventPayload.site || "Sin dato"}`,
+      `Período: ${periodLabels[String(eventPayload.period || "")] || eventPayload.period || "Sin dato"}`,
+    ];
+    if (eventPayload.wants_news) {
+      details.push(`Quiere novedades${eventPayload.phone ? `: ${eventPayload.phone}` : ""}`);
+    }
+    notification = {
+      title: "Nueva respuesta en la encuesta",
+      body: `${contactName ? `${contactName} completó la encuesta.` : "Una familia completó la encuesta."}\n${details.join(" · ")}`,
+      url: "/encuesta-colonia-resultados",
+      actions: [{ action: "open-survey", title: "Ver resultados" }],
+    };
   } else if (event.event_type === "custom_notification") {
     notification = {
       title: String(eventPayload.title || "PLUGIN Gestión").slice(0, 80),
@@ -548,6 +581,7 @@ Deno.serve(async (request) => {
         "attendance_recorded",
         "daily_summary",
         "birthday_summary",
+        "survey_response",
       ];
       if (!allowedTypes.includes(eventType) || typeof payload.enabled !== "boolean") {
         return jsonResponse(400, { ok: false, error: "Tipo de notificación inválido" });

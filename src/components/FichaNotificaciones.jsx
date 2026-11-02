@@ -16,6 +16,7 @@ const ETIQUETAS = {
   attendance_recorded: "Asistencia",
   daily_summary: "Resumen diario",
   birthday_summary: "Cumpleaños",
+  survey_response: "Encuesta completada",
   custom_notification: "Personalizada",
 };
 
@@ -33,6 +34,11 @@ const resumenEvento = (evento) => {
   if (evento.event_type === "birthday_summary") {
     const cantidad = Array.isArray(payload.birthdays) ? payload.birthdays.length : 0;
     return cantidad ? `${cantidad} cumpleaños` : "Sin cumpleaños";
+  }
+  if (evento.event_type === "survey_response") {
+    return payload.contact_name
+      ? `${payload.contact_name} · ${payload.phone || "Con contacto"}`
+      : "Nueva respuesta de una familia";
   }
   return "Notificación";
 };
