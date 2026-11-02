@@ -16,7 +16,7 @@ import {
   FaKey,
   FaSignOutAlt,
   FaWhatsapp
-  ,FaPoll
+  ,FaSun
 } from "react-icons/fa";
 
 export default function MenuGestion() {
@@ -176,13 +176,13 @@ export default function MenuGestion() {
         </Link>
 
         <Link
-          to="/encuesta-colonia-resultados"
+          to="/colonia-gestion"
           className="bg-white rounded-xl border-l-8 border-cyan-500 p-4 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
         >
-          <FaPoll className="text-cyan-600 text-3xl" />
+          <FaSun className="text-cyan-600 text-3xl" />
           <div>
-            <span className="block font-semibold text-lg">Encuesta Colonia 2027</span>
-            <span className="block text-sm text-gray-500">Resultados, cruces y exportación</span>
+            <span className="block font-semibold text-lg">Colonia Tecnológica</span>
+            <span className="block text-sm text-gray-500">Encuesta y resultados 2027</span>
           </div>
         </Link>
 

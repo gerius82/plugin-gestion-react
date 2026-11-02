@@ -111,7 +111,7 @@ export default function EncuestaColoniaResultados() {
   return (
     <main className="w-full max-w-7xl pb-10">
       <header className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-3"><button type="button" onClick={() => navigate("/menu-gestion")} className="!flex !h-10 !w-10 items-center justify-center rounded-full border bg-gray-50 !p-0"><FaArrowLeft /></button><div><h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl"><FaChartBar className="text-cyan-700" /> Encuesta Colonia 2027</h1><p className="text-sm text-gray-500">Resultados reales almacenados en Supabase</p></div></div>
+        <div className="flex items-center gap-3"><button type="button" onClick={() => navigate("/colonia-gestion")} className="!flex !h-10 !w-10 items-center justify-center rounded-full border bg-gray-50 !p-0"><FaArrowLeft /></button><div><h1 className="flex items-center gap-2 text-xl font-bold sm:text-2xl"><FaChartBar className="text-cyan-700" /> Encuesta Colonia 2027</h1><p className="text-sm text-gray-500">Resultados reales almacenados en Supabase</p></div></div>
         <div className="flex w-full gap-2 sm:w-auto"><button type="button" onClick={load} disabled={loading} className="!flex !w-auto flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold sm:flex-none"><FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualizar</button><button type="button" onClick={exportCsv} disabled={!filtered.length} className="!flex !w-auto flex-1 items-center justify-center gap-2 rounded-lg bg-cyan-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:flex-none"><FaDownload /> Exportar CSV</button></div>
       </header>
 
@@ -159,4 +159,3 @@ export default function EncuestaColoniaResultados() {
     </main>
   );
 }
-
