@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FaBirthdayCake, FaExchangeAlt, FaHistory, FaTag, FaUserEdit, FaUserTimes } from "react-icons/fa";
+import { FaBirthdayCake, FaExchangeAlt, FaHistory, FaRobot, FaTag, FaUserEdit, FaUserTimes } from "react-icons/fa";
 
 export default function MenuPadres() {
   const [config, setConfig] = useState(null);
@@ -50,6 +50,17 @@ export default function MenuPadres() {
           </span>
         </Link>
       </div>
+
+      <Link
+        to="/encuesta-colonia-2027"
+        className="bg-white border-l-8 border-cyan-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
+      >
+        <FaRobot className="text-cyan-600 text-3xl" />
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold">Colonia Tecnológica 2027</span>
+          <span className="text-xs text-gray-500">Contanos qué propuesta te gustaría para el verano</span>
+        </div>
+      </Link>
 
       <Link
         to="/promos"

@@ -42,6 +42,8 @@ import MenuProfes from "./components/menus/MenuProfes";
 import MenuResumen from "./components/menus/MenuResumen";
 import PagosMenu from "./components/menus/PagosMenu";
 import WhatsAppCentro from "./components/WhatsAppCentro";
+import EncuestaColonia2027 from "./components/EncuestaColonia2027";
+import EncuestaColoniaResultados from "./components/EncuestaColoniaResultados";
 
 function App() {
   return (
@@ -74,6 +76,7 @@ function App() {
             <Route path="/profes-urgencias" element={<ProfesUrgencias />} />
             <Route path="/asistencias" element={<FichaAsistencia />} />
             <Route path="/pagos" element={<Pagos />} />
+            <Route path="/encuesta-colonia-2027" element={<EncuestaColonia2027 />} />
 
             {/* Todo el sector de Gestión requiere sesión */}
             <Route element={<RequireGestionAuth />}>
@@ -106,6 +109,7 @@ function App() {
               <Route path="/instalar-app" element={<InstalarApp />} />
               <Route path="/notificaciones" element={<Notificaciones />} />
               <Route path="/whatsapp-centro" element={<WhatsAppCentro />} />
+              <Route path="/encuesta-colonia-resultados" element={<EncuestaColoniaResultados />} />
             </Route>
           </Routes>
         </div>
