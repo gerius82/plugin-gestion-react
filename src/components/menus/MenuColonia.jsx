@@ -108,15 +108,15 @@ export default function MenuColonia() {
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Link
-          to="/encuesta-colonia-2027"
+          to="/encuesta-colonia-2027?preview=gestion"
           className="group rounded-2xl border border-cyan-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
         >
           <div className="flex items-start justify-between gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-100 text-2xl text-cyan-700"><FaRobot /></span>
             <FaExternalLinkAlt className="text-gray-400 transition group-hover:text-cyan-700" />
           </div>
-          <h2 className="mt-5 text-lg font-bold text-gray-900">Ver encuesta pública</h2>
-          <p className="mt-2 text-sm leading-relaxed text-gray-600">Abrí el formulario exactamente como lo verán las familias.</p>
+          <h2 className="mt-5 text-lg font-bold text-gray-900">Vista previa de la encuesta</h2>
+          <p className="mt-2 text-sm leading-relaxed text-gray-600">Revisá el formulario completo aunque todavía esté oculto para las familias.</p>
         </Link>
 
         <Link

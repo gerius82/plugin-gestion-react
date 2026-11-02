@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaCheck, FaFlask, FaGamepad, FaLaptopCode, FaPalette, FaRobot, FaWhatsapp } from "react-icons/fa";
+import { useLocation } from "react-router-dom";
+import { useGestionAuth } from "./GestionAuth";
 
 const DRAFT_KEY = "plugin_encuesta_colonia_2027_borrador";
 const SUBMISSION_KEY = "plugin_encuesta_colonia_2027_envio";
@@ -103,6 +105,9 @@ function Question({ number, field, value, onChange }) {
 }
 
 export default function EncuestaColonia2027() {
+  const location = useLocation();
+  const { cargando: authLoading, esAdministrador } = useGestionAuth();
+  const previewRequested = new URLSearchParams(location.search).get("preview") === "gestion";
   const [form, setForm] = useState(() => {
     try {
       return { ...initialForm, ...JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}") };
@@ -112,6 +117,7 @@ export default function EncuestaColonia2027() {
   });
   const [config, setConfig] = useState(null);
   const [available, setAvailable] = useState(null);
+  const [previewMode, setPreviewMode] = useState(false);
   const [startedAt] = useState(Date.now());
   const [submissionId] = useState(() => {
     const stored = localStorage.getItem(SUBMISSION_KEY);
@@ -129,17 +135,22 @@ export default function EncuestaColonia2027() {
   }, []);
 
   useEffect(() => {
-    if (!config) return;
+    if (!config || authLoading) return;
     fetch(`${config.supabaseUrl}/functions/v1/encuesta-colonia-2027?action=status`, {
       headers: { apikey: config.supabaseKey },
     })
       .then((response) => response.json())
-      .then((result) => setAvailable(result?.visible === true))
+      .then((result) => {
+        const publicVisible = result?.visible === true;
+        const adminPreview = !publicVisible && previewRequested && esAdministrador;
+        setPreviewMode(adminPreview);
+        setAvailable(publicVisible || adminPreview);
+      })
       .catch(() => {
         setAvailable(false);
         setError("No pudimos comprobar si la encuesta está disponible.");
       });
-  }, [config]);
+  }, [authLoading, config, esAdministrador, previewRequested]);
 
   useEffect(() => {
     if (!sent) localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
@@ -229,6 +240,11 @@ export default function EncuestaColonia2027() {
 
   return (
     <main className="w-full max-w-3xl pb-10">
+      {previewMode && (
+        <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950">
+          <strong>Vista previa administrativa:</strong> la encuesta está oculta para las familias. Podés revisar y completar el formulario, pero el envío permanecerá deshabilitado hasta que la publiques.
+        </div>
+      )}
       <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-cyan-700 via-blue-700 to-indigo-800 p-6 text-white shadow-xl sm:p-9">
         <p className="text-sm font-bold uppercase tracking-[0.2em] text-cyan-100">Colonia Tecnológica 2027</p>
         <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl">☀️🤖 ¡Este verano, la diversión no depende del clima!</h1>
@@ -292,8 +308,8 @@ export default function EncuestaColonia2027() {
 
         <input name="website" value={form.website} onChange={change} tabIndex="-1" autoComplete="off" className="absolute -left-[9999px]" aria-hidden="true" />
         {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-        <button type="submit" disabled={sending || !completed || !config} className="!w-full rounded-xl bg-cyan-700 px-6 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50">
-          {sending ? "Enviando…" : "Enviar encuesta"}
+        <button type="submit" disabled={sending || !completed || !config || previewMode} className="!w-full rounded-xl bg-cyan-700 px-6 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-50">
+          {previewMode ? "Vista previa — envío deshabilitado" : sending ? "Enviando…" : "Enviar encuesta"}
         </button>
         <p className="text-center text-xs text-gray-500">No solicitamos DNI ni datos innecesarios.</p>
       </form>
