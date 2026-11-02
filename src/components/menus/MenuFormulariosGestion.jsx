@@ -107,13 +107,11 @@ export default function MenuFormulariosGestion() {
                       </span>
                     </div>
                     {ciclo.descripcion && <p className="mt-2 text-sm text-gray-600">{ciclo.descripcion}</p>}
-                    {(ciclo.fecha_inicio || ciclo.fecha_fin) && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        {ciclo.fecha_inicio ? `Desde ${formatearFecha(ciclo.fecha_inicio)}` : ""}
-                        {ciclo.fecha_inicio && ciclo.fecha_fin ? " · " : ""}
-                        {ciclo.fecha_fin ? `Hasta ${formatearFecha(ciclo.fecha_fin)}` : ""}
-                      </p>
-                    )}
+                    <div className="mt-2 space-y-1 text-xs text-gray-500">
+                      {ciclo.fecha_inicio && <p>Inscripciones: {formatearFecha(ciclo.fecha_inicio)}</p>}
+                      {ciclo.fecha_inicio_ciclo && <p>Inicio del taller: {formatearFecha(ciclo.fecha_inicio_ciclo)}</p>}
+                      {ciclo.fecha_fin && <p>Finalización: {formatearFecha(ciclo.fecha_fin)}</p>}
+                    </div>
                     <span className="mt-4 inline-flex items-center gap-2 font-semibold text-cyan-700 group-hover:text-cyan-800">
                       <FaEye /> Ver formulario
                     </span>

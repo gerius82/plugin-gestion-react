@@ -16,7 +16,7 @@ select
   true,
   'Taller de verano para los meses de enero y febrero de 2027',
   2,
-  date '2027-01-05'
+  date '2027-01-04'
 where not exists (
   select 1 from public.ciclos where codigo = 'TDV_2027'
 );
@@ -83,4 +83,3 @@ where source.ciclo_codigo = 'TDV'
       and target.dia = source.dia
       and target.hora = source.hora
   );
-

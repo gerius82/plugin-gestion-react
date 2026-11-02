@@ -862,7 +862,7 @@ const elegirHorario = (hora) => {
             {/* Duración, fechas, modalidad */}
             <ul className="mt-4 space-y-1 text-sm text-gray-800">
               <li>📅 <strong>Duración:</strong> 2 meses (8 clases)</li>
-              <li>🗓️ <strong>Inicio:</strong> 5 de enero de 2027</li>
+              <li>🗓️ <strong>Inicio:</strong> 4 de enero de 2027</li>
               <li>🧩 <strong>Modalidad:</strong> 1 clase por semana de 90 minutos cada una</li>
             </ul>
 
