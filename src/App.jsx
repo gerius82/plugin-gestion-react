@@ -38,6 +38,7 @@ import MenuGestion from "./components/menus/MenuGestion";
 import MenuColonia from "./components/menus/MenuColonia";
 import MenuInscripcionCursos from "./components/menus/MenuInscripcionCursos";
 import MenuInscripcionPadres from "./components/menus/MenuInscripcionPadres";
+import MenuFormulariosGestion from "./components/menus/MenuFormulariosGestion";
 import MenuPadres from "./components/menus/MenuPadres";
 import MenuProfes from "./components/menus/MenuProfes";
 import MenuResumen from "./components/menus/MenuResumen";
@@ -87,6 +88,7 @@ function App() {
               <Route path="/" element={<Navigate to="/menu-gestion" replace />} />
               <Route path="/seguridad-gestion" element={<SeguridadGestion />} />
               <Route path="/menu-gestion" element={<MenuGestion />} />
+              <Route path="/formularios-inscripcion" element={<MenuFormulariosGestion />} />
               <Route path="/colonia-gestion" element={<MenuColonia />} />
               <Route path="/alumnos-menu" element={<AlumnosMenu />} />
               <Route path="/ficha" element={<FichaAlumno />} />

@@ -64,7 +64,7 @@ const FormularioInscripcion = () => {
   const cicloParaVolver = cicloSel || cicloParam || "";
   const rutaSalida =
     origen === "gestion"
-      ? "/menu-gestion"
+      ? `/menu-inscripcion-cursos?origen=gestion&ciclo=${encodeURIComponent(cicloParaVolver)}`
       : from === "menu-inscripcion-cursos"
       ? `/menu-inscripcion-cursos?ciclo=${encodeURIComponent(cicloParaVolver)}`
       : origen === "padres" || from === "menu-intermedio"
@@ -735,6 +735,11 @@ const FormularioInscripcion = () => {
 
   return (
     <div className="max-w-[700px] w-full mx-auto p-8 bg-white rounded-xl shadow-lg mt-8">
+      {origen === "gestion" && !mensajeExito && (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <strong>Vista administrativa:</strong> este es el mismo formulario que verán las familias. Podés completarlo y generar una inscripción desde aquí.
+        </div>
+      )}
       {mensajeExito ? (
         <div className="mt-6 p-4 border-l-4 border-green-400 bg-green-50 text-green-800 rounded animate-fadeIn">
           <h4 className="text-lg font-semibold mb-1">Inscripción completada con exito</h4>

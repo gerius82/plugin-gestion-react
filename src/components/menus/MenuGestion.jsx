@@ -55,13 +55,16 @@ export default function MenuGestion() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* ✅ Formulario de Inscripción */}
+        {/* ✅ Formularios de Inscripción */}
         <Link
-          to="/formulario?origen=gestion"
+          to="/formularios-inscripcion"
           className="bg-white rounded-xl border-l-8 border-green-500 p-5 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
         >
           <FaUserEdit className="text-green-500 text-3xl" />
-          <span className="font-semibold text-lg">Formulario de Inscripción</span>
+          <div>
+            <span className="block font-semibold text-lg">Formularios de Inscripción</span>
+            <span className="block text-sm text-gray-500">Vista previa y carga administrativa</span>
+          </div>
         </Link>
 
         {/* ✅ Ficha Alumno */}

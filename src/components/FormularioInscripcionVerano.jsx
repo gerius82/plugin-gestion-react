@@ -45,6 +45,7 @@ const FormularioInscripcionVerano = () => {
   const [searchParams] = useSearchParams();
   const origen = searchParams.get("origen");
   const from = searchParams.get("from");
+  const esVistaGestion = origen === "gestion";
 
   const [ciclos, setCiclos] = useState([]);
   const [cicloSel, setCicloSel] = useState("");
@@ -88,7 +89,7 @@ const FormularioInscripcionVerano = () => {
 
   const rutaSalida =
   origen === "gestion"
-    ? "/menu-gestion"
+    ? "/formularios-inscripcion"
     : from === "menu-intermedio"
     ? "/menu-inscripcion-padres"
     : "/menu-padres";
@@ -405,7 +406,7 @@ const FormularioInscripcionVerano = () => {
     const dataCiclo = resCiclo.ok ? await resCiclo.json() : [];
     const ciclo = Array.isArray(dataCiclo) ? dataCiclo[0] : null;
     const hoy = fechaActualArgentina();
-    const abierta = Boolean(
+    const abierta = esVistaGestion || Boolean(
       ciclo?.activo &&
       (!ciclo.fecha_inicio || hoy >= ciclo.fecha_inicio) &&
       (!ciclo.fecha_fin || hoy <= ciclo.fecha_fin)
@@ -436,7 +437,7 @@ const FormularioInscripcionVerano = () => {
       setFormulario((prev) => ({ ...prev, curso: "" }));
     }
   })();
-}, [config]);
+}, [config, esVistaGestion]);
 
 useEffect(() => {
   const s = Object.keys(turnosConfig || {});
@@ -779,6 +780,12 @@ const elegirHorario = (hora) => {
 
   return (
     <div className="max-w-[700px] w-full mx-auto p-8 bg-white rounded-xl shadow-lg mt-8">
+
+      {esVistaGestion && !mensajeExito && (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <strong>Vista administrativa:</strong> este es el mismo formulario que verán las familias. Podés completarlo y generar una inscripción aun antes de su publicación.
+        </div>
+      )}
 
       {mensajeExito ? (
         // ✅ Solo mensaje de éxito final

@@ -46,6 +46,7 @@ export default function MenuInscripcionCursos() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const ciclo = params.get("ciclo") || "";
+  const esGestion = params.get("origen") === "gestion";
 
   const [config, setConfig] = useState(null);
   const [cicloNombre, setCicloNombre] = useState("");
@@ -183,10 +184,10 @@ export default function MenuInscripcionCursos() {
     <div className="w-full max-w-6xl mx-auto mt-8 px-4">
       <div className="max-w-5xl mx-auto flex items-center justify-between mb-6 gap-4">
         <h1 className="text-2xl md:text-3xl font-bold text-center flex-1">
-          Cursos disponibles
+          {esGestion ? "Formularios disponibles" : "Cursos disponibles"}
         </h1>
         <button
-          onClick={() => navigate("/menu-inscripcion-padres")}
+          onClick={() => navigate(esGestion ? "/formularios-inscripcion" : "/menu-inscripcion-padres")}
           className="ml-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 hover:bg-gray-200 flex-none w-auto"
           style={{ border: "1px solid #d1d5db" }}
         >
@@ -195,6 +196,11 @@ export default function MenuInscripcionCursos() {
       </div>
 
       <div className="bg-white rounded-xl shadow p-6 max-w-5xl mx-auto">
+        {esGestion && (
+          <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <strong>Vista administrativa:</strong> abrí cualquier taller para ver y completar el formulario real.
+          </div>
+        )}
         <p className="text-center text-gray-600 mb-6">
           Ciclo: <span className="font-semibold text-gray-800">{cicloNombre}</span>
         </p>
@@ -260,14 +266,14 @@ export default function MenuInscripcionCursos() {
                       type="button"
                       onClick={() =>
                         navigate(
-                          `/formulario?origen=padres&from=menu-inscripcion-cursos&ciclo=${encodeURIComponent(
+                          `/formulario?origen=${esGestion ? "gestion" : "padres"}&from=menu-inscripcion-cursos&ciclo=${encodeURIComponent(
                             ciclo
                           )}&curso_id=${curso.id}`
                         )
                       }
                       className="w-full px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition"
                     >
-                      Inscribir
+                      {esGestion ? "Ver formulario" : "Inscribir"}
                     </button>
                   </div>
                 </div>
