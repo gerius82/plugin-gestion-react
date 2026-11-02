@@ -92,6 +92,11 @@ const publicSubmit = async (request: Request) => {
   const body = await parseBody(request);
   if (cleanText(body.website, 100)) return jsonResponse(200, { ok: true });
 
+  const settings = await rest("encuesta_colonia_config?select=visible&id=eq.global&limit=1");
+  if (settings?.[0]?.visible !== true) {
+    return jsonResponse(403, { ok: false, error: "La encuesta no está disponible en este momento." });
+  }
+
   const startedAt = Number(body.started_at || 0);
   if (!Number.isFinite(startedAt) || Date.now() - startedAt < 2500) {
     return jsonResponse(429, { ok: false, error: "Esperá unos segundos antes de enviar." });
@@ -156,13 +161,33 @@ const publicSubmit = async (request: Request) => {
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    if (request.method === "POST") return await publicSubmit(request);
+    if (request.method === "POST") {
+      const cloned = request.clone();
+      const body = await parseBody(cloned);
+      if (body.action === "set_visibility") {
+        if (!(await verifyAdmin(request))) return jsonResponse(403, { ok: false, error: "Acceso administrativo requerido" });
+        const visible = body.visible === true;
+        await rest("encuesta_colonia_config?id=eq.global", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({ visible, updated_at: new Date().toISOString() }),
+        });
+        return jsonResponse(200, { ok: true, visible });
+      }
+      return await publicSubmit(request);
+    }
     if (request.method === "GET") {
+      const action = new URL(request.url).searchParams.get("action");
+      if (action === "status") {
+        const settings = await rest("encuesta_colonia_config?select=visible&id=eq.global&limit=1");
+        return jsonResponse(200, { ok: true, visible: settings?.[0]?.visible === true });
+      }
       if (!(await verifyAdmin(request))) return jsonResponse(403, { ok: false, error: "Acceso administrativo requerido" });
-      const rows = await rest(
-        "encuesta_colonia_2027?select=id,created_at,interes,intencion_inscripcion,sede_preferida,turno_preferido,periodo_interes,actividades,sugerencias,quiere_novedades,nombre_contacto,whatsapp_contacto&order=created_at.desc&limit=1000",
-      );
-      return jsonResponse(200, { ok: true, responses: rows || [] });
+      const [rows, settings] = await Promise.all([
+        rest("encuesta_colonia_2027?select=id,created_at,interes,intencion_inscripcion,sede_preferida,turno_preferido,periodo_interes,actividades,sugerencias,quiere_novedades,nombre_contacto,whatsapp_contacto&order=created_at.desc&limit=1000"),
+        rest("encuesta_colonia_config?select=visible,updated_at&id=eq.global&limit=1"),
+      ]);
+      return jsonResponse(200, { ok: true, responses: rows || [], settings: settings?.[0] || { visible: false } });
     }
     return jsonResponse(405, { ok: false, error: "Método no permitido" });
   } catch (error) {
@@ -170,4 +195,3 @@ Deno.serve(async (request) => {
     return jsonResponse(500, { ok: false, error: error instanceof Error ? error.message : "Error interno" });
   }
 });
-

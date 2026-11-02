@@ -5,6 +5,7 @@ import { FaBirthdayCake, FaExchangeAlt, FaHistory, FaRobot, FaTag, FaUserEdit, F
 export default function MenuPadres() {
   const [config, setConfig] = useState(null);
   const [cumplesHabilitado, setCumplesHabilitado] = useState(false);
+  const [encuestaVisible, setEncuestaVisible] = useState(false);
 
   useEffect(() => {
     fetch("/config.json")
@@ -32,35 +33,40 @@ export default function MenuPadres() {
     })();
   }, [config]);
 
+  useEffect(() => {
+    if (!config) return;
+    fetch(`${config.supabaseUrl}/functions/v1/encuesta-colonia-2027?action=status`, {
+      headers: { apikey: config.supabaseKey },
+    })
+      .then((response) => response.json())
+      .then((result) => setEncuestaVisible(result?.visible === true))
+      .catch(() => setEncuestaVisible(false));
+  }, [config]);
+
   return (
     <div className="max-w-2xl mx-auto mt-8 space-y-4">
       <h1 className="text-2xl font-bold mb-4 text-center">Menú para Padres</h1>
 
-      <div className="relative">
-        <Link
-          to="/menu-inscripcion-padres"
-          className="bg-white border-l-8 border-green-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex flex-col items-start gap-3"
-        >
-          <div className="flex items-center gap-4">
-            <FaUserEdit className="text-green-500 text-3xl" />
-            <span className="font-semibold text-lg">Información de talleres</span>
-          </div>
-          <span className="mx-auto text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-md animate-blink glow-badge">
-            Inscripción abierta
-          </span>
-        </Link>
-      </div>
-
       <Link
-        to="/encuesta-colonia-2027"
-        className="bg-white border-l-8 border-cyan-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
+        to="/menu-inscripcion-padres"
+        className="bg-white border-l-8 border-green-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
       >
-        <FaRobot className="text-cyan-600 text-3xl" />
-        <div className="flex flex-col gap-1">
-          <span className="font-semibold">Colonia Tecnológica 2027</span>
-          <span className="text-xs text-gray-500">Contanos qué propuesta te gustaría para el verano</span>
-        </div>
+        <FaUserEdit className="text-green-500 text-3xl" />
+        <span className="font-semibold text-lg">Información de talleres</span>
       </Link>
+
+      {encuestaVisible && (
+        <Link
+          to="/encuesta-colonia-2027"
+          className="bg-white border-l-8 border-cyan-500 text-gray-800 rounded-xl p-5 shadow hover:shadow-md transition hover:scale-[1.02] text-left flex items-center gap-4"
+        >
+          <FaRobot className="text-cyan-600 text-3xl" />
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">Encuesta: Colonia Tecnológica 2027</span>
+            <span className="text-xs text-gray-500">Ayudanos a conocer el interés de las familias para el verano</span>
+          </div>
+        </Link>
+      )}
 
       <Link
         to="/promos"

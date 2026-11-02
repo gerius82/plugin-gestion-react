@@ -1,8 +1,62 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaChartBar, FaExternalLinkAlt, FaRobot, FaSun } from "react-icons/fa";
+import { getSupabaseAuthClient } from "../../lib/supabaseAuth";
 
 export default function MenuColonia() {
   const navigate = useNavigate();
+  const [config, setConfig] = useState(null);
+  const [visible, setVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/config.json")
+      .then((response) => response.json())
+      .then(setConfig)
+      .catch(() => {
+        setError("No se pudo cargar la configuración.");
+        setLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    fetch(`${config.supabaseUrl}/functions/v1/encuesta-colonia-2027?action=status`, {
+      headers: { apikey: config.supabaseKey },
+    })
+      .then((response) => response.json())
+      .then((result) => setVisible(result?.visible === true))
+      .catch(() => setError("No se pudo consultar el estado de la encuesta."))
+      .finally(() => setLoading(false));
+  }, [config]);
+
+  const changeVisibility = async () => {
+    try {
+      setSaving(true);
+      setError("");
+      const client = await getSupabaseAuthClient();
+      const { data } = await client.auth.getSession();
+      const next = !visible;
+      const response = await fetch(`${config.supabaseUrl}/functions/v1/encuesta-colonia-2027`, {
+        method: "POST",
+        headers: {
+          apikey: config.supabaseKey,
+          Authorization: `Bearer ${data.session?.access_token || ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "set_visibility", visible: next }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) throw new Error(result.error || "No se pudo cambiar la visibilidad.");
+      setVisible(next);
+    } catch (currentError) {
+      setError(currentError.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <main className="w-full max-w-3xl">
@@ -25,6 +79,32 @@ export default function MenuColonia() {
           </div>
         </div>
       </header>
+
+      <section className="mb-5 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${visible ? "bg-green-500" : "bg-gray-400"}`} />
+            <h2 className="font-bold text-gray-900">Publicación de la encuesta</h2>
+          </div>
+          <p className="mt-1 text-sm text-gray-600">
+            {loading
+              ? "Consultando estado…"
+              : visible
+                ? "Visible en el Menú para Padres y habilitada para responder."
+                : "Oculta del Menú para Padres y cerrada para nuevas respuestas."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={changeVisibility}
+          disabled={loading || saving || !config}
+          className={`!w-full rounded-xl px-5 py-2.5 font-bold text-white transition disabled:opacity-50 sm:!w-auto ${visible ? "bg-gray-700 hover:bg-gray-800" : "bg-green-600 hover:bg-green-700"}`}
+        >
+          {saving ? "Guardando…" : visible ? "Ocultar encuesta" : "Mostrar encuesta"}
+        </button>
+      </section>
+
+      {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Link
@@ -55,4 +135,3 @@ export default function MenuColonia() {
     </main>
   );
 }
-

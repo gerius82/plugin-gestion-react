@@ -111,6 +111,7 @@ export default function EncuestaColonia2027() {
     }
   });
   const [config, setConfig] = useState(null);
+  const [available, setAvailable] = useState(null);
   const [startedAt] = useState(Date.now());
   const [submissionId] = useState(() => {
     const stored = localStorage.getItem(SUBMISSION_KEY);
@@ -126,6 +127,19 @@ export default function EncuestaColonia2027() {
   useEffect(() => {
     fetch("/config.json").then((response) => response.json()).then(setConfig).catch(() => setError("No se pudo cargar la configuración."));
   }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    fetch(`${config.supabaseUrl}/functions/v1/encuesta-colonia-2027?action=status`, {
+      headers: { apikey: config.supabaseKey },
+    })
+      .then((response) => response.json())
+      .then((result) => setAvailable(result?.visible === true))
+      .catch(() => {
+        setAvailable(false);
+        setError("No pudimos comprobar si la encuesta está disponible.");
+      });
+  }, [config]);
 
   useEffect(() => {
     if (!sent) localStorage.setItem(DRAFT_KEY, JSON.stringify(form));
@@ -192,6 +206,22 @@ export default function EncuestaColonia2027() {
           <p className="mt-4 text-gray-600">Tu opinión nos ayuda a preparar nuevas experiencias para los chicos.</p>
           <p className="mt-2 text-gray-600">¡Pronto compartiremos más novedades sobre la Colonia Tecnológica Plugin 2027!</p>
           <p className="mt-6 font-bold text-cyan-800">Equipo Plugin Robótica</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (available === null) {
+    return <main className="w-full max-w-2xl py-10 text-center text-sm text-gray-500">Comprobando disponibilidad de la encuesta…</main>;
+  }
+
+  if (!available) {
+    return (
+      <main className="w-full max-w-2xl py-8">
+        <div className="rounded-3xl border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-2xl text-gray-500"><FaRobot /></div>
+          <h1 className="text-2xl font-bold text-gray-900">Encuesta no disponible</h1>
+          <p className="mt-3 text-gray-600">La encuesta sobre la Colonia Tecnológica 2027 no está habilitada en este momento.</p>
         </div>
       </main>
     );
