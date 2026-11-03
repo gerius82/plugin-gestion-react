@@ -1238,7 +1238,7 @@ const elegirHorario = (hora) => {
                     {mostrarResumenTurno()}
                 </div>
 
-                {diaSel === "Martes" && (
+                {normalizarTextoComparacion(`${diaSel} ${formulario.turno_1}`).includes("martes") && (
                   <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
                     <h4 className="mb-1 font-semibold">🎭 Reprogramación por Carnaval</h4>
                     <p>
@@ -1259,7 +1259,7 @@ const elegirHorario = (hora) => {
             <div className="mt-6 p-4 border-l-4 border-green-300 bg-green-50 rounded">
             <h4 className="text-lg font-semibold text-green-800 mb-2">📌 Información importante</h4>
             <p className="text-gray-700 text-sm leading-relaxed">
-                Nos comunicamos telefónicamente con todos los inscriptos. Recibirán un mensaje de WhatsApp para abonar la reserva de cupo de <strong>$10.000</strong>.
+                Al finalizar la inscripción podrás abonar en el momento la reserva de cupo de <strong>$10.000</strong> mediante <strong>Mercado Pago</strong>.
             </p>
             <p className="mt-2 text-gray-700 text-sm leading-relaxed">
                 La reserva se descontará de la primera cuota mensual de <strong>$65.000</strong>, por lo que quedarán <strong>$55.000</strong> por abonar ese mes.
@@ -1286,7 +1286,7 @@ const elegirHorario = (hora) => {
               }}
               className="w-full sm:w-auto bg-green-400 hover:bg-green-500 text-white font-medium py-2 sm:py-3 px-6 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
             >
-              Confirmar envío
+              Continuar
             </button>
             <button type="button" onClick={() => {
                 setMostrarResumen(false);
@@ -1297,6 +1297,9 @@ const elegirHorario = (hora) => {
               Cancelar
             </button>
           </div>
+          <p className="mt-3 text-center text-sm text-gray-600">
+            En el próximo paso podrás autorizar o no el uso institucional de fotos y videos. Después se enviará la inscripción.
+          </p>
         </div>
       )}
 
