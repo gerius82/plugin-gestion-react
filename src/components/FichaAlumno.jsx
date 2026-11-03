@@ -216,7 +216,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     if (!config) return [];
     setCargandoAlumnos(true);
     try {
-      const baseSelect = "select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,curso,sede,turno_1,tiene_promo,beneficiario_id,creado_en,actualizado_en";
+      const baseSelect = "select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,curso,sede,turno_1,tiene_promo,beneficiario_id,creado_en,actualizado_en,autoriza_imagenes,autorizacion_imagenes_en";
       const filtroActivo = incluirInactivos ? "" : "activo=eq.true&";
 
       const resMat = await fetch(
@@ -318,7 +318,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     if (!config || !personaId) return [];
 
     const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/inscripciones?or=(id.eq.${personaId},persona_id.eq.${personaId})&select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion&order=creado_en.desc`,
+      `${config.supabaseUrl}/rest/v1/inscripciones?or=(id.eq.${personaId},persona_id.eq.${personaId})&select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion,autoriza_imagenes,autorizacion_imagenes_en&order=creado_en.desc`,
       { headers }
     );
     const data = await res.json();
@@ -1715,6 +1715,16 @@ const renderEditorMatricula = () => (
                 </div>
                 <div>
                   <span className="font-medium">Mail:</span> {alumnoSeleccionado.email || "-"}
+                </div>
+                <div>
+                  <span className="font-medium">Uso de fotos y videos:</span>{" "}
+                  {alumnoSeleccionado.autoriza_imagenes === true ? (
+                    <span className="font-semibold text-green-700">Autorizado</span>
+                  ) : alumnoSeleccionado.autoriza_imagenes === false ? (
+                    <span className="font-semibold text-red-700">No autorizado</span>
+                  ) : (
+                    <span className="text-gray-500">Sin respuesta registrada</span>
+                  )}
                 </div>
                 <div>
                   <span className="font-medium">Promo:</span>{" "}

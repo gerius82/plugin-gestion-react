@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import emailjs from "@emailjs/browser";
 import "../assets/formulario.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import AutorizacionImagenesModal from "./AutorizacionImagenesModal";
+
+const VERSION_AUTORIZACION_IMAGENES = "2026-11-03-v1";
 
 const normalizarTextoComparacion = (valor = "") =>
   String(valor || "")
@@ -34,6 +37,8 @@ const FormularioInscripcion = () => {
   const [config, setConfig] = useState(null);
   const [telefonoValido, setTelefonoValido] = useState(true);
   const [emailValido, setEmailValido] = useState(true);
+  const [mostrarAutorizacionImagenes, setMostrarAutorizacionImagenes] = useState(false);
+  const [procesandoInscripcion, setProcesandoInscripcion] = useState(false);
   const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
   const [searchParams] = useSearchParams();
   const origen = searchParams.get("origen");
@@ -183,6 +188,8 @@ const FormularioInscripcion = () => {
     setCupoMaximo(null);
     setAnotadosTurno(0);
     setTurnosCards([]);
+    setMostrarAutorizacionImagenes(false);
+    setProcesandoInscripcion(false);
   };
 
   const mostrarResumenTurno = () => {
@@ -586,7 +593,10 @@ const FormularioInscripcion = () => {
   const nombreCiclo = cicloSeleccionado?.nombre_publico || cicloSel || "Ciclo de talleres";
   const esCiclo2027 = /2027/.test(`${cicloSel} ${nombreCiclo}`);
 
-  const confirmarEnvio = async () => {
+  const confirmarEnvio = async (autorizaImagenes) => {
+    if (typeof autorizaImagenes !== "boolean") return;
+    setProcesandoInscripcion(true);
+    setMostrarAutorizacionImagenes(false);
     setMostrarResumen(false);
     setMensajeExito("Procesando inscripcion... Esto puede tardar unos segundos.");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -613,6 +623,9 @@ const FormularioInscripcion = () => {
       curso: cursoNombre,
       turno_1: `${diaSel} ${horaSel}`,
       lista_espera: listaEspera || false,
+      autoriza_imagenes: autorizaImagenes,
+      autorizacion_imagenes_en: new Date().toISOString(),
+      autorizacion_imagenes_version: VERSION_AUTORIZACION_IMAGENES,
     };
     const payload = {
       ...payloadBase,
@@ -1158,7 +1171,7 @@ const FormularioInscripcion = () => {
             <button
               type="button"
               onClick={() => {
-                confirmarEnvio();
+                setMostrarAutorizacionImagenes(true);
               }}
               className="w-full sm:w-auto bg-green-400 hover:bg-green-500 text-white font-medium py-2 sm:py-3 px-6 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
             >
@@ -1177,6 +1190,14 @@ const FormularioInscripcion = () => {
           </div>
         </div>
       )}
+
+      <AutorizacionImagenesModal
+        abierto={mostrarAutorizacionImagenes}
+        nombreAlumno={formulario.nombre}
+        procesando={procesandoInscripcion}
+        onDecidir={confirmarEnvio}
+        onVolver={() => setMostrarAutorizacionImagenes(false)}
+      />
 
       <style>{`
         @keyframes fadeIn {

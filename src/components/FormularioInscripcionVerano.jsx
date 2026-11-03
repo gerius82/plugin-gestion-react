@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import emailjs from "@emailjs/browser";
 import "../assets/formulario.css";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import AutorizacionImagenesModal from "./AutorizacionImagenesModal";
 
 const normalizarTextoComparacion = (valor = "") =>
   String(valor || "")
@@ -17,6 +18,7 @@ const normalizarTextoComparacion = (valor = "") =>
 const normalizarTelefono = (valor = "") => String(valor || "").replace(/\D/g, "").slice(0, 10);
 const validarTelefonoArg = (valor = "") => /^[1-9]\d{9}$/.test(normalizarTelefono(valor));
 const CICLO_VERANO = "TDV_2027";
+const VERSION_AUTORIZACION_IMAGENES = "2026-11-03-v1";
 
 const fechaActualArgentina = () => {
   const parts = new Intl.DateTimeFormat("es-AR", {
@@ -41,6 +43,8 @@ const FormularioInscripcionVerano = () => {
   const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
   const [telefonoValido, setTelefonoValido] = useState(true);
   const [emailValido, setEmailValido] = useState(true);
+  const [mostrarAutorizacionImagenes, setMostrarAutorizacionImagenes] = useState(false);
+  const [procesandoInscripcion, setProcesandoInscripcion] = useState(false);
   //const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
   const [searchParams] = useSearchParams();
   const origen = searchParams.get("origen");
@@ -330,6 +334,8 @@ const FormularioInscripcionVerano = () => {
     setAnotadosTurno(0);
     setInscripcionFinalizada(null);
     setErrorPago("");
+    setMostrarAutorizacionImagenes(false);
+    setProcesandoInscripcion(false);
   };
 
   const iniciarPagoReserva = async () => {
@@ -596,7 +602,10 @@ const elegirHorario = (hora) => {
   };
 
 
-  const confirmarEnvio = async () => {
+  const confirmarEnvio = async (autorizaImagenes) => {
+  if (typeof autorizaImagenes !== "boolean") return;
+  setProcesandoInscripcion(true);
+  setMostrarAutorizacionImagenes(false);
   setMostrarResumen(false);
   setMensajeExito("Procesando inscripción... Esto puede tardar unos segundos.");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -623,6 +632,9 @@ const elegirHorario = (hora) => {
     curso: cursoNombre,                  // ? Rob?tica (no "Taller de Verano")
     turno_1: `${diaSel} ${horaSel}`,      // legacy
       lista_espera: listaEspera || false,
+      autoriza_imagenes: autorizaImagenes,
+      autorizacion_imagenes_en: new Date().toISOString(),
+      autorizacion_imagenes_version: VERSION_AUTORIZACION_IMAGENES,
   };
   const payload = {
     ...payloadBase,
@@ -1269,14 +1281,14 @@ const elegirHorario = (hora) => {
             {/* Botones en la pantalla de resumen */}
             
           <div className="flex justify-center gap-4 mt-6">
-            <button type="submit"           onClick={() => {
-                confirmarEnvio();
+            <button type="button" onClick={() => {
+                setMostrarAutorizacionImagenes(true);
               }}
               className="w-full sm:w-auto bg-green-400 hover:bg-green-500 text-white font-medium py-2 sm:py-3 px-6 rounded-lg shadow transition hover:scale-105 text-sm sm:text-base"
             >
               Confirmar envío
             </button>
-            <button type="submit"          onClick={() => {
+            <button type="button" onClick={() => {
                 setMostrarResumen(false);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
@@ -1287,6 +1299,14 @@ const elegirHorario = (hora) => {
           </div>
         </div>
       )}
+
+      <AutorizacionImagenesModal
+        abierto={mostrarAutorizacionImagenes}
+        nombreAlumno={formulario.nombre}
+        procesando={procesandoInscripcion}
+        onDecidir={confirmarEnvio}
+        onVolver={() => setMostrarAutorizacionImagenes(false)}
+      />
 
       <style>{`
         @keyframes fadeIn {
