@@ -4,6 +4,35 @@ import { useLocation, useNavigate } from "react-router-dom";
 const normalizarTelefonoBusqueda = (valor = "") =>
   String(valor || "").replace(/\D/g, "").replace(/^0+/, "");
 
+const fechaArgentinaISO = (fecha = new Date()) => {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(fecha);
+  const valor = (tipo) => partes.find((parte) => parte.type === tipo)?.value || "";
+  return `${valor("year")}-${valor("month")}-${valor("day")}`;
+};
+
+const elegirCicloEnCurso = (ciclos = []) => {
+  const hoy = fechaArgentinaISO();
+  const activos = ciclos.filter((ciclo) => ciclo?.activo);
+  const vigentes = activos
+    .filter(
+      (ciclo) =>
+        (!ciclo.fecha_inicio || ciclo.fecha_inicio <= hoy) &&
+        (!ciclo.fecha_fin || ciclo.fecha_fin >= hoy)
+    )
+    .sort((a, b) =>
+      String(a.fecha_fin || "9999-12-31").localeCompare(
+        String(b.fecha_fin || "9999-12-31")
+      )
+    );
+
+  return vigentes[0] || activos[0] || ciclos[0] || null;
+};
+
 export default function FichaRecuperar() {
   // Ruta de regreso: por defecto /menu-padres; si viene con ?from=alumnos-menu => /alumnos-menu
   const navigate = useNavigate();
@@ -49,12 +78,12 @@ export default function FichaRecuperar() {
     (async () => {
       try {
         const resCiclos = await fetch(
-          `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,activo,orden&order=orden.asc`,
+          `${config.supabaseUrl}/rest/v1/ciclos?select=codigo,activo,orden,fecha_inicio,fecha_fin&order=orden.asc`,
           { headers: headers() }
         );
         const dataCiclos = await resCiclos.json();
         const listaCiclos = Array.isArray(dataCiclos) ? dataCiclos : [];
-        const cicloActual = listaCiclos.find((c) => c.activo) || listaCiclos[0] || null;
+        const cicloActual = elegirCicloEnCurso(listaCiclos);
         setCicloActivo(cicloActual?.codigo || "");
 
         const res = await fetch(`${config.supabaseUrl}/rest/v1/feriados?select=fecha`, {
