@@ -259,6 +259,26 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
   }
 
   const eventPayload = event.payload || {};
+  if (event.event_type === "contact_sync") {
+    try {
+      await syncStudentToGoogleContacts(eventPayload, supabaseUrl, serviceRoleKey);
+      await fetch(`${supabaseUrl}/rest/v1/notification_events?id=eq.${event.id}`, {
+        method: "PATCH",
+        headers: databaseHeaders(serviceRoleKey),
+        body: JSON.stringify({ status: "sent", error: null, processed_at: new Date().toISOString() }),
+      });
+      return jsonResponse(200, { ok: true, contactSynced: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo sincronizar el contacto";
+      await fetch(`${supabaseUrl}/rest/v1/notification_events?id=eq.${event.id}`, {
+        method: "PATCH",
+        headers: databaseHeaders(serviceRoleKey),
+        body: JSON.stringify({ status: "failed", error: message, processed_at: new Date().toISOString() }),
+      });
+      return jsonResponse(500, { ok: false, error: message });
+    }
+  }
+
   let notification: {
     title: string;
     body: string;
@@ -424,7 +444,7 @@ const dispatchEvent = async (eventId: unknown, vapidPublicKey: string) => {
     return jsonResponse(400, { ok: false, error: "Tipo de evento desconocido" });
   }
 
-  if (event.event_type === "new_student") {
+  if (event.event_type === "new_student" && eventPayload.cycle !== "TDV_2027") {
     try {
       await syncStudentToGoogleContacts(eventPayload, supabaseUrl, serviceRoleKey);
     } catch (error) {

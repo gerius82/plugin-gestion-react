@@ -12,6 +12,7 @@ const DESTINOS = [
 
 const ETIQUETAS = {
   new_student: "Nueva inscripción",
+  contact_sync: "Contacto sincronizado",
   payment_received: "Pago recibido",
   attendance_recorded: "Asistencia",
   daily_summary: "Resumen diario",
@@ -24,6 +25,7 @@ const resumenEvento = (evento) => {
   const payload = evento?.payload || {};
   if (evento.event_type === "custom_notification") return payload.body || "";
   if (evento.event_type === "new_student") return payload.name || "Nuevo alumno";
+  if (evento.event_type === "contact_sync") return payload.name || "Contacto familiar";
   if (evento.event_type === "payment_received") {
     return `${payload.payment_method || "Pago"}${payload.amount ? ` · $${Number(payload.amount).toLocaleString("es-AR")}` : ""}`;
   }
