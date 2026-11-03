@@ -1226,6 +1226,15 @@ const elegirHorario = (hora) => {
                     {mostrarResumenTurno()}
                 </div>
 
+                {diaSel === "Martes" && (
+                  <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
+                    <h4 className="mb-1 font-semibold">🎭 Reprogramación por Carnaval</h4>
+                    <p>
+                      La clase del <strong>martes 9 de febrero de 2027</strong> no se dictará por ser feriado nacional. Se realizará excepcionalmente el <strong>viernes 12 de febrero</strong>, en la misma sede y de <strong>18:30 a 20:00</strong>.
+                    </p>
+                  </div>
+                )}
+
                 {formulario.comentarios && (
                     <div className="p-4 rounded-lg bg-white shadow-sm">
                     <h4 className="font-semibold text-gray-700 mb-2">Comentarios adicionales</h4>
@@ -1250,7 +1259,7 @@ const elegirHorario = (hora) => {
             <h4 className="text-lg font-semibold text-gray-800 mb-2">📌 Normas del Instituto</h4>
             <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
                 <li>Las ausencias justificadas podrán recuperarse en otros turnos según disponibilidad.</li>
-                <li>Los feriados NO podrán recuperarse.</li>
+                <li>Los feriados no se dictan. Cuando PLUGIN programe una clase general excepcional, se informará previamente a las familias.</li>
                 <li>Los pagos mensuales deberán ser cancelados dentro de los primeros 10 días del mes; luego tendrán un incremento del 5%.</li>
                 <li>Agendá este número para recibir notificaciones: <strong>3412153057</strong></li>
             </ul>

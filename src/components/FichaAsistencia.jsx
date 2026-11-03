@@ -30,6 +30,7 @@ const FichaAsistencia = () => {
   const [mensaje, setMensaje] = useState("");
   const [cicloCodigo, setCicloCodigo] = useState("");
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
+  const [clasesExcepcionales, setClasesExcepcionales] = useState([]);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -91,7 +92,20 @@ const FichaAsistencia = () => {
           ciclo_codigo: m.ciclo_codigo,
         };
       });
+      const resExcepciones = cicloCodigo
+        ? await fetch(
+            `${config.supabaseUrl}/rest/v1/clases_excepcionales?select=*&activo=eq.true&ciclo_codigo=eq.${encodeURIComponent(cicloCodigo)}`,
+            {
+              headers: {
+                apikey: config.supabaseKey,
+                Authorization: `Bearer ${config.supabaseKey}`,
+              },
+            }
+          )
+        : null;
+      const dataExcepciones = resExcepciones?.ok ? await resExcepciones.json() : [];
       setAlumnos(lista);
+      setClasesExcepcionales(Array.isArray(dataExcepciones) ? dataExcepciones : []);
       setSede("");
       setDia("");
       setHorario("");
@@ -125,21 +139,43 @@ const FichaAsistencia = () => {
   const ordenarHorarios = (lista = []) =>
     [...new Set(lista)].sort((a, b) => inicioDeRango(a).localeCompare(inicioDeRango(b)));
 
+  const fechaSeleccionada = fecha || fechaHoyArgentina();
+  const excepcionesDelDia = clasesExcepcionales.filter(
+    (item) => item.fecha_reprogramada === fechaSeleccionada
+  );
   const sedesDisponibles = [...new Set(alumnos.map((a) => a.sede).filter(Boolean))].sort();
   const diasDisponibles = ordenarDias(
-    alumnos
-      .filter((a) => (!sede || a.sede === sede))
-      .map((a) => a.dia)
-      .filter(Boolean)
+    [
+      ...alumnos
+        .filter((a) => (!sede || a.sede === sede))
+        .map((a) => a.dia),
+      ...excepcionesDelDia
+        .filter((item) => !sede || item.sede === sede)
+        .map((item) => item.dia_reprogramado),
+    ].filter(Boolean)
   );
   const horariosDisponibles = ordenarHorarios(
-    alumnos
-      .filter((a) => (!sede || a.sede === sede) && (!dia || a.dia === dia))
-      .map((a) => a.hora)
-      .filter(Boolean)
+    [
+      ...alumnos
+        .filter((a) => (!sede || a.sede === sede) && (!dia || a.dia === dia))
+        .map((a) => a.hora),
+      ...excepcionesDelDia
+        .filter(
+          (item) =>
+            (!sede || item.sede === sede) &&
+            (!dia || item.dia_reprogramado === dia)
+        )
+        .map((item) => item.hora_reprogramada),
+    ].filter(Boolean)
   );
 
   const turnoCompleto = [dia, horario].filter(Boolean).join(" ");
+  const excepcionSeleccionada = excepcionesDelDia.find(
+    (item) =>
+      item.sede === sede &&
+      item.dia_reprogramado === dia &&
+      item.hora_reprogramada === horario
+  );
 
   const cargarListaTurno = async () => {
     if (!config || !sede || !dia || !horario) return;
@@ -150,8 +186,10 @@ const FichaAsistencia = () => {
       Authorization: `Bearer ${config.supabaseKey}`,
     };
 
+    const diaMatricula = excepcionSeleccionada?.dia_original || dia;
+    const horaMatricula = excepcionSeleccionada?.hora_original || horario;
     const seleccionadosBase = alumnos
-      .filter((a) => a.sede === sede && a.dia === dia && a.hora === horario)
+      .filter((a) => a.sede === sede && a.dia === diaMatricula && a.hora === horaMatricula)
       .map((a) => ({
         ...a,
         presente: true,
@@ -460,9 +498,23 @@ const FichaAsistencia = () => {
                 </select>
               </div>
               <div>
-                <label className="font-medium block mb-1">Dia:</label>
+                <label className="font-medium block mb-1">Fecha:</label>
+                <input
+                  className="w-full border p-2 rounded"
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => {
+                    setFecha(e.target.value);
+                    setDia("");
+                    setHorario("");
+                    setListaMostrada([]);
+                  }}
+                />
+              </div>
+              <div>
+                <label className="font-medium block mb-1">Día:</label>
                 <select className="w-full border p-2 rounded" value={dia} onChange={(e) => setDia(e.target.value)}>
-                  <option value="">-- Seleccionar dia --</option>
+                  <option value="">-- Seleccionar día --</option>
                   {diasDisponibles.map((d) => (
                     <option key={d} value={d}>
                       {d}
@@ -481,11 +533,13 @@ const FichaAsistencia = () => {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="font-medium block mb-1">Fecha:</label>
-                <input className="w-full border p-2 rounded" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-              </div>
             </div>
+
+            {excepcionSeleccionada && (
+              <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <strong>Clase reprogramada:</strong> este turno corresponde al grupo habitual del martes y se dicta excepcionalmente el viernes 12 de febrero por el feriado de Carnaval.
+              </div>
+            )}
 
             <div className="flex gap-4 justify-center mb-6">
               <button onClick={cargarListaTurno} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
