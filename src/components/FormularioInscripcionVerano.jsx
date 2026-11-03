@@ -868,11 +868,13 @@ const elegirHorario = (hora) => {
 
             {/* Días y horarios */}
             <p className="text-sm text-gray-700 mt-4 font-semibold">🕒 Días y horarios disponibles:</p>
-            <ul className="text-sm text-gray-800 space-y-1">
-              <li>👉 <strong>Martes:</strong> 17:00 a 18:30hs · 19:00 a 20:30hs</li>
-              <li>👉 <strong>Miércoles:</strong> 17:00 a 18:30hs · 19:00 a 20:30hs</li>
-              <li>👉 <strong>Jueves:</strong> 17:00 a 18:30hs · 19:00 a 20:30hs</li>
-              <li>👉 <strong>Sábados:</strong> 09:00 a 10:30hs · 11:00 a 12:30hs</li>
+            <ul className="text-sm text-gray-800 space-y-1 mt-1">
+              <li>🏫 <strong>Calle Mendoza:</strong></li>
+              <li className="pl-4">👉 Martes, miércoles y jueves: <strong>18:30 a 20:00 hs</strong></li>
+              <li className="pl-4">👉 Sábados: <strong>9:30 a 11:00 hs</strong> y <strong>11:30 a 13:00 hs</strong></li>
+              <li className="pt-1">🏫 <strong>Fisherton:</strong></li>
+              <li className="pl-4">👉 Martes y jueves: <strong>18:30 a 20:00 hs</strong></li>
+              <li className="pl-4">👉 Sábados: <strong>9:30 a 11:00 hs</strong></li>
             </ul>
 
             {/* Precios y formas de pago */}
