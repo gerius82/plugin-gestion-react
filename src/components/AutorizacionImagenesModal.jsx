@@ -57,7 +57,7 @@ const AutorizacionImagenesModal = ({ abierto, nombreAlumno, procesando, onDecidi
             type="button"
             disabled={procesando}
             onClick={onVolver}
-            className="w-full py-1 text-sm font-medium text-slate-500 underline-offset-4 hover:text-slate-700 hover:underline disabled:opacity-60"
+            className="!mt-0 w-full !bg-transparent py-2 text-sm font-medium !text-slate-500 underline-offset-4 hover:!bg-slate-100 hover:!text-slate-700 hover:underline disabled:opacity-60"
           >
             Volver al resumen
           </button>

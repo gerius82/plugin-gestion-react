@@ -1297,9 +1297,6 @@ const elegirHorario = (hora) => {
               Cancelar
             </button>
           </div>
-          <p className="mt-3 text-center text-sm text-gray-600">
-            En el próximo paso podrás autorizar o no el uso institucional de fotos y videos. Después se enviará la inscripción.
-          </p>
         </div>
       )}
 
