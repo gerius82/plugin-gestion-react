@@ -2,6 +2,26 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
 
+const calcularEdadActual = (fechaNacimiento, edadGuardada) => {
+  const raw = String(fechaNacimiento || "").trim();
+  if (raw) {
+    const base = raw.includes("T") ? raw.split("T")[0] : raw.split(" ")[0];
+    const fecha = new Date(`${base}T00:00:00`);
+    if (!Number.isNaN(fecha.getTime())) {
+      const hoy = new Date();
+      let edad = hoy.getFullYear() - fecha.getFullYear();
+      const diferenciaMes = hoy.getMonth() - fecha.getMonth();
+      if (diferenciaMes < 0 || (diferenciaMes === 0 && hoy.getDate() < fecha.getDate())) {
+        edad -= 1;
+      }
+      if (edad >= 0) return edad;
+    }
+  }
+
+  const fallback = Number(edadGuardada);
+  return Number.isInteger(fallback) && fallback >= 0 ? fallback : null;
+};
+
 export default function FichaAvisosAlumnos() {
   const MODULO_PLANTILLAS = "avisos";
   const navigate = useNavigate();
@@ -12,6 +32,8 @@ export default function FichaAvisosAlumnos() {
   const [filtroDia, setFiltroDia] = useState("");
   const [filtroHora, setFiltroHora] = useState("");
   const [filtroCiclo, setFiltroCiclo] = useState("");
+  const [filtroEdadMin, setFiltroEdadMin] = useState("");
+  const [filtroEdadMax, setFiltroEdadMax] = useState("");
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
   const [diasDisponibles, setDiasDisponibles] = useState([]);
   const [horasDisponibles, setHorasDisponibles] = useState([]);
@@ -67,7 +89,7 @@ export default function FichaAvisosAlumnos() {
   useEffect(() => {
     if (!config) return;
     cargarAlumnos();
-  }, [config, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo, ciclosDisponibles]);
+  }, [config, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroEdadMin, filtroEdadMax, ciclosDisponibles]);
 
   useEffect(() => {
     if (!config) return;
@@ -236,7 +258,7 @@ export default function FichaAvisosAlumnos() {
     setError("");
 
     try {
-      let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,creado_en,inscripciones(id,persona_id,nombre,apellido,telefono)`;
+      let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,creado_en,inscripciones(id,persona_id,nombre,apellido,telefono,fecha_nacimiento,edad)`;
 
       const filtros = [];
 
@@ -274,6 +296,8 @@ export default function FichaAvisosAlumnos() {
           nombre: (alumno.nombre || "").trimEnd(),
           apellido: (alumno.apellido || "").trimEnd(),
           telefono: alumno.telefono,
+          fecha_nacimiento: alumno.fecha_nacimiento || "",
+          edad: calcularEdadActual(alumno.fecha_nacimiento, alumno.edad),
           sede: m.sede,
           dia: m.dia,
           hora: m.hora,
@@ -294,7 +318,7 @@ export default function FichaAvisosAlumnos() {
         });
 
         const resInsc = await fetch(
-          `${config.supabaseUrl}/rest/v1/inscripciones?select=id,persona_id,nombre,apellido,telefono,sede,turno_1,tipo_inscripcion`,
+          `${config.supabaseUrl}/rest/v1/inscripciones?select=id,persona_id,nombre,apellido,telefono,fecha_nacimiento,edad,sede,turno_1,tipo_inscripcion`,
           { headers: headers() }
         );
         const dataInsc = await resInsc.json();
@@ -321,6 +345,8 @@ export default function FichaAvisosAlumnos() {
               nombre: (i.nombre || "").trimEnd(),
               apellido: (i.apellido || "").trimEnd(),
               telefono: i.telefono || "",
+              fecha_nacimiento: i.fecha_nacimiento || "",
+              edad: calcularEdadActual(i.fecha_nacimiento, i.edad),
               sede: i.sede || "",
               dia,
               hora,
@@ -342,6 +368,22 @@ export default function FichaAvisosAlumnos() {
       // una sola fila por persona, aun cuando tenga matrículas activas, dadas de
       // baja o finalizadas en distintos ciclos.
       listaBase = consolidarPorAlumno(listaBase);
+
+      const edadMin = filtroEdadMin === "" ? null : Number(filtroEdadMin);
+      const edadMax = filtroEdadMax === "" ? null : Number(filtroEdadMax);
+      const hayFiltroEdad = edadMin !== null || edadMax !== null;
+      const rangoEdadValido = edadMin === null || edadMax === null || edadMin <= edadMax;
+
+      if (hayFiltroEdad) {
+        listaBase = rangoEdadValido
+          ? listaBase.filter((alumno) => {
+              if (alumno.edad === null) return false;
+              if (edadMin !== null && alumno.edad < edadMin) return false;
+              if (edadMax !== null && alumno.edad > edadMax) return false;
+              return true;
+            })
+          : [];
+      }
 
       // ordenar por nombre y apellido
       const listaFiltrada = [...listaBase].sort((a, b) => {
@@ -415,6 +457,11 @@ export default function FichaAvisosAlumnos() {
   const alumnosConTelefono = alumnos.filter((a) => a.telefono);
   const total = alumnos.length;
   const totalConTel = alumnosConTelefono.length;
+  const edadMinNumero = filtroEdadMin === "" ? null : Number(filtroEdadMin);
+  const edadMaxNumero = filtroEdadMax === "" ? null : Number(filtroEdadMax);
+  const hayFiltroEdad = edadMinNumero !== null || edadMaxNumero !== null;
+  const rangoEdadInvalido =
+    edadMinNumero !== null && edadMaxNumero !== null && edadMinNumero > edadMaxNumero;
   const pillForEstado = (estado) => {
     const e = (estado || "").toLowerCase();
     if (e === "activa") return { cls: "bg-green-100 text-green-800", label: "Activa" };
@@ -440,7 +487,7 @@ export default function FichaAvisosAlumnos() {
       <div className="bg-white rounded-xl shadow p-6 max-w-5xl mx-auto">
 
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-2">
         {/* Estado */}
         <div>
           <label className="block font-medium mb-1 text-sm">Estado:</label>
@@ -471,6 +518,48 @@ export default function FichaAvisosAlumnos() {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Edad */}
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <label className="block font-medium text-sm">Edad:</label>
+            <button
+              type="button"
+              className="text-xs text-sky-700 hover:text-sky-900 hover:underline"
+              onClick={() => {
+                setFiltroEdadMin("5");
+                setFiltroEdadMax("10");
+              }}
+            >
+              Colonia 5–10
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              max="99"
+              inputMode="numeric"
+              aria-label="Edad mínima"
+              className="w-full min-w-0 border p-2 rounded text-sm"
+              placeholder="Desde"
+              value={filtroEdadMin}
+              onChange={(e) => setFiltroEdadMin(e.target.value)}
+            />
+            <span className="text-gray-400">–</span>
+            <input
+              type="number"
+              min="0"
+              max="99"
+              inputMode="numeric"
+              aria-label="Edad máxima"
+              className="w-full min-w-0 border p-2 rounded text-sm"
+              placeholder="Hasta"
+              value={filtroEdadMax}
+              onChange={(e) => setFiltroEdadMax(e.target.value)}
+            />
+          </div>
         </div>
 
         {/* Sede */}
@@ -521,7 +610,15 @@ export default function FichaAvisosAlumnos() {
             ))}
           </select>
         </div>
-        <div />
+      </div>
+      <div className="mb-6 min-h-5 text-xs">
+        {rangoEdadInvalido ? (
+          <p className="text-red-600">La edad mínima no puede ser mayor que la máxima.</p>
+        ) : hayFiltroEdad ? (
+          <p className="text-gray-500">
+            El rango incluye ambas edades. Los alumnos sin edad registrada no se muestran.
+          </p>
+        ) : null}
       </div>
 
       {/* Editor de mensaje */}
@@ -620,6 +717,7 @@ export default function FichaAvisosAlumnos() {
             <thead className="bg-gray-100">
               <tr>
                 <th className="px-3 py-2 text-left">Alumno</th>
+                <th className="px-3 py-2 text-left">Edad</th>
                 <th className="px-3 py-2 text-left">Teléfono</th>
                 <th className="px-3 py-2 text-left">Sede</th>
                 <th className="px-3 py-2 text-left">Día</th>
@@ -636,6 +734,9 @@ export default function FichaAvisosAlumnos() {
                   <tr key={a.id} className="border-t">
                     <td className="px-3 py-2 whitespace-nowrap">
                       {a.nombre} {a.apellido}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {a.edad ?? <span className="text-gray-400">—</span>}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {a.telefono || <span className="text-gray-400">Sin teléfono</span>}
