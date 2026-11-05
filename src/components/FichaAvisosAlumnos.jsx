@@ -526,7 +526,7 @@ export default function FichaAvisosAlumnos() {
             <label className="block font-medium text-sm">Edad:</label>
             <button
               type="button"
-              className="text-xs text-sky-700 hover:text-sky-900 hover:underline"
+              className="!mt-0 !w-auto rounded-md border border-sky-200 !bg-sky-50 !px-2 !py-0.5 text-xs !font-medium !text-sky-700 transition-colors hover:!bg-sky-100 hover:!text-sky-900"
               onClick={() => {
                 setFiltroEdadMin("5");
                 setFiltroEdadMax("10");
