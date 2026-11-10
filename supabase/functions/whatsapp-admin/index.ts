@@ -212,6 +212,20 @@ Deno.serve(async (request) => {
       return jsonResponse(200, { ok: true });
     }
 
+    if (body.action === "delete_conversation") {
+      const phone = String(body.phone || "").replace(/\D/g, "");
+      if (!phone) return jsonResponse(400, { ok: false, error: "Teléfono inválido" });
+      await rest(`whatsapp_messages?from_phone=eq.${encodeURIComponent(phone)}`, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
+      });
+      await rest(`whatsapp_conversations?phone=eq.${encodeURIComponent(phone)}`, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
+      });
+      return jsonResponse(200, { ok: true });
+    }
+
     if (body.action === "simulate") {
       const phone = normalizePhone(body.phone);
       if (!phone) return jsonResponse(400, { ok: false, error: "Ingresá un teléfono" });

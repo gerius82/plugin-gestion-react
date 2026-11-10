@@ -8,6 +8,7 @@ import {
   FaPlay,
   FaRobot,
   FaSyncAlt,
+  FaTrash,
   FaWhatsapp,
 } from "react-icons/fa";
 import { getSupabaseAuthClient } from "../lib/supabaseAuth";
@@ -172,6 +173,23 @@ export default function WhatsAppCentro() {
     }
   };
 
+  const deleteConversation = async () => {
+    if (!selectedPhone) return;
+    const label = selectedConversation?.contact_name || `+${selectedPhone}`;
+    if (!window.confirm(`¿Eliminar la conversación con ${label}? Esta acción no se puede deshacer.`)) return;
+    try {
+      setBusy(true);
+      setError("");
+      await api({ action: "delete_conversation", phone: selectedPhone });
+      setSelectedPhone("");
+      await loadInbox();
+    } catch (currentError) {
+      setError(currentError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const simulate = async (input) => {
     const cleanInput = String(input || "").trim();
     if (!cleanInput || !simPhone.trim()) return;
@@ -229,14 +247,6 @@ export default function WhatsAppCentro() {
           <FaSyncAlt className={loading ? "animate-spin" : ""} />
           <span className="hidden sm:inline">Actualizar</span>
         </button>
-      </div>
-
-      <div className="mb-5 flex gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950">
-        <span className="mt-0.5 shrink-0" aria-hidden="true">⚠️</span>
-        <p>
-          <strong>Modo seguro:</strong> los envíos reales están bloqueados. La bandeja solo lee y clasifica;
-          el laboratorio genera respuestas simuladas sin contactar a ninguna familia.
-        </p>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-200/70 p-1">
@@ -334,6 +344,14 @@ export default function WhatsAppCentro() {
                         className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 sm:!w-auto"
                       >
                         <FaCheckDouble /> Marcar leídos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={deleteConversation}
+                        disabled={busy}
+                        className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 sm:!w-auto"
+                      >
+                        <FaTrash /> Eliminar
                       </button>
                       <select
                         value={selectedConversation.bot_mode}
