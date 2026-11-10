@@ -101,21 +101,28 @@ Deno.serve(async (request) => {
             String(contact.profile?.name || ""),
           ]),
         );
-        for (const message of value.messages || []) {
+        const appendMessage = (message: Record<string, any>, direction: "inbound" | "outbound") => {
           const timestamp = Number(message.timestamp || 0);
+          const contactPhone = direction === "outbound" ? String(message.to || "") : String(message.from || "");
+          if (!message.id || !contactPhone) return;
           records.push({
             wa_message_id: String(message.id),
-            from_phone: String(message.from || ""),
-            contact_name: contactNames.get(String(message.from || "")) || null,
+            from_phone: contactPhone,
+            contact_name: contactNames.get(contactPhone) || null,
             message_type: String(message.type || "unknown"),
             text_body: extractText(message) || null,
             media_id: extractMediaId(message) || null,
-            payload: message,
+            payload: { ...message, _direction: direction },
             received_at: timestamp
               ? new Date(timestamp * 1000).toISOString()
               : new Date().toISOString(),
+            status: direction === "outbound" ? "read" : "unread",
+            direction,
           });
-        }
+        };
+
+        for (const message of value.messages || []) appendMessage(message, "inbound");
+        for (const message of value.message_echoes || []) appendMessage(message, "outbound");
       }
     }
 
@@ -132,7 +139,7 @@ Deno.serve(async (request) => {
             "Content-Type": "application/json",
             Prefer: "resolution=ignore-duplicates,return=representation",
           },
-          body: JSON.stringify(records),
+          body: JSON.stringify(records.map(({ direction: _direction, ...record }) => record)),
         },
       );
       if (!saveResponse.ok) {
@@ -142,6 +149,54 @@ Deno.serve(async (request) => {
 
       const savedRecords = await saveResponse.json();
       for (const record of savedRecords) {
+        const direction = record.payload?._direction === "outbound" ? "outbound" : "inbound";
+        if (direction === "outbound") {
+          const preview = record.text_body || `[${record.message_type}]`;
+          const updateResponse = await fetch(
+            `${supabaseUrl}/rest/v1/whatsapp_conversations?phone=eq.${encodeURIComponent(record.from_phone)}`,
+            {
+              method: "PATCH",
+              headers: {
+                apikey: serviceRoleKey,
+                Authorization: `Bearer ${serviceRoleKey}`,
+                "Content-Type": "application/json",
+                Prefer: "return=representation",
+              },
+              body: JSON.stringify({
+                bot_mode: "human",
+                last_message_at: record.received_at,
+                last_message_preview: preview,
+                updated_at: new Date().toISOString(),
+              }),
+            },
+          );
+          if (!updateResponse.ok) {
+            console.error("No se pudo actualizar la conversación saliente", await updateResponse.text());
+            continue;
+          }
+          const updated = await updateResponse.json();
+          if (!updated.length) {
+            const insertResponse = await fetch(`${supabaseUrl}/rest/v1/whatsapp_conversations`, {
+              method: "POST",
+              headers: {
+                apikey: serviceRoleKey,
+                Authorization: `Bearer ${serviceRoleKey}`,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal",
+              },
+              body: JSON.stringify({
+                phone: record.from_phone,
+                contact_name: record.contact_name,
+                bot_mode: "human",
+                unread_count: 0,
+                last_message_at: record.received_at,
+                last_message_preview: preview,
+              }),
+            });
+            if (!insertResponse.ok) console.error("No se pudo crear la conversación saliente", await insertResponse.text());
+          }
+          continue;
+        }
         const conversationResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/record_whatsapp_inbound`, {
           method: "POST",
           headers: {

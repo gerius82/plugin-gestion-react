@@ -53,6 +53,7 @@ export default function WhatsAppCentro() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [config, setConfig] = useState(null);
+  const [mediaUrls, setMediaUrls] = useState({});
 
   const [simPhone, setSimPhone] = useState("3412153057");
   const [simInput, setSimInput] = useState("");
@@ -92,6 +93,25 @@ export default function WhatsAppCentro() {
     return result;
   };
 
+  const fetchMedia = async (mediaId) => {
+    if (!config || !mediaId) return null;
+    const client = await getSupabaseAuthClient();
+    const { data: sessionData } = await client.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) throw new Error("La sesión administrativa venció.");
+    const response = await fetch(
+      `${config.supabaseUrl}/functions/v1/whatsapp-admin?media_id=${encodeURIComponent(mediaId)}`,
+      {
+        headers: {
+          apikey: config.supabaseKey,
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    if (!response.ok) throw new Error("No se pudo cargar una imagen de WhatsApp.");
+    return URL.createObjectURL(await response.blob());
+  };
+
   const loadInbox = async () => {
     if (!config) return;
     try {
@@ -110,6 +130,33 @@ export default function WhatsAppCentro() {
   useEffect(() => {
     loadInbox();
   }, [config]);
+
+  useEffect(() => {
+    const missingIds = [...new Set(
+      (data.messages || [])
+        .filter((message) => message.message_type === "image" && message.media_id && !mediaUrls[message.media_id])
+        .map((message) => message.media_id),
+    )];
+    if (!missingIds.length) return;
+    let cancelled = false;
+    Promise.all(missingIds.map(async (mediaId) => {
+      try {
+        return [mediaId, await fetchMedia(mediaId)];
+      } catch {
+        return [mediaId, null];
+      }
+    })).then((entries) => {
+      if (cancelled) {
+        for (const [, url] of entries) if (url) URL.revokeObjectURL(url);
+        return;
+      }
+      setMediaUrls((current) => ({
+        ...current,
+        ...Object.fromEntries(entries.filter(([, url]) => url)),
+      }));
+    });
+    return () => { cancelled = true; };
+  }, [config, data.messages]);
 
   const contactsByPhone = useMemo(() => {
     const map = new Map();
@@ -454,15 +501,36 @@ export default function WhatsAppCentro() {
                       {selectedConversation ? "No hay mensajes guardados." : "Este contacto todavía no tiene una conversación iniciada."}
                     </div>
                   )}
-                  {selectedMessages.map((message) => (
-                    <div key={message.id} className="max-w-[85%] rounded-lg rounded-tl-sm bg-white p-3 shadow-sm">
-                      <p className="whitespace-pre-wrap text-sm">{message.text_body || `[${message.message_type}]`}</p>
-                      <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-gray-400">
-                        <span>{message.status}</span>
-                        <span>{formatDate(message.received_at)}</span>
+                  {selectedMessages.map((message) => {
+                    const outbound = message.payload?._direction === "outbound";
+                    const imageUrl = message.media_id ? mediaUrls[message.media_id] : null;
+                    return (
+                      <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[85%] rounded-lg p-2.5 shadow-sm ${outbound ? "rounded-tr-sm bg-[#d9fdd3]" : "rounded-tl-sm bg-white"}`}>
+                          {message.message_type === "image" && (
+                            imageUrl ? (
+                              <a href={imageUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md bg-gray-100">
+                                <img src={imageUrl} alt={message.text_body || "Imagen recibida por WhatsApp"} className="max-h-80 w-auto max-w-full object-contain" />
+                              </a>
+                            ) : (
+                              <div className="flex h-40 min-w-56 items-center justify-center rounded-md bg-gray-100 text-sm text-gray-500">
+                                <FaImage className="mr-2" /> Cargando imagen…
+                              </div>
+                            )
+                          )}
+                          {(message.text_body || message.message_type !== "image") && (
+                            <p className={`whitespace-pre-wrap px-1 text-sm ${message.message_type === "image" ? "mt-2" : ""}`}>
+                              {message.text_body || `[${message.message_type}]`}
+                            </p>
+                          )}
+                          <div className="mt-1.5 flex items-center justify-end gap-2 px-1 text-[11px] text-gray-400">
+                            <span>{formatDate(message.received_at)}</span>
+                            {outbound && <FaCheckDouble className="text-sky-500" title="Enviado desde WhatsApp Business" />}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="flex items-center gap-2 border-t bg-gray-100 p-3">
                   <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !p-0 text-gray-400" title="Adjuntar archivo"><FaPaperclip /></button>

@@ -97,7 +97,7 @@ const fetchEnrollments = async (contacts: Array<Record<string, any>>) => {
 const buildInbox = async () => {
   const [conversations, messages, settings, contacts, enrollments] = await Promise.all([
     rest("whatsapp_conversations?select=*&order=last_message_at.desc.nullslast&limit=200"),
-    rest("whatsapp_messages?select=id,wa_message_id,from_phone,contact_name,message_type,text_body,media_id,received_at,status&order=received_at.desc&limit=500"),
+    rest("whatsapp_messages?select=id,wa_message_id,from_phone,contact_name,message_type,text_body,media_id,payload,received_at,status&order=received_at.desc&limit=500"),
     rest("whatsapp_bot_settings?select=*&id=eq.true&limit=1"),
     fetchAllContacts(),
     fetchAllActiveEnrollments(),
@@ -185,6 +185,38 @@ Deno.serve(async (request) => {
     }
 
     if (request.method === "GET") {
+      const mediaId = new URL(request.url).searchParams.get("media_id")?.trim();
+      if (mediaId) {
+        if (!/^[A-Za-z0-9._-]+$/.test(mediaId)) {
+          return jsonResponse(400, { ok: false, error: "Identificador de imagen inválido" });
+        }
+        const accessToken = requiredSecret("WHATSAPP_ACCESS_TOKEN");
+        const phoneNumberId = requiredSecret("WHATSAPP_PHONE_NUMBER_ID");
+        const metadataResponse = await fetch(
+          `https://graph.facebook.com/v24.0/${encodeURIComponent(mediaId)}?phone_number_id=${encodeURIComponent(phoneNumberId)}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        if (!metadataResponse.ok) {
+          console.error("No se pudo consultar la imagen de WhatsApp", await metadataResponse.text());
+          return jsonResponse(502, { ok: false, error: "No se pudo obtener la imagen de WhatsApp" });
+        }
+        const metadata = await metadataResponse.json();
+        const mediaResponse = await fetch(metadata.url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!mediaResponse.ok) {
+          console.error("No se pudo descargar la imagen de WhatsApp", await mediaResponse.text());
+          return jsonResponse(502, { ok: false, error: "No se pudo descargar la imagen de WhatsApp" });
+        }
+        return new Response(await mediaResponse.arrayBuffer(), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": metadata.mime_type || mediaResponse.headers.get("content-type") || "application/octet-stream",
+            "Cache-Control": "private, max-age=300",
+          },
+        });
+      }
       return jsonResponse(200, { ok: true, ...(await buildInbox()) });
     }
 
