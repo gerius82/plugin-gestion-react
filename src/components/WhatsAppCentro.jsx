@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  FaAddressBook,
   FaArrowLeft,
   FaCheckDouble,
   FaCommentDots,
+  FaImage,
   FaPaperPlane,
+  FaPaperclip,
+  FaPhoneAlt,
   FaPlay,
   FaRobot,
+  FaSearch,
   FaSyncAlt,
   FaTrash,
+  FaUser,
   FaWhatsapp,
 } from "react-icons/fa";
 import { getSupabaseAuthClient } from "../lib/supabaseAuth";
@@ -141,17 +147,51 @@ export default function WhatsAppCentro() {
     });
   }, [contactsByPhone, data.conversations, filter]);
 
+  const agenda = useMemo(() => {
+    const grouped = new Map();
+    for (const contact of data.contacts || []) {
+      const phone = normalizePhone(contact.telefono_busqueda || contact.telefono);
+      if (!phone) continue;
+      if (!grouped.has(phone)) grouped.set(phone, { phone, contacts: [] });
+      grouped.get(phone).contacts.push(contact);
+    }
+    const query = filter.trim().toLowerCase();
+    return [...grouped.values()]
+      .map((entry) => {
+        const responsible = entry.contacts.find((item) => item.responsable)?.responsable || "";
+        const students = entry.contacts
+          .map((item) => `${item.nombre || ""} ${item.apellido || ""}`.trim())
+          .filter(Boolean);
+        return {
+          ...entry,
+          responsible,
+          students,
+          title: responsible || students[0] || `+${entry.phone}`,
+        };
+      })
+      .filter((entry) => !query || [entry.title, entry.phone, ...entry.students].join(" ").toLowerCase().includes(query))
+      .sort((left, right) => left.title.localeCompare(right.title, "es"));
+  }, [data.contacts, filter]);
+
   const selectedConversation = (data.conversations || []).find(
-    (conversation) => conversation.phone === selectedPhone,
+    (conversation) => normalizePhone(conversation.phone) === normalizePhone(selectedPhone),
   );
-  const selectedMessages = messagesByPhone.get(selectedPhone) || [];
+  const activePhone = selectedConversation?.phone || selectedPhone;
+  const selectedMessages = messagesByPhone.get(activePhone) || [];
   const selectedContacts = contactsByPhone.get(normalizePhone(selectedPhone)) || [];
+  const selectedEnrollments = (data.enrollments || []).filter((enrollment) =>
+    selectedContacts.some((contact) => [contact.id, contact.persona_id].filter(Boolean).map(String).includes(String(enrollment.alumno_id))),
+  );
+  const selectedTitle = selectedContacts[0]?.responsable
+    || selectedConversation?.contact_name
+    || selectedContacts.map((contact) => `${contact.nombre || ""} ${contact.apellido || ""}`.trim()).filter(Boolean).join(" / ")
+    || (selectedPhone ? `+${selectedPhone}` : "");
 
   const markRead = async () => {
-    if (!selectedPhone) return;
+    if (!activePhone) return;
     try {
       setBusy(true);
-      await api({ action: "mark_read", phone: selectedPhone });
+      await api({ action: "mark_read", phone: activePhone });
       await loadInbox();
     } catch (currentError) {
       setError(currentError.message);
@@ -161,10 +201,10 @@ export default function WhatsAppCentro() {
   };
 
   const setBotMode = async (mode) => {
-    if (!selectedPhone) return;
+    if (!activePhone) return;
     try {
       setBusy(true);
-      await api({ action: "set_bot_mode", phone: selectedPhone, mode });
+      await api({ action: "set_bot_mode", phone: activePhone, mode });
       await loadInbox();
     } catch (currentError) {
       setError(currentError.message);
@@ -174,13 +214,13 @@ export default function WhatsAppCentro() {
   };
 
   const deleteConversation = async () => {
-    if (!selectedPhone) return;
-    const label = selectedConversation?.contact_name || `+${selectedPhone}`;
+    if (!activePhone) return;
+    const label = selectedConversation?.contact_name || `+${activePhone}`;
     if (!window.confirm(`¿Eliminar la conversación con ${label}? Esta acción no se puede deshacer.`)) return;
     try {
       setBusy(true);
       setError("");
-      await api({ action: "delete_conversation", phone: selectedPhone });
+      await api({ action: "delete_conversation", phone: activePhone });
       setSelectedPhone("");
       await loadInbox();
     } catch (currentError) {
@@ -235,7 +275,7 @@ export default function WhatsAppCentro() {
               </span>
               <span>Centro de WhatsApp</span>
             </h1>
-            <p className="mt-0.5 hidden text-sm text-gray-500 sm:block">Bandeja protegida y laboratorio del bot</p>
+            <p className="mt-0.5 hidden text-sm text-gray-500 sm:block">Mensajes, contactos y automatizaciones</p>
           </div>
         </div>
         <button
@@ -249,13 +289,20 @@ export default function WhatsAppCentro() {
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-200/70 p-1">
+      <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
         <button
           type="button"
           onClick={() => setTab("inbox")}
           className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "inbox" ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-700 hover:bg-white/70"}`}
         >
           <FaCommentDots className="inline mr-2" /> Bandeja
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("contacts")}
+          className={`!w-full rounded-lg px-3 py-2.5 font-semibold transition ${tab === "contacts" ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-700 hover:bg-gray-100"}`}
+        >
+          <FaAddressBook className="inline mr-2" /> Agenda
         </button>
         <button
           type="button"
@@ -268,24 +315,31 @@ export default function WhatsAppCentro() {
 
       {error && <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-red-700">{error}</div>}
 
-      {tab === "inbox" && (
-        <div className="grid min-h-[560px] grid-cols-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm lg:grid-cols-[340px_minmax(0,1fr)]">
+      {(tab === "inbox" || tab === "contacts") && (
+        <div className="grid min-h-[620px] grid-cols-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)_290px]">
           <aside className="border-b lg:border-b-0 lg:border-r">
-            <div className="p-3 border-b">
-              <input
-                type="search"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder="Buscar nombre o teléfono"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
+            <div className="border-b bg-gray-50 p-3">
+              <h2 className="mb-3 text-lg font-bold text-gray-900">{tab === "inbox" ? "Chats" : "Contactos"}</h2>
+              <div className="relative">
+                <FaSearch className="pointer-events-none absolute left-3 top-3 text-sm text-gray-400" />
+                <input
+                  type="search"
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                  placeholder={tab === "inbox" ? "Buscar un chat" : "Buscar en la agenda"}
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                />
+              </div>
             </div>
             <div className="max-h-[500px] overflow-y-auto">
-              {loading && <p className="p-5 text-sm text-gray-500">Cargando conversaciones…</p>}
-              {!loading && conversations.length === 0 && (
+              {loading && <p className="p-5 text-sm text-gray-500">Cargando…</p>}
+              {!loading && tab === "inbox" && conversations.length === 0 && (
                 <p className="p-5 text-sm text-gray-500">Todavía no hay conversaciones para mostrar.</p>
               )}
-              {conversations.map((conversation) => {
+              {!loading && tab === "contacts" && agenda.length === 0 && (
+                <p className="p-5 text-sm text-gray-500">No encontramos contactos con teléfono.</p>
+              )}
+              {tab === "inbox" && conversations.map((conversation) => {
                 const matches = contactsByPhone.get(normalizePhone(conversation.phone)) || [];
                 const title = matches.length
                   ? matches.map((contact) => `${contact.nombre || ""} ${contact.apellido || ""}`.trim()).join(" / ")
@@ -313,21 +367,44 @@ export default function WhatsAppCentro() {
                   </button>
                 );
               })}
+              {tab === "contacts" && agenda.map((entry) => (
+                <button
+                  type="button"
+                  key={entry.phone}
+                  onClick={() => setSelectedPhone(entry.phone)}
+                  className={`w-full border-b p-4 text-left transition hover:bg-gray-50 ${normalizePhone(selectedPhone) === entry.phone ? "bg-green-50" : ""}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 font-bold text-green-700">
+                      {entry.title.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900">{entry.title}</p>
+                      <p className="truncate text-sm text-gray-500">{entry.students.join(" · ") || `+${entry.phone}`}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">+{entry.phone}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
           </aside>
 
           <section className="flex min-w-0 flex-col">
-            {!selectedConversation ? (
+            {!selectedPhone ? (
               <div className="flex flex-1 items-center justify-center p-8 text-center text-gray-500">
-                Seleccioná una conversación.
+                <div>
+                  <span className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-50 text-4xl text-green-600"><FaWhatsapp /></span>
+                  <p className="font-semibold text-gray-700">Seleccioná un chat o un contacto</p>
+                  <p className="mt-1 text-sm">Acá vas a poder ver la conversación y responder.</p>
+                </div>
               </div>
             ) : (
               <>
                 <div className="border-b p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h2 className="font-bold text-lg">{selectedConversation.contact_name || `+${selectedPhone}`}</h2>
-                      <p className="text-sm text-gray-500">+{selectedPhone}</p>
+                      <h2 className="font-bold text-lg">{selectedTitle}</h2>
+                      <p className="text-sm text-gray-500">+{activePhone}</p>
                       {selectedContacts.length > 0 ? (
                         <p className="mt-1 text-sm text-green-700">
                           Asociado a {selectedContacts.map((contact) => `${contact.nombre} ${contact.apellido}`).join(", ")}
@@ -337,39 +414,48 @@ export default function WhatsAppCentro() {
                       )}
                     </div>
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={markRead}
-                        disabled={busy || selectedConversation.unread_count === 0}
-                        className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 sm:!w-auto"
-                      >
-                        <FaCheckDouble /> Marcar leídos
-                      </button>
-                      <button
-                        type="button"
-                        onClick={deleteConversation}
-                        disabled={busy}
-                        className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 sm:!w-auto"
-                      >
-                        <FaTrash /> Eliminar
-                      </button>
-                      <select
-                        value={selectedConversation.bot_mode}
-                        onChange={(event) => setBotMode(event.target.value)}
-                        disabled={busy}
-                        className="!w-full min-w-[180px] rounded-lg border px-3 py-2 text-sm sm:!w-auto"
-                      >
-                        <option value="active">Bot activo</option>
-                        <option value="paused">Bot pausado</option>
-                        <option value="human">Atención humana</option>
-                      </select>
+                      {selectedConversation && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={markRead}
+                            disabled={busy || selectedConversation.unread_count === 0}
+                            className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 sm:!w-auto"
+                          >
+                            <FaCheckDouble /> Marcar leídos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={deleteConversation}
+                            disabled={busy}
+                            className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 sm:!w-auto"
+                          >
+                            <FaTrash /> Eliminar
+                          </button>
+                          <select
+                            value={selectedConversation.bot_mode}
+                            onChange={(event) => setBotMode(event.target.value)}
+                            disabled={busy}
+                            className="!w-full min-w-[150px] rounded-lg border px-3 py-2 text-sm sm:!w-auto"
+                          >
+                            <option value="active">Bot activo</option>
+                            <option value="paused">Bot pausado</option>
+                            <option value="human">Atención humana</option>
+                          </select>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 space-y-3 overflow-y-auto bg-gray-50 p-4">
-                  {selectedMessages.length === 0 && <p className="text-sm text-gray-500">No hay mensajes guardados.</p>}
+                <div className="flex-1 space-y-3 overflow-y-auto bg-[#efeae2] p-4" style={{ backgroundImage: "radial-gradient(rgba(0,0,0,0.035) 1px, transparent 1px)", backgroundSize: "18px 18px" }}>
+                  {selectedMessages.length === 0 && (
+                    <div className="mx-auto mt-16 max-w-sm rounded-xl bg-white/90 p-5 text-center text-sm text-gray-600 shadow-sm">
+                      <FaCommentDots className="mx-auto mb-2 text-2xl text-green-600" />
+                      {selectedConversation ? "No hay mensajes guardados." : "Este contacto todavía no tiene una conversación iniciada."}
+                    </div>
+                  )}
                   {selectedMessages.map((message) => (
-                    <div key={message.id} className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white p-3 shadow-sm border">
+                    <div key={message.id} className="max-w-[85%] rounded-lg rounded-tl-sm bg-white p-3 shadow-sm">
                       <p className="whitespace-pre-wrap text-sm">{message.text_body || `[${message.message_type}]`}</p>
                       <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-gray-400">
                         <span>{message.status}</span>
@@ -378,12 +464,52 @@ export default function WhatsAppCentro() {
                     </div>
                   ))}
                 </div>
-                <div className="border-t bg-gray-100 p-3 text-center text-sm text-gray-500">
-                  Envíos desactivados hasta completar aprobación y coexistencia.
+                <div className="flex items-center gap-2 border-t bg-gray-100 p-3">
+                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !p-0 text-gray-400" title="Adjuntar archivo"><FaPaperclip /></button>
+                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !p-0 text-gray-400" title="Enviar imagen"><FaImage /></button>
+                  <input disabled placeholder="La respuesta desde la bandeja estará disponible en el próximo paso" className="min-w-0 flex-1 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-500" />
+                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full bg-green-600 !p-0 text-white opacity-50" aria-label="Enviar"><FaPaperPlane /></button>
                 </div>
               </>
             )}
           </section>
+
+          <aside className="hidden border-l bg-gray-50 xl:block">
+            {!selectedPhone ? (
+              <p className="p-6 text-center text-sm text-gray-500">Seleccioná un contacto para ver su información.</p>
+            ) : (
+              <div>
+                <div className="border-b bg-white p-6 text-center">
+                  <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-3xl font-bold text-green-700">
+                    {(selectedTitle || "?").slice(0, 1).toUpperCase()}
+                  </span>
+                  <h3 className="mt-3 font-bold text-gray-900">{selectedTitle}</h3>
+                  <p className="mt-1 text-sm text-gray-500">+{activePhone}</p>
+                </div>
+                <div className="space-y-5 p-5 text-sm">
+                  <div>
+                    <p className="mb-2 flex items-center gap-2 font-semibold text-gray-700"><FaUser className="text-green-600" /> Alumnos relacionados</p>
+                    {selectedContacts.length === 0 ? <p className="text-gray-500">Sin alumnos asociados.</p> : selectedContacts.map((contact) => (
+                      <div key={contact.id} className="mb-2 rounded-lg border bg-white p-3">
+                        <p className="font-semibold">{`${contact.nombre || ""} ${contact.apellido || ""}`.trim()}</p>
+                        {contact.responsable && <p className="mt-1 text-xs text-gray-500">Responsable: {contact.responsable}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <p className="mb-2 flex items-center gap-2 font-semibold text-gray-700"><FaAddressBook className="text-green-600" /> Matrículas activas</p>
+                    {selectedEnrollments.length === 0 ? <p className="text-gray-500">Sin matrículas activas.</p> : selectedEnrollments.map((enrollment) => (
+                      <div key={enrollment.id} className="mb-2 rounded-lg border bg-white p-3">
+                        <p className="font-semibold">{enrollment.curso_nombre || "Curso"}</p>
+                        <p className="mt-1 text-xs text-gray-500">{[enrollment.sede, enrollment.dia, enrollment.hora].filter(Boolean).join(" · ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border bg-white p-3 text-gray-600"><FaPhoneAlt className="text-green-600" /> +{activePhone}</div>
+                </div>
+              </div>
+            )}
+          </aside>
         </div>
       )}
 

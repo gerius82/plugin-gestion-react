@@ -75,6 +75,16 @@ const fetchContacts = async (phones: string[]) => {
   );
 };
 
+const fetchAllContacts = async () =>
+  await rest(
+    "inscripciones?select=id,persona_id,nombre,apellido,responsable,telefono,telefono_busqueda&order=responsable.asc.nullslast,nombre.asc&limit=2000",
+  );
+
+const fetchAllActiveEnrollments = async () =>
+  await rest(
+    "matriculas?select=id,alumno_id,estado,curso_nombre,sede,dia,hora,ciclo_codigo&estado=eq.activa&limit=5000",
+  );
+
 const fetchEnrollments = async (contacts: Array<Record<string, any>>) => {
   const ids = [...new Set(contacts.flatMap((item) => [item.persona_id, item.id]).filter(Boolean))];
   if (!ids.length) return [];
@@ -85,14 +95,13 @@ const fetchEnrollments = async (contacts: Array<Record<string, any>>) => {
 };
 
 const buildInbox = async () => {
-  const [conversations, messages, settings] = await Promise.all([
+  const [conversations, messages, settings, contacts, enrollments] = await Promise.all([
     rest("whatsapp_conversations?select=*&order=last_message_at.desc.nullslast&limit=200"),
     rest("whatsapp_messages?select=id,wa_message_id,from_phone,contact_name,message_type,text_body,media_id,received_at,status&order=received_at.desc&limit=500"),
     rest("whatsapp_bot_settings?select=*&id=eq.true&limit=1"),
+    fetchAllContacts(),
+    fetchAllActiveEnrollments(),
   ]);
-  const phones = (conversations || []).map((item: Record<string, any>) => item.phone);
-  const contacts = await fetchContacts(phones);
-  const enrollments = await fetchEnrollments(contacts || []);
   return {
     conversations: conversations || [],
     messages: messages || [],
