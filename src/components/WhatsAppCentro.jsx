@@ -573,14 +573,14 @@ export default function WhatsAppCentro() {
                           )}
                           {message.message_type === "document" && (
                             mediaUrl ? (
-                              <div className="relative w-64 max-w-full overflow-hidden rounded-md border border-gray-200 bg-white">
-                                <iframe
-                                  src={`${mediaUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                                  title="Vista previa del PDF"
-                                  className="h-72 w-full pointer-events-none"
-                                />
-                                <div className="flex items-center justify-center gap-2 border-t bg-white px-3 py-2 text-sm font-semibold text-red-700">
-                                  <FaFilePdf /> Abrir PDF
+                              <div className="relative aspect-[210/297] w-64 max-w-full overflow-hidden rounded-md border border-gray-200 bg-white">
+                                <div className="absolute inset-0 overflow-hidden">
+                                  <iframe
+                                    src={`${mediaUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+                                    title="Vista previa del PDF"
+                                    scrolling="no"
+                                    className="h-full w-[calc(100%+18px)] pointer-events-none"
+                                  />
                                 </div>
                                 <a
                                   href={mediaUrl}
