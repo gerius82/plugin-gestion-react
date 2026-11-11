@@ -111,6 +111,17 @@ const buildInbox = async () => {
   };
 };
 
+const buildMessageUpdates = async () => {
+  const [conversations, messages] = await Promise.all([
+    rest("whatsapp_conversations?select=*&order=last_message_at.desc.nullslast&limit=200"),
+    rest("whatsapp_messages?select=id,wa_message_id,from_phone,contact_name,message_type,text_body,media_id,payload,received_at,status&order=received_at.desc&limit=500"),
+  ]);
+  return {
+    conversations: conversations || [],
+    messages: messages || [],
+  };
+};
+
 const findContext = async (phone: string) => {
   const contacts = await fetchContacts([phone]);
   const enrollments = await fetchEnrollments(contacts || []);
@@ -185,7 +196,8 @@ Deno.serve(async (request) => {
     }
 
     if (request.method === "GET") {
-      const mediaId = new URL(request.url).searchParams.get("media_id")?.trim();
+      const requestUrl = new URL(request.url);
+      const mediaId = requestUrl.searchParams.get("media_id")?.trim();
       if (mediaId) {
         if (!/^[A-Za-z0-9._-]+$/.test(mediaId)) {
           return jsonResponse(400, { ok: false, error: "Identificador de imagen inválido" });
@@ -216,6 +228,9 @@ Deno.serve(async (request) => {
             "Cache-Control": "private, max-age=300",
           },
         });
+      }
+      if (requestUrl.searchParams.get("updates") === "1") {
+        return jsonResponse(200, { ok: true, ...(await buildMessageUpdates()) });
       }
       return jsonResponse(200, { ok: true, ...(await buildInbox()) });
     }

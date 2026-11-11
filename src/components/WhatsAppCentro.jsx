@@ -110,13 +110,13 @@ export default function WhatsAppCentro() {
       .catch((currentError) => setError(currentError.message));
   }, []);
 
-  const api = async (body) => {
+  const api = async (body, query = "") => {
     if (!config) throw new Error("La configuración todavía no está disponible.");
     const client = await getSupabaseAuthClient();
     const { data: sessionData } = await client.auth.getSession();
     const token = sessionData?.session?.access_token;
     if (!token) throw new Error("La sesión administrativa venció.");
-    const response = await fetch(`${config.supabaseUrl}/functions/v1/whatsapp-admin`, {
+    const response = await fetch(`${config.supabaseUrl}/functions/v1/whatsapp-admin${query}`, {
       method: body ? "POST" : "GET",
       headers: {
         apikey: config.supabaseKey,
@@ -151,23 +151,42 @@ export default function WhatsAppCentro() {
     return URL.createObjectURL(await response.blob());
   };
 
-  const loadInbox = async () => {
+  const loadInbox = async (silent = false) => {
     if (!config) return;
     try {
-      setLoading(true);
-      setError("");
-      const result = await api();
-      setData(result);
+      if (!silent) {
+        setLoading(true);
+        setError("");
+      }
+      const result = await api(undefined, silent ? "?updates=1" : "");
+      setData((current) => silent
+        ? { ...current, conversations: result.conversations || [], messages: result.messages || [] }
+        : result);
       setSelectedPhone((current) => current || result.conversations?.[0]?.phone || "");
     } catch (currentError) {
-      setError(currentError.message);
+      if (!silent) setError(currentError.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadInbox();
+  }, [config]);
+
+  useEffect(() => {
+    if (!config) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") loadInbox(true);
+    };
+    const intervalId = window.setInterval(refresh, 4000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [config]);
 
   useEffect(() => {
@@ -395,7 +414,7 @@ export default function WhatsAppCentro() {
         </div>
         <button
           type="button"
-          onClick={loadInbox}
+          onClick={() => loadInbox()}
           disabled={loading}
           className="!flex !w-auto shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:px-4"
         >
