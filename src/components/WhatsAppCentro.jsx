@@ -55,6 +55,26 @@ const friendlyPreview = (value) => {
   return value || "Mensaje sin texto";
 };
 
+const renderWhatsAppText = (value) => {
+  const text = String(value || "");
+  const parts = text.split(/(```[\s\S]*?```|\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("```") && part.endsWith("```") && part.length >= 6) {
+      return <code key={index} className="rounded bg-black/5 px-1 font-mono text-[0.95em]">{part.slice(3, -3)}</code>;
+    }
+    if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+      return <strong key={index}>{part.slice(1, -1)}</strong>;
+    }
+    if (part.startsWith("_") && part.endsWith("_") && part.length > 2) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith("~") && part.endsWith("~") && part.length > 2) {
+      return <del key={index}>{part.slice(1, -1)}</del>;
+    }
+    return part;
+  });
+};
+
 export default function WhatsAppCentro() {
   const navigate = useNavigate();
   const [data, setData] = useState({
@@ -440,7 +460,7 @@ export default function WhatsAppCentro() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 truncate text-sm text-gray-600">{friendlyPreview(conversation.last_message_preview)}</p>
+                    <p className="mt-2 truncate text-sm text-gray-600">{renderWhatsAppText(friendlyPreview(conversation.last_message_preview))}</p>
                     <p className="mt-1 text-xs text-gray-400">{formatDate(conversation.last_message_at)}</p>
                   </button>
                 );
@@ -578,7 +598,7 @@ export default function WhatsAppCentro() {
                           )}
                           {(message.text_body || !["image", "document", "sticker"].includes(message.message_type)) && (
                             <p className={`whitespace-pre-wrap px-1 text-sm ${["image", "document"].includes(message.message_type) ? "mt-2" : ""}`}>
-                              {friendlyMessageText(message.text_body, message.message_type)}
+                              {renderWhatsAppText(friendlyMessageText(message.text_body, message.message_type))}
                             </p>
                           )}
                           <div className={`mt-1.5 flex items-center justify-end gap-2 px-1 text-[11px] ${sticker ? "text-gray-500" : "text-gray-400"}`}>
