@@ -267,6 +267,94 @@ Deno.serve(async (request) => {
       return jsonResponse(200, { ok: true });
     }
 
+    if (body.action === "send_message") {
+      const phone = String(body.phone || "").replace(/\D/g, "");
+      const text = String(body.text || "").trim();
+      if (!phone) return jsonResponse(400, { ok: false, error: "Teléfono inválido" });
+      if (!text) return jsonResponse(400, { ok: false, error: "Escribí un mensaje" });
+      if (text.length > 4096) return jsonResponse(400, { ok: false, error: "El mensaje es demasiado largo" });
+
+      const recentMessages = await rest(
+        `whatsapp_messages?select=received_at,payload&from_phone=eq.${encodeURIComponent(phone)}&order=received_at.desc&limit=100`,
+      );
+      const lastInbound = (recentMessages || []).find(
+        (message: Record<string, any>) => message.payload?._direction !== "outbound",
+      );
+      const customerWindowOpen = lastInbound?.received_at
+        && Date.now() - new Date(lastInbound.received_at).getTime() < 24 * 60 * 60 * 1000;
+      if (!customerWindowOpen) {
+        return jsonResponse(409, {
+          ok: false,
+          error: "La ventana de 24 horas está cerrada. Para iniciar la conversación necesitás una plantilla aprobada por Meta.",
+        });
+      }
+
+      const accessToken = requiredSecret("WHATSAPP_ACCESS_TOKEN");
+      const phoneNumberId = requiredSecret("WHATSAPP_PHONE_NUMBER_ID");
+      const graphResponse = await fetch(
+        `https://graph.facebook.com/v24.0/${encodeURIComponent(phoneNumberId)}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: phone,
+            type: "text",
+            text: { preview_url: true, body: text },
+          }),
+        },
+      );
+      const graphResult = await graphResponse.json().catch(() => ({}));
+      if (!graphResponse.ok || !graphResult?.messages?.[0]?.id) {
+        console.error("No se pudo enviar el mensaje de WhatsApp", graphResult);
+        return jsonResponse(502, {
+          ok: false,
+          error: graphResult?.error?.error_data?.details || graphResult?.error?.message || "Meta rechazó el mensaje",
+        });
+      }
+
+      const sentAt = new Date().toISOString();
+      const messageId = String(graphResult.messages[0].id);
+      await rest("whatsapp_messages?on_conflict=wa_message_id", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "resolution=ignore-duplicates,return=minimal",
+        },
+        body: JSON.stringify({
+          wa_message_id: messageId,
+          from_phone: phone,
+          message_type: "text",
+          text_body: text,
+          payload: {
+            id: messageId,
+            to: phone,
+            type: "text",
+            text: { body: text },
+            _direction: "outbound",
+            _source: "plugin_center",
+          },
+          received_at: sentAt,
+          status: "read",
+        }),
+      });
+      await rest(`whatsapp_conversations?phone=eq.${encodeURIComponent(phone)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({
+          bot_mode: "human",
+          last_message_at: sentAt,
+          last_message_preview: text,
+          updated_at: sentAt,
+        }),
+      });
+      return jsonResponse(200, { ok: true, messageId, sentAt });
+    }
+
     if (body.action === "simulate") {
       const phone = normalizePhone(body.phone);
       if (!phone) return jsonResponse(400, { ok: false, error: "Ingresá un teléfono" });

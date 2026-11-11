@@ -92,6 +92,7 @@ export default function WhatsAppCentro() {
   const [busy, setBusy] = useState(false);
   const [config, setConfig] = useState(null);
   const [mediaUrls, setMediaUrls] = useState({});
+  const [replyText, setReplyText] = useState("");
 
   const [simPhone, setSimPhone] = useState("3412153057");
   const [simInput, setSimInput] = useState("");
@@ -320,6 +321,22 @@ export default function WhatsAppCentro() {
       setError("");
       await api({ action: "delete_conversation", phone: activePhone });
       setSelectedPhone("");
+      await loadInbox();
+    } catch (currentError) {
+      setError(currentError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendReply = async () => {
+    const text = replyText.trim();
+    if (!selectedConversation || !text || busy) return;
+    try {
+      setBusy(true);
+      setError("");
+      await api({ action: "send_message", phone: activePhone, text });
+      setReplyText("");
       await loadInbox();
     } catch (currentError) {
       setError(currentError.message);
@@ -610,12 +627,31 @@ export default function WhatsAppCentro() {
                     );
                   })}
                 </div>
-                <div className="flex items-center gap-2 border-t bg-gray-100 p-3">
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    sendReply();
+                  }}
+                  className="flex items-center gap-2 border-t bg-gray-100 p-3"
+                >
                   <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !p-0 text-gray-400" title="Adjuntar archivo"><FaPaperclip /></button>
                   <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !p-0 text-gray-400" title="Enviar imagen"><FaImage /></button>
-                  <input disabled placeholder="La respuesta desde la bandeja estará disponible en el próximo paso" className="min-w-0 flex-1 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-500" />
-                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full bg-green-600 !p-0 text-white opacity-50" aria-label="Enviar"><FaPaperPlane /></button>
-                </div>
+                  <input
+                    value={replyText}
+                    onChange={(event) => setReplyText(event.target.value)}
+                    disabled={busy || !selectedConversation}
+                    placeholder={selectedConversation ? "Escribí un mensaje" : "Este contacto todavía no inició una conversación"}
+                    className="min-w-0 flex-1 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-gray-50 disabled:text-gray-400"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy || !selectedConversation || !replyText.trim()}
+                    className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full bg-green-600 !p-0 text-white hover:bg-green-700 disabled:opacity-40"
+                    aria-label="Enviar"
+                  >
+                    <FaPaperPlane />
+                  </button>
+                </form>
               </>
             )}
           </section>
