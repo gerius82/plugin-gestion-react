@@ -526,15 +526,23 @@ export default function WhatsAppCentro() {
                           )}
                           {message.message_type === "document" && (
                             mediaUrl ? (
-                              <a
-                                href={mediaUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex min-w-56 items-center gap-3 rounded-lg border border-red-100 bg-white/80 p-3 text-red-700 transition hover:bg-red-50"
-                              >
-                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-xl"><FaFilePdf /></span>
-                                <span className="font-semibold">Abrir PDF</span>
-                              </a>
+                              <div className="relative w-64 max-w-full overflow-hidden rounded-md border border-gray-200 bg-white">
+                                <iframe
+                                  src={`${mediaUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                                  title="Vista previa del PDF"
+                                  className="h-72 w-full pointer-events-none"
+                                />
+                                <div className="flex items-center justify-center gap-2 border-t bg-white px-3 py-2 text-sm font-semibold text-red-700">
+                                  <FaFilePdf /> Abrir PDF
+                                </div>
+                                <a
+                                  href={mediaUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="absolute inset-0"
+                                  aria-label="Abrir PDF en una pestaña nueva"
+                                />
+                              </div>
                             ) : (
                               <div className="flex min-w-56 items-center gap-3 rounded-lg bg-white/80 p-3 text-sm text-gray-500">
                                 <FaFilePdf className="text-xl text-red-500" /> Cargando PDF…
