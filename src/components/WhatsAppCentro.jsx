@@ -42,6 +42,7 @@ const friendlyMessageText = (value, type) => {
   if (value) return value;
   if (type === "unsupported") return "Mensaje no compatible. Ver en WhatsApp Business.";
   if (type === "sticker") return "Sticker";
+  if (type === "audio") return "Audio";
   if (type === "document") return "PDF";
   if (type === "image") return "Imagen";
   return `[${type}]`;
@@ -50,6 +51,7 @@ const friendlyMessageText = (value, type) => {
 const friendlyPreview = (value) => {
   if (value === "[unsupported]") return "Mensaje no compatible. Ver en WhatsApp Business.";
   if (value === "[sticker]") return "Sticker";
+  if (value === "[audio]") return "Audio";
   if (value === "[document]") return "PDF";
   if (value === "[image]") return "Imagen";
   return value || "Mensaje sin texto";
@@ -192,7 +194,7 @@ export default function WhatsAppCentro() {
   useEffect(() => {
     const missingIds = [...new Set(
       (data.messages || [])
-        .filter((message) => ["image", "document", "sticker"].includes(message.message_type) && message.media_id && !mediaUrls[message.media_id])
+        .filter((message) => ["image", "document", "sticker", "audio"].includes(message.message_type) && message.media_id && !mediaUrls[message.media_id])
         .map((message) => message.media_id),
     )];
     if (!missingIds.length) return;
@@ -607,6 +609,15 @@ export default function WhatsAppCentro() {
                               </div>
                             )
                           )}
+                          {message.message_type === "audio" && (
+                            mediaUrl ? (
+                              <audio controls preload="metadata" src={mediaUrl} className="h-10 w-64 max-w-full" aria-label="Audio recibido por WhatsApp" />
+                            ) : (
+                              <div className="flex h-10 min-w-56 items-center justify-center rounded-full bg-white/70 px-4 text-sm text-gray-500">
+                                Cargando audio…
+                              </div>
+                            )
+                          )}
                           {message.message_type === "document" && (
                             mediaUrl ? (
                               <div className="relative aspect-[210/297] w-64 max-w-full overflow-hidden rounded-md border border-gray-200 bg-white">
@@ -632,7 +643,7 @@ export default function WhatsAppCentro() {
                               </div>
                             )
                           )}
-                          {(message.text_body || !["image", "document", "sticker"].includes(message.message_type)) && (
+                          {(message.text_body || !["image", "document", "sticker", "audio"].includes(message.message_type)) && (
                             <p className={`whitespace-pre-wrap px-1 text-sm ${["image", "document"].includes(message.message_type) ? "mt-2" : ""}`}>
                               {renderWhatsAppText(friendlyMessageText(message.text_body, message.message_type))}
                             </p>
