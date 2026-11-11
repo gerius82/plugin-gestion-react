@@ -234,18 +234,31 @@ export default function WhatsAppCentro() {
     || selectedContacts.map((contact) => `${contact.nombre || ""} ${contact.apellido || ""}`.trim()).filter(Boolean).join(" / ")
     || (selectedPhone ? `+${selectedPhone}` : "");
 
-  const markRead = async () => {
-    if (!activePhone) return;
-    try {
-      setBusy(true);
-      await api({ action: "mark_read", phone: activePhone });
-      await loadInbox();
-    } catch (currentError) {
-      setError(currentError.message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  useEffect(() => {
+    if (!selectedConversation || selectedConversation.unread_count === 0) return;
+    let cancelled = false;
+    api({ action: "mark_read", phone: selectedConversation.phone })
+      .then(() => {
+        if (cancelled) return;
+        setData((current) => ({
+          ...current,
+          conversations: (current.conversations || []).map((conversation) =>
+            conversation.phone === selectedConversation.phone
+              ? { ...conversation, unread_count: 0 }
+              : conversation,
+          ),
+          messages: (current.messages || []).map((message) =>
+            message.from_phone === selectedConversation.phone && message.status === "unread"
+              ? { ...message, status: "read" }
+              : message,
+          ),
+        }));
+      })
+      .catch((currentError) => {
+        if (!cancelled) setError(currentError.message);
+      });
+    return () => { cancelled = true; };
+  }, [selectedConversation?.phone, selectedConversation?.unread_count]);
 
   const setBotMode = async (mode) => {
     if (!activePhone) return;
@@ -463,14 +476,6 @@ export default function WhatsAppCentro() {
                     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                       {selectedConversation && (
                         <>
-                          <button
-                            type="button"
-                            onClick={markRead}
-                            disabled={busy || selectedConversation.unread_count === 0}
-                            className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 sm:!w-auto"
-                          >
-                            <FaCheckDouble /> Marcar leídos
-                          </button>
                           <button
                             type="button"
                             onClick={deleteConversation}
