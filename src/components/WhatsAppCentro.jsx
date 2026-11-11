@@ -5,6 +5,7 @@ import {
   FaArrowLeft,
   FaCheckDouble,
   FaCommentDots,
+  FaFilePdf,
   FaImage,
   FaPaperPlane,
   FaPaperclip,
@@ -134,7 +135,7 @@ export default function WhatsAppCentro() {
   useEffect(() => {
     const missingIds = [...new Set(
       (data.messages || [])
-        .filter((message) => message.message_type === "image" && message.media_id && !mediaUrls[message.media_id])
+        .filter((message) => ["image", "document"].includes(message.message_type) && message.media_id && !mediaUrls[message.media_id])
         .map((message) => message.media_id),
     )];
     if (!missingIds.length) return;
@@ -508,14 +509,14 @@ export default function WhatsAppCentro() {
                   )}
                   {selectedMessages.map((message) => {
                     const outbound = message.payload?._direction === "outbound";
-                    const imageUrl = message.media_id ? mediaUrls[message.media_id] : null;
+                    const mediaUrl = message.media_id ? mediaUrls[message.media_id] : null;
                     return (
                       <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[85%] rounded-lg p-2.5 shadow-sm ${outbound ? "rounded-tr-sm bg-[#d9fdd3]" : "rounded-tl-sm bg-white"}`}>
                           {message.message_type === "image" && (
-                            imageUrl ? (
-                              <a href={imageUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md bg-gray-100">
-                                <img src={imageUrl} alt={message.text_body || "Imagen recibida por WhatsApp"} className="max-h-80 w-auto max-w-full object-contain" />
+                            mediaUrl ? (
+                              <a href={mediaUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md bg-gray-100">
+                                <img src={mediaUrl} alt={message.text_body || "Imagen recibida por WhatsApp"} className="max-h-80 w-auto max-w-full object-contain" />
                               </a>
                             ) : (
                               <div className="flex h-40 min-w-56 items-center justify-center rounded-md bg-gray-100 text-sm text-gray-500">
@@ -523,8 +524,25 @@ export default function WhatsAppCentro() {
                               </div>
                             )
                           )}
-                          {(message.text_body || message.message_type !== "image") && (
-                            <p className={`whitespace-pre-wrap px-1 text-sm ${message.message_type === "image" ? "mt-2" : ""}`}>
+                          {message.message_type === "document" && (
+                            mediaUrl ? (
+                              <a
+                                href={mediaUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex min-w-56 items-center gap-3 rounded-lg border border-red-100 bg-white/80 p-3 text-red-700 transition hover:bg-red-50"
+                              >
+                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-xl"><FaFilePdf /></span>
+                                <span className="font-semibold">Abrir PDF</span>
+                              </a>
+                            ) : (
+                              <div className="flex min-w-56 items-center gap-3 rounded-lg bg-white/80 p-3 text-sm text-gray-500">
+                                <FaFilePdf className="text-xl text-red-500" /> Cargando PDF…
+                              </div>
+                            )
+                          )}
+                          {(message.text_body || !["image", "document"].includes(message.message_type)) && (
+                            <p className={`whitespace-pre-wrap px-1 text-sm ${["image", "document"].includes(message.message_type) ? "mt-2" : ""}`}>
                               {message.text_body || `[${message.message_type}]`}
                             </p>
                           )}
