@@ -48,6 +48,9 @@ const extractText = (message: Record<string, any>) => {
         "",
     );
   }
+  if (message.type === "reaction") {
+    return String(message.reaction?.emoji || "");
+  }
   if (["image", "video", "document"].includes(message.type)) {
     return String(message[message.type]?.caption || "");
   }

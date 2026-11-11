@@ -38,6 +38,23 @@ const botModeLabel = {
   human: "Atención humana",
 };
 
+const friendlyMessageText = (value, type) => {
+  if (value) return value;
+  if (type === "unsupported") return "Mensaje no compatible. Ver en WhatsApp Business.";
+  if (type === "sticker") return "Sticker";
+  if (type === "document") return "PDF";
+  if (type === "image") return "Imagen";
+  return `[${type}]`;
+};
+
+const friendlyPreview = (value) => {
+  if (value === "[unsupported]") return "Mensaje no compatible. Ver en WhatsApp Business.";
+  if (value === "[sticker]") return "Sticker";
+  if (value === "[document]") return "PDF";
+  if (value === "[image]") return "Imagen";
+  return value || "Mensaje sin texto";
+};
+
 export default function WhatsAppCentro() {
   const navigate = useNavigate();
   const [data, setData] = useState({
@@ -135,7 +152,7 @@ export default function WhatsAppCentro() {
   useEffect(() => {
     const missingIds = [...new Set(
       (data.messages || [])
-        .filter((message) => ["image", "document"].includes(message.message_type) && message.media_id && !mediaUrls[message.media_id])
+        .filter((message) => ["image", "document", "sticker"].includes(message.message_type) && message.media_id && !mediaUrls[message.media_id])
         .map((message) => message.media_id),
     )];
     if (!missingIds.length) return;
@@ -423,7 +440,7 @@ export default function WhatsAppCentro() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-2 truncate text-sm text-gray-600">{conversation.last_message_preview || "Mensaje sin texto"}</p>
+                    <p className="mt-2 truncate text-sm text-gray-600">{friendlyPreview(conversation.last_message_preview)}</p>
                     <p className="mt-1 text-xs text-gray-400">{formatDate(conversation.last_message_at)}</p>
                   </button>
                 );
@@ -510,9 +527,10 @@ export default function WhatsAppCentro() {
                   {selectedMessages.map((message) => {
                     const outbound = message.payload?._direction === "outbound";
                     const mediaUrl = message.media_id ? mediaUrls[message.media_id] : null;
+                    const sticker = message.message_type === "sticker";
                     return (
                       <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[85%] rounded-lg p-2.5 shadow-sm ${outbound ? "rounded-tr-sm bg-[#d9fdd3]" : "rounded-tl-sm bg-white"}`}>
+                        <div className={`max-w-[85%] rounded-lg ${sticker ? "bg-transparent p-0" : `p-2.5 shadow-sm ${outbound ? "rounded-tr-sm bg-[#d9fdd3]" : "rounded-tl-sm bg-white"}`}`}>
                           {message.message_type === "image" && (
                             mediaUrl ? (
                               <a href={mediaUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md bg-gray-100">
@@ -521,6 +539,15 @@ export default function WhatsAppCentro() {
                             ) : (
                               <div className="flex h-40 min-w-56 items-center justify-center rounded-md bg-gray-100 text-sm text-gray-500">
                                 <FaImage className="mr-2" /> Cargando imagen…
+                              </div>
+                            )
+                          )}
+                          {message.message_type === "sticker" && (
+                            mediaUrl ? (
+                              <img src={mediaUrl} alt="Sticker recibido por WhatsApp" className="max-h-40 max-w-40 object-contain" />
+                            ) : (
+                              <div className="flex h-28 w-28 items-center justify-center rounded-md bg-white/50 text-xs text-gray-500">
+                                Cargando sticker…
                               </div>
                             )
                           )}
@@ -549,12 +576,12 @@ export default function WhatsAppCentro() {
                               </div>
                             )
                           )}
-                          {(message.text_body || !["image", "document"].includes(message.message_type)) && (
+                          {(message.text_body || !["image", "document", "sticker"].includes(message.message_type)) && (
                             <p className={`whitespace-pre-wrap px-1 text-sm ${["image", "document"].includes(message.message_type) ? "mt-2" : ""}`}>
-                              {message.text_body || `[${message.message_type}]`}
+                              {friendlyMessageText(message.text_body, message.message_type)}
                             </p>
                           )}
-                          <div className="mt-1.5 flex items-center justify-end gap-2 px-1 text-[11px] text-gray-400">
+                          <div className={`mt-1.5 flex items-center justify-end gap-2 px-1 text-[11px] ${sticker ? "text-gray-500" : "text-gray-400"}`}>
                             <span>{formatDate(message.received_at)}</span>
                             {outbound && <FaCheckDouble className="text-sky-500" title="Enviado desde WhatsApp Business" />}
                           </div>
