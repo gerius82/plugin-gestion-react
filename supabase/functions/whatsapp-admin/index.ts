@@ -145,10 +145,10 @@ const includesAny = (value: string, terms: string[]) =>
   terms.some((term) => value === term || value.includes(term));
 
 const botOptions = [
-  { id: "1", label: "Horarios de clase" },
+  { id: "1", label: "Cursos e inscripciones" },
   { id: "2", label: "Recuperar una clase" },
   { id: "3", label: "Cambio de turno" },
-  { id: "4", label: "Cursos e inscripciones" },
+  { id: "4", label: "Horarios de clase" },
   { id: "5", label: "Hablar con una persona" },
 ];
 
@@ -160,7 +160,7 @@ const simulate = async (phone: string, input: string) => {
   const context = await findContext(phone);
   const greeting = includesAny(normalizedInput, ["hola", "buen dia", "buenas tardes", "buenas noches", "menu", "inicio"]);
 
-  if (normalizedInput === "1" || includesAny(normalizedInput, ["horario", "cuando tiene", "cuando es", "proxima clase", "dia de clase"])) {
+  if (normalizedInput === "4" || includesAny(normalizedInput, ["horario", "cuando tiene", "cuando es", "proxima clase", "dia de clase"])) {
     if (!context.enrollments.length) {
       return {
         message: "No encontré una matrícula activa asociada a este teléfono. Te derivo con una persona para que pueda revisarlo.",
@@ -205,7 +205,7 @@ const simulate = async (phone: string, input: string) => {
     };
   }
 
-  if (normalizedInput === "4" || includesAny(normalizedInput, ["curso", "inscripcion", "inscribir", "vacante", "precio", "informacion"])) {
+  if (normalizedInput === "1" || includesAny(normalizedInput, ["curso", "inscripcion", "inscribir", "vacante", "precio", "informacion"])) {
     return {
       message: `Podés consultar los ciclos disponibles e iniciar una inscripción desde:\n${publicSiteUrl()}/menu-inscripcion-padres\n\nSi necesitás ayuda para elegir, escribí *persona*.`,
       options: botOptions,
