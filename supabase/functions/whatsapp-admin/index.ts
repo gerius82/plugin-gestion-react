@@ -147,8 +147,9 @@ const includesAny = (value: string, terms: string[]) =>
 const botOptions = [
   { id: "1", label: "Horarios de clase" },
   { id: "2", label: "Recuperar una clase" },
-  { id: "3", label: "Cursos e inscripciones" },
-  { id: "4", label: "Hablar con una persona" },
+  { id: "3", label: "Cambio de turno" },
+  { id: "4", label: "Cursos e inscripciones" },
+  { id: "5", label: "Hablar con una persona" },
 ];
 
 const publicSiteUrl = () =>
@@ -195,7 +196,16 @@ const simulate = async (phone: string, input: string) => {
     };
   }
 
-  if (normalizedInput === "3" || includesAny(normalizedInput, ["curso", "inscripcion", "inscribir", "vacante", "precio", "informacion"])) {
+  if (normalizedInput === "3" || includesAny(normalizedInput, ["cambio de turno", "cambiar turno", "cambiar horario", "otro turno"])) {
+    return {
+      message: `Podés solicitar un cambio de turno desde:\n${publicSiteUrl()}/cambio-turno\n\nEl sistema te pedirá el teléfono registrado. Si necesitás ayuda, escribí *persona*.`,
+      options: botOptions,
+      nextStep: "menu",
+      context,
+    };
+  }
+
+  if (normalizedInput === "4" || includesAny(normalizedInput, ["curso", "inscripcion", "inscribir", "vacante", "precio", "informacion"])) {
     return {
       message: `Podés consultar los ciclos disponibles e iniciar una inscripción desde:\n${publicSiteUrl()}/menu-inscripcion-padres\n\nSi necesitás ayuda para elegir, escribí *persona*.`,
       options: botOptions,
@@ -204,7 +214,7 @@ const simulate = async (phone: string, input: string) => {
     };
   }
 
-  if (normalizedInput === "4" || includesAny(normalizedInput, ["persona", "humano", "asesor", "atencion", "hablar con alguien"])) {
+  if (normalizedInput === "5" || includesAny(normalizedInput, ["persona", "humano", "asesor", "atencion", "hablar con alguien"])) {
     return {
       message: "Listo, pausé las respuestas automáticas. Una persona continuará la conversación apenas esté disponible.",
       options: [],
@@ -213,10 +223,9 @@ const simulate = async (phone: string, input: string) => {
     };
   }
 
-  const responsible = context.contacts.find((item: Record<string, any>) => item.responsable)?.responsable;
   const known = context.contacts.length
     ? `Encontré ${context.contacts.map(studentLabel).join(" y ")} asociado${context.contacts.length > 1 ? "s" : ""} a este teléfono.`
-    : "No encontré alumnos asociados a este teléfono, pero igualmente puedo orientarte.";
+    : "";
 
   if (!greeting) {
     return {
@@ -228,7 +237,7 @@ const simulate = async (phone: string, input: string) => {
   }
 
   return {
-    message: `¡Hola${responsible ? `, ${responsible}` : ""}! Soy el asistente de Plugin Robótica 🤖\n\n${known}\n\n¿En qué podemos ayudarte?`,
+    message: `¡Hola! Soy el asistente de Plugin Robótica 🤖${known ? `\n\n${known}` : ""}\n\n¿En qué podemos ayudarte?`,
     options: botOptions,
     nextStep: "menu",
     context,
