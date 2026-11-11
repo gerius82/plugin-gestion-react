@@ -149,7 +149,9 @@ const botOptions = [
   { id: "2", label: "Recuperar una clase" },
   { id: "3", label: "Cambio de turno" },
   { id: "4", label: "Horarios de clase" },
-  { id: "5", label: "Hablar con una persona" },
+  { id: "5", label: "Promos" },
+  { id: "6", label: "Festejá tu cumple" },
+  { id: "7", label: "Hablar con una persona" },
 ];
 
 const publicSiteUrl = () =>
@@ -205,7 +207,7 @@ const simulate = async (phone: string, input: string) => {
     };
   }
 
-  if (normalizedInput === "1" || includesAny(normalizedInput, ["curso", "inscripcion", "inscribir", "vacante", "precio", "informacion"])) {
+  if (normalizedInput === "1" || includesAny(normalizedInput, ["curso", "taller", "inscripcion", "inscribir", "vacante"])) {
     return {
       message: `Podés consultar los ciclos disponibles e iniciar una inscripción desde:\n${publicSiteUrl()}/menu-inscripcion-padres\n\nSi necesitás ayuda para elegir, escribí *persona*.`,
       options: botOptions,
@@ -214,7 +216,25 @@ const simulate = async (phone: string, input: string) => {
     };
   }
 
-  if (normalizedInput === "5" || includesAny(normalizedInput, ["persona", "humano", "asesor", "atencion", "hablar con alguien"])) {
+  if (normalizedInput === "5" || includesAny(normalizedInput, ["promo", "promocion", "descuento", "beneficio"])) {
+    return {
+      message: `Podés consultar los descuentos y beneficios vigentes desde:\n${publicSiteUrl()}/promos`,
+      options: botOptions,
+      nextStep: "menu",
+      context,
+    };
+  }
+
+  if (normalizedInput === "6" || includesAny(normalizedInput, ["cumple", "cumpleanos", "festejo", "festejar"] )) {
+    return {
+      message: `Conocé nuestras propuestas de cumpleaños creativos para chicos desde:\n${publicSiteUrl()}/cumples-info?from=menu-padres`,
+      options: botOptions,
+      nextStep: "menu",
+      context,
+    };
+  }
+
+  if (normalizedInput === "7" || includesAny(normalizedInput, ["persona", "humano", "asesor", "atencion", "hablar con alguien"])) {
     return {
       message: "Listo, pausé las respuestas automáticas. Una persona continuará la conversación apenas esté disponible.",
       options: [],
