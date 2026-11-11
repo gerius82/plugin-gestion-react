@@ -89,6 +89,7 @@ export default function WhatsAppCentro() {
   const [selectedPhone, setSelectedPhone] = useState("");
   const [tab, setTab] = useState("inbox");
   const [filter, setFilter] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -244,6 +245,7 @@ export default function WhatsAppCentro() {
   const conversations = useMemo(() => {
     const query = filter.trim().toLowerCase();
     return (data.conversations || []).filter((conversation) => {
+      if (unreadOnly && Number(conversation.unread_count || 0) === 0) return false;
       if (!query) return true;
       const contacts = contactsByPhone.get(normalizePhone(conversation.phone)) || [];
       const searchable = [
@@ -253,7 +255,12 @@ export default function WhatsAppCentro() {
       ].join(" ").toLowerCase();
       return searchable.includes(query);
     });
-  }, [contactsByPhone, data.conversations, filter]);
+  }, [contactsByPhone, data.conversations, filter, unreadOnly]);
+
+  const unreadConversationsCount = useMemo(
+    () => (data.conversations || []).filter((conversation) => Number(conversation.unread_count || 0) > 0).length,
+    [data.conversations],
+  );
 
   const agenda = useMemo(() => {
     const grouped = new Map();
@@ -469,11 +476,36 @@ export default function WhatsAppCentro() {
                   className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
                 />
               </div>
+              {tab === "inbox" && (
+                <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-gray-200/70 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setUnreadOnly(false)}
+                    className={`!w-full rounded-md px-3 py-1.5 text-xs font-semibold transition ${!unreadOnly ? "bg-white text-gray-900 shadow-sm" : "bg-transparent text-gray-600 hover:text-gray-900"}`}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUnreadOnly(true)}
+                    className={`!flex !w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${unreadOnly ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-600 hover:text-gray-900"}`}
+                  >
+                    No leídos
+                    {unreadConversationsCount > 0 && (
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${unreadOnly ? "bg-white text-green-700" : "bg-green-600 text-white"}`}>
+                        {unreadConversationsCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="max-h-[500px] overflow-y-auto">
               {loading && <p className="p-5 text-sm text-gray-500">Cargando…</p>}
               {!loading && tab === "inbox" && conversations.length === 0 && (
-                <p className="p-5 text-sm text-gray-500">Todavía no hay conversaciones para mostrar.</p>
+                <p className="p-5 text-sm text-gray-500">
+                  {unreadOnly ? "No hay conversaciones sin leer." : "Todavía no hay conversaciones para mostrar."}
+                </p>
               )}
               {!loading && tab === "contacts" && agenda.length === 0 && (
                 <p className="p-5 text-sm text-gray-500">No encontramos contactos con teléfono.</p>
