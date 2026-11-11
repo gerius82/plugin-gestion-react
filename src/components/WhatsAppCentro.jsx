@@ -409,7 +409,7 @@ export default function WhatsAppCentro() {
           <button
             type="button"
             onClick={() => navigate("/menu-gestion")}
-            className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-50 !p-0 text-gray-700 transition hover:bg-gray-100"
+            className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 !bg-gray-50 !p-0 text-gray-700 transition hover:!bg-gray-100"
             aria-label="Volver"
           >
             <FaArrowLeft />
@@ -428,7 +428,7 @@ export default function WhatsAppCentro() {
           type="button"
           onClick={() => loadInbox()}
           disabled={loading}
-          className="!flex !w-auto shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:px-4"
+          className="!flex !w-auto shrink-0 items-center gap-2 rounded-lg border border-gray-200 !bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:!bg-gray-50 disabled:opacity-50 sm:px-4"
         >
           <FaSyncAlt className={loading ? "animate-spin" : ""} />
           <span className="hidden sm:inline">Actualizar</span>
@@ -439,21 +439,21 @@ export default function WhatsAppCentro() {
         <button
           type="button"
           onClick={() => setTab("inbox")}
-          className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "inbox" ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-700 hover:bg-white/70"}`}
+          className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "inbox" ? "!bg-green-600 !text-white shadow-sm hover:!bg-green-700" : "!bg-transparent !text-gray-700 hover:!bg-gray-100"}`}
         >
           <FaCommentDots className="inline mr-2" /> Bandeja
         </button>
         <button
           type="button"
           onClick={() => setTab("contacts")}
-          className={`!w-full rounded-lg px-3 py-2.5 font-semibold transition ${tab === "contacts" ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-700 hover:bg-gray-100"}`}
+          className={`!w-full rounded-lg px-3 py-2.5 font-semibold transition ${tab === "contacts" ? "!bg-green-600 !text-white shadow-sm hover:!bg-green-700" : "!bg-transparent !text-gray-700 hover:!bg-gray-100"}`}
         >
           <FaAddressBook className="inline mr-2" /> Agenda
         </button>
         <button
           type="button"
           onClick={() => setTab("simulator")}
-          className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "simulator" ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-700 hover:bg-white/70"}`}
+          className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "simulator" ? "!bg-green-600 !text-white shadow-sm hover:!bg-green-700" : "!bg-transparent !text-gray-700 hover:!bg-gray-100"}`}
         >
           <FaRobot className="inline mr-2" /> Simulador del bot
         </button>
@@ -481,14 +481,14 @@ export default function WhatsAppCentro() {
                   <button
                     type="button"
                     onClick={() => setUnreadOnly(false)}
-                    className={`!w-full rounded-md px-3 py-1.5 text-xs font-semibold transition ${!unreadOnly ? "bg-white text-gray-900 shadow-sm" : "bg-transparent text-gray-600 hover:text-gray-900"}`}
+                    className={`!w-full rounded-md px-3 py-1.5 text-xs font-semibold transition ${!unreadOnly ? "!bg-white !text-gray-900 shadow-sm hover:!bg-gray-100" : "!bg-transparent !text-gray-600 hover:!bg-gray-100 hover:!text-gray-900"}`}
                   >
                     Todos
                   </button>
                   <button
                     type="button"
                     onClick={() => setUnreadOnly(true)}
-                    className={`!flex !w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${unreadOnly ? "bg-green-600 text-white shadow-sm" : "bg-transparent text-gray-600 hover:text-gray-900"}`}
+                    className={`!flex !w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${unreadOnly ? "!bg-green-600 !text-white shadow-sm hover:!bg-green-700" : "!bg-transparent !text-gray-600 hover:!bg-gray-100 hover:!text-gray-900"}`}
                   >
                     No leídos
                     {unreadConversationsCount > 0 && (
@@ -520,7 +520,7 @@ export default function WhatsAppCentro() {
                     type="button"
                     key={conversation.phone}
                     onClick={() => setSelectedPhone(conversation.phone)}
-                    className={`w-full border-b p-4 text-left hover:bg-gray-50 ${selectedPhone === conversation.phone ? "bg-green-50" : ""}`}
+                    className={`w-full border-b p-4 text-left ${selectedPhone === conversation.phone ? "!bg-green-50 hover:!bg-green-100" : "!bg-white hover:!bg-gray-50"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -543,7 +543,7 @@ export default function WhatsAppCentro() {
                   type="button"
                   key={entry.phone}
                   onClick={() => setSelectedPhone(entry.phone)}
-                  className={`w-full border-b p-4 text-left transition hover:bg-gray-50 ${normalizePhone(selectedPhone) === entry.phone ? "bg-green-50" : ""}`}
+                  className={`w-full border-b p-4 text-left transition ${normalizePhone(selectedPhone) === entry.phone ? "!bg-green-50 hover:!bg-green-100" : "!bg-white hover:!bg-gray-50"}`}
                 >
                   <div className="flex items-center gap-3">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 font-bold text-green-700">
@@ -591,7 +591,7 @@ export default function WhatsAppCentro() {
                             type="button"
                             onClick={deleteConversation}
                             disabled={busy}
-                            className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 sm:!w-auto"
+                            className="!flex !w-full items-center justify-center gap-2 rounded-lg border border-red-200 !bg-white px-3 py-2 text-sm text-red-700 hover:!bg-red-50 disabled:opacity-50 sm:!w-auto"
                           >
                             <FaTrash /> Eliminar
                           </button>
@@ -699,8 +699,8 @@ export default function WhatsAppCentro() {
                   }}
                   className="flex items-center gap-2 border-t bg-gray-100 p-3"
                 >
-                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !p-0 text-gray-400" title="Adjuntar archivo"><FaPaperclip /></button>
-                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !p-0 text-gray-400" title="Enviar imagen"><FaImage /></button>
+                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !bg-transparent !p-0 text-gray-400 hover:!bg-transparent" title="Adjuntar archivo"><FaPaperclip /></button>
+                  <button type="button" disabled className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !bg-transparent !p-0 text-gray-400 hover:!bg-transparent" title="Enviar imagen"><FaImage /></button>
                   <input
                     value={replyText}
                     onChange={(event) => setReplyText(event.target.value)}
@@ -711,7 +711,7 @@ export default function WhatsAppCentro() {
                   <button
                     type="submit"
                     disabled={busy || !selectedConversation || !replyText.trim()}
-                    className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full bg-green-600 !p-0 text-white hover:bg-green-700 disabled:opacity-40"
+                    className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !bg-green-600 !p-0 text-white hover:!bg-green-700 disabled:opacity-40"
                     aria-label="Enviar"
                   >
                     <FaPaperPlane />
@@ -779,7 +779,7 @@ export default function WhatsAppCentro() {
               type="button"
               onClick={startSimulation}
               disabled={busy || !simPhone.trim()}
-              className="mt-3 !flex !w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+              className="mt-3 !flex !w-full items-center justify-center gap-2 rounded-lg !bg-green-600 px-4 py-2.5 font-semibold text-white hover:!bg-green-700 disabled:opacity-50"
             >
               <FaPlay /> {simLog.length ? "Reiniciar conversación" : "Iniciar conversación"}
             </button>
@@ -828,7 +828,7 @@ export default function WhatsAppCentro() {
                       key={option.id}
                       onClick={() => simulate(option.id)}
                       disabled={busy}
-                      className="block !w-full rounded-lg border border-green-200 bg-white px-4 py-2 text-left text-sm font-semibold text-green-700 shadow-sm hover:bg-green-50"
+                      className="block !w-full rounded-lg border border-green-200 !bg-white px-4 py-2 text-left text-sm font-semibold text-green-700 shadow-sm hover:!bg-green-50"
                     >
                       {option.id}. {option.label}
                     </button>
@@ -852,7 +852,7 @@ export default function WhatsAppCentro() {
               <button
                 type="submit"
                 disabled={busy || !simInput.trim()}
-                className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full bg-green-600 !p-0 text-white disabled:opacity-50"
+                className="!flex !h-10 !w-10 shrink-0 items-center justify-center rounded-full !bg-green-600 !p-0 text-white hover:!bg-green-700 disabled:opacity-50"
                 aria-label="Enviar en simulador"
               >
                 <FaPaperPlane />
