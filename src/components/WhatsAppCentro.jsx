@@ -101,6 +101,7 @@ export default function WhatsAppCentro() {
   const [simLog, setSimLog] = useState([]);
   const [simOptions, setSimOptions] = useState([]);
   const [simContext, setSimContext] = useState(null);
+  const [simStep, setSimStep] = useState("idle");
 
   useEffect(() => {
     fetch("/config.json")
@@ -378,6 +379,7 @@ export default function WhatsAppCentro() {
       setSimLog((current) => [...current, { role: "bot", text: result.message }]);
       setSimOptions(result.options || []);
       setSimContext(result.context || null);
+      setSimStep(result.nextStep || "menu");
     } catch (currentError) {
       setError(currentError.message);
     } finally {
@@ -389,6 +391,7 @@ export default function WhatsAppCentro() {
     setSimLog([]);
     setSimOptions([]);
     setSimContext(null);
+    setSimStep("menu");
     simulate("Hola");
   };
 
@@ -728,7 +731,11 @@ export default function WhatsAppCentro() {
       {tab === "simulator" && (
         <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
           <aside className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="font-bold text-lg flex items-center gap-2"><FaRobot className="text-green-600" /> Configuración de prueba</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-lg font-bold"><FaRobot className="text-green-600" /> Bot de prueba</h2>
+              <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-800">NO ENVÍA</span>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">Probá el recorrido con cualquier teléfono de la agenda. Consulta datos reales, pero todas las respuestas quedan dentro del simulador.</p>
             <label className="mt-4 block text-sm font-semibold">Teléfono a simular</label>
             <input
               value={simPhone}
@@ -742,7 +749,7 @@ export default function WhatsAppCentro() {
               disabled={busy || !simPhone.trim()}
               className="mt-3 !flex !w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
             >
-              <FaPlay /> Iniciar conversación
+              <FaPlay /> {simLog.length ? "Reiniciar conversación" : "Iniciar conversación"}
             </button>
             <div className="mt-5 rounded-lg bg-gray-50 p-3 text-sm">
               <p className="font-semibold">Contexto encontrado</p>
@@ -751,6 +758,7 @@ export default function WhatsAppCentro() {
                 <>
                   <p className="mt-1">Alumnos: <strong>{simContext.contacts?.length || 0}</strong></p>
                   <p>Matrículas activas: <strong>{simContext.enrollments?.length || 0}</strong></p>
+                  <p className="mt-2 border-t pt-2">Estado: <strong className={simStep === "human" ? "text-amber-700" : "text-green-700"}>{simStep === "human" ? "Derivado a una persona" : "Bot atendiendo"}</strong></p>
                 </>
               )}
             </div>
@@ -776,7 +784,7 @@ export default function WhatsAppCentro() {
                   className={`flex ${item.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div className={`max-w-[85%] rounded-xl p-3 text-sm shadow-sm ${item.role === "user" ? "bg-[#d9fdd3]" : "bg-white"}`}>
-                    <p className="whitespace-pre-wrap">{item.text}</p>
+                    <p className="whitespace-pre-wrap">{renderWhatsAppText(item.text)}</p>
                   </div>
                 </div>
               ))}

@@ -131,58 +131,115 @@ const findContext = async (phone: string) => {
 const studentLabel = (contact: Record<string, any>) =>
   `${contact?.nombre || ""} ${contact?.apellido || ""}`.trim() || "el alumno";
 
+const normalizeBotInput = (value: unknown) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const includesAny = (value: string, terms: string[]) =>
+  terms.some((term) => value === term || value.includes(term));
+
+const botOptions = [
+  { id: "1", label: "Horarios de clase" },
+  { id: "2", label: "Recuperar una clase" },
+  { id: "3", label: "Enviar un comprobante" },
+  { id: "4", label: "Cursos e inscripciones" },
+  { id: "5", label: "Hablar con una persona" },
+];
+
+const publicSiteUrl = () =>
+  (Deno.env.get("PUBLIC_SITE_URL")?.trim() || "https://gestionplugin2.netlify.app").replace(/\/$/, "");
+
 const simulate = async (phone: string, input: string) => {
-  const normalizedInput = String(input || "").trim().toLowerCase();
+  const normalizedInput = normalizeBotInput(input);
   const context = await findContext(phone);
-  const options = [
-    { id: "1", label: "Próxima clase" },
-    { id: "2", label: "Recuperar una clase" },
-    { id: "3", label: "Pagos y comprobantes" },
-    { id: "4", label: "Hablar con una persona" },
-  ];
+  const greeting = includesAny(normalizedInput, ["hola", "buen dia", "buenas tardes", "buenas noches", "menu", "inicio"]);
 
-  if (["1", "proxima", "próxima", "clase"].includes(normalizedInput)) {
-    const enrollment = context.enrollments[0];
-    const contact = context.contacts[0];
-    const message = enrollment
-      ? `La próxima clase de ${studentLabel(contact)} es ${enrollment.dia || "el día habitual"} a las ${enrollment.hora || "el horario habitual"}${enrollment.sede ? ` en ${enrollment.sede}` : ""}.`
-      : "No encontré una matrícula activa asociada a este teléfono. Voy a derivar la consulta para que la revisemos.";
-    return { message, options, nextStep: enrollment ? "menu" : "human", context };
-  }
+  if (normalizedInput === "1" || includesAny(normalizedInput, ["horario", "cuando tiene", "cuando es", "proxima clase", "dia de clase"])) {
+    if (!context.enrollments.length) {
+      return {
+        message: "No encontré una matrícula activa asociada a este teléfono. Te derivo con una persona para que pueda revisarlo.",
+        options: [],
+        nextStep: "human",
+        context,
+      };
+    }
 
-  if (["2", "recuperar", "recuperacion", "recuperación"].includes(normalizedInput)) {
+    const lines = context.enrollments.map((enrollment: Record<string, any>) => {
+      const contact = context.contacts.find((item: Record<string, any>) =>
+        [item.id, item.persona_id].filter(Boolean).map(String).includes(String(enrollment.alumno_id))
+      );
+      const schedule = [enrollment.dia, enrollment.hora ? `${enrollment.hora} hs` : "", enrollment.sede]
+        .filter(Boolean)
+        .join(" · ");
+      return `• ${studentLabel(contact)}${enrollment.curso_nombre ? ` — ${enrollment.curso_nombre}` : ""}: ${schedule || "horario a confirmar"}`;
+    });
     return {
-      message: "Podés consultar y solicitar una recuperación desde https://gestion.plugin.ar/recuperar. Si preferís, también puedo derivarte con una persona.",
-      options,
+      message: `Estos son los horarios activos asociados a este teléfono:\n\n${lines.join("\n")}\n\n¿Necesitás consultar algo más?`,
+      options: botOptions,
       nextStep: "menu",
       context,
     };
   }
 
-  if (["3", "pago", "pagos", "comprobante"].includes(normalizedInput)) {
+  if (normalizedInput === "2" || includesAny(normalizedInput, ["recuper", "falto", "falta", "ausencia", "cambiar clase"])) {
     return {
-      message: "Podés consultar pagos y comprobantes desde https://gestion.plugin.ar/pagos. Por seguridad, el sistema te pedirá validar el teléfono registrado.",
-      options,
+      message: `Podés consultar las ausencias y solicitar una recuperación desde:\n${publicSiteUrl()}/recuperar\n\nEl sistema te pedirá el teléfono registrado. Si no encontrás una opción adecuada, escribí *persona* y te derivamos.`,
+      options: botOptions,
       nextStep: "menu",
       context,
     };
   }
 
-  if (["4", "persona", "humano", "asesor"].includes(normalizedInput)) {
+  if (normalizedInput === "3" || includesAny(normalizedInput, ["pago", "pagar", "comprobante", "transferencia", "cuota"])) {
     return {
-      message: "Listo, pausé las respuestas automáticas. Una persona continuará la conversación.",
+      message: "Podés enviar el comprobante en este mismo chat como imagen o PDF. Una persona lo revisará y confirmará la acreditación.",
       options: [],
       nextStep: "human",
       context,
     };
   }
 
+  if (normalizedInput === "4" || includesAny(normalizedInput, ["curso", "inscripcion", "inscribir", "vacante", "precio", "informacion"])) {
+    return {
+      message: `Podés consultar los ciclos disponibles e iniciar una inscripción desde:\n${publicSiteUrl()}/menu-inscripcion-padres\n\nSi necesitás ayuda para elegir, escribí *persona*.`,
+      options: botOptions,
+      nextStep: "menu",
+      context,
+    };
+  }
+
+  if (normalizedInput === "5" || includesAny(normalizedInput, ["persona", "humano", "asesor", "atencion", "hablar con alguien"])) {
+    return {
+      message: "Listo, pausé las respuestas automáticas. Una persona continuará la conversación apenas esté disponible.",
+      options: [],
+      nextStep: "human",
+      context,
+    };
+  }
+
+  const responsible = context.contacts.find((item: Record<string, any>) => item.responsable)?.responsable;
   const known = context.contacts.length
-    ? ` Encontré ${context.contacts.map(studentLabel).join(" y ")} asociado${context.contacts.length > 1 ? "s" : ""} a este teléfono.`
-    : " No encontré alumnos asociados; podés continuar igualmente con una opción.";
+    ? `Encontré ${context.contacts.map(studentLabel).join(" y ")} asociado${context.contacts.length > 1 ? "s" : ""} a este teléfono.`
+    : "No encontré alumnos asociados a este teléfono, pero igualmente puedo orientarte.";
+
+  if (!greeting) {
+    return {
+      message: "No llegué a entender esa consulta. Podés elegir una opción o escribir *persona* para que te atienda alguien.",
+      options: botOptions,
+      nextStep: "menu",
+      context,
+    };
+  }
+
   return {
-    message: `¡Hola! Soy el asistente de Plugin Robótica 🤖${known} ¿En qué podemos ayudarte?`,
-    options,
+    message: `¡Hola${responsible ? `, ${responsible}` : ""}! Soy el asistente de Plugin Robótica 🤖\n\n${known}\n\n¿En qué podemos ayudarte?`,
+    options: botOptions,
     nextStep: "menu",
     context,
   };
