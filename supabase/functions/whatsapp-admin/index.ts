@@ -524,9 +524,25 @@ const simulate = async (phone: string, input: string) => {
 
   if (selectedAction === "promos" || includesAny(normalizedInput, ["promo", "promocion", "descuento", "beneficio"])) {
     return {
-      message: `Podés consultar los descuentos y beneficios vigentes desde:\n${publicSiteUrl()}/promos`,
-      options,
-      nextStep: "menu",
+      message: `*Promos vigentes* 🎉
+
+👧 *Promo Hermanos — 10% de descuento*
+10% de descuento en la cuota mensual para hermanos.
+
+🤝 *Promo Mejores Amigos — 10% de descuento*
+10% de descuento en la cuota mensual para mejores amigos que vengan juntos.
+
+☀️ *Taller de Verano 2027 — Inscripción bonificada*
+Quienes realicen el Taller de Verano 2027 no abonan inscripción al Ciclo 2027.
+
+📅 *Promo doble turno — 10% de descuento*
+Si el alumno asiste dos veces por semana, en el mismo o en distintos talleres, tiene 10% de descuento en la cuota.`,
+      options: numberedOptions([
+        { action: "courses", label: "Ver talleres e inscripciones" },
+        { action: "human", label: "Consultar con una persona" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "promos",
       context,
     };
   }
