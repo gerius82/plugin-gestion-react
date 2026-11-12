@@ -287,6 +287,128 @@ const fetchAvailableSchedules = async (course: Record<string, any>) => {
     });
 };
 
+const currentMonthName = () => {
+  const value = new Intl.DateTimeFormat("es-AR", {
+    month: "long",
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
+  return `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
+};
+
+const paymentProposal = async (phone: string, detectedAmount: number) => {
+  const contacts = await fetchContacts([phone]);
+  const studentIds = [...new Set(
+    (contacts || []).flatMap((contact: Record<string, any>) => [contact.persona_id, contact.id]).filter(Boolean).map(String),
+  )];
+  if (!studentIds.length) return { students: [], candidates: [], month: currentMonthName() };
+  const idFilter = encodeURIComponent(`(${studentIds.join(",")})`);
+  const year = new Date().getFullYear();
+  const [enrollments, payments, initialPromos] = await Promise.all([
+    rest(`matriculas?select=id,alumno_id,curso_id,ciclo_codigo,curso_nombre,creado_en&alumno_id=in.${idFilter}&estado=eq.activa&limit=200`),
+    rest(`pagos?select=id,alumno_id,mes,pago_mes,pago_inscripcion,creado_en&alumno_id=in.${idFilter}&creado_en=gte.${year}-01-01T00:00:00Z&creado_en=lt.${year + 1}-01-01T00:00:00Z&limit=1000`),
+    rest(`promos_grupo?select=grupo_id,alumno_id,descuento_pct&alumno_id=in.${idFilter}&limit=200`),
+  ]);
+  const courseIds = [...new Set((enrollments || []).map((item: Record<string, any>) => item.curso_id).filter(Boolean).map(String))];
+  const courses = courseIds.length
+    ? await rest(`cursos?select=id,nombre,precio_curso,precio_inscripcion&id=in.${encodeURIComponent(`(${courseIds.join(",")})`)}&limit=200`)
+    : [];
+  const coursesById = new Map((courses || []).map((course: Record<string, any>) => [String(course.id), course]));
+  const promosByStudent = new Map(
+    (initialPromos || []).map((promo: Record<string, any>) => [String(promo.alumno_id), Number(promo.descuento_pct || 10)]),
+  );
+  const contactsById = new Map<string, Record<string, any>>();
+  for (const contact of contacts || []) {
+    for (const id of [contact.persona_id, contact.id].filter(Boolean)) contactsById.set(String(id), contact);
+  }
+  const month = currentMonthName();
+  const obligations: Array<Record<string, any>> = [];
+  const students = studentIds.map((studentId) => {
+    const studentEnrollments = (enrollments || []).filter((item: Record<string, any>) => String(item.alumno_id) === studentId);
+    const contact = contactsById.get(studentId) || {};
+    const name = `${contact.nombre || ""} ${contact.apellido || ""}`.trim() || `Alumno ${studentId}`;
+    const promoPct = promosByStudent.has(studentId)
+      ? Math.max(0, Math.min(100, Number(promosByStudent.get(studentId))))
+      : studentEnrollments.length >= 2 ? 10 : 0;
+    const factor = 1 - promoPct / 100;
+    const studentPayments = (payments || []).filter((payment: Record<string, any>) => String(payment.alumno_id) === studentId);
+    const tuitionPaid = studentPayments.some((payment: Record<string, any>) => payment.pago_mes && payment.mes === month);
+    const registrationPaid = studentPayments.some((payment: Record<string, any>) => payment.pago_inscripcion);
+    const tuitionBase = studentEnrollments.reduce((sum: number, enrollment: Record<string, any>) => {
+      const course = coursesById.get(String(enrollment.curso_id));
+      return sum + Number(course?.precio_curso || 0);
+    }, 0);
+    const registrationBase = studentEnrollments.reduce((highest: number, enrollment: Record<string, any>) => {
+      const course = coursesById.get(String(enrollment.curso_id));
+      return Math.max(highest, Number(course?.precio_inscripcion || 0));
+    }, 0);
+    const discountDetail = promoPct
+      ? promosByStudent.has(studentId) ? `Promo grupo ${promoPct}%` : `Promo doble turno ${promoPct}%`
+      : null;
+    if (!tuitionPaid && tuitionBase > 0) {
+      obligations.push({ studentId, name, kind: "tuition", amount: Math.round(tuitionBase * factor), promoPct, discountDetail });
+    }
+    if (!registrationPaid && registrationBase > 0) {
+      obligations.push({ studentId, name, kind: "registration", amount: Math.round(registrationBase * factor), promoPct, discountDetail });
+    }
+    return { id: studentId, name, promoPct, activeEnrollments: studentEnrollments.length };
+  });
+
+  const matches: Array<Record<string, any>> = [];
+  const tolerance = Math.max(1, Math.round(detectedAmount * 0.005));
+  const searchable = obligations.slice(0, 14);
+  for (let mask = 1; mask < (1 << searchable.length); mask += 1) {
+    const selected = searchable.filter((_item, index) => (mask & (1 << index)) !== 0);
+    const total = selected.reduce((sum, item) => sum + item.amount, 0);
+    const difference = Math.abs(total - detectedAmount);
+    if (difference > tolerance) continue;
+    const grouped = new Map<string, Record<string, any>>();
+    for (const item of selected) {
+      const allocation = grouped.get(item.studentId) || {
+        studentId: item.studentId,
+        name: item.name,
+        tuition: false,
+        registration: false,
+        amount: 0,
+        promoPct: item.promoPct || null,
+        discountDetail: item.discountDetail,
+      };
+      allocation[item.kind] = true;
+      allocation.amount += item.amount;
+      grouped.set(item.studentId, allocation);
+    }
+    const allocations = [...grouped.values()];
+    const detail = allocations.map((item) => {
+      const concepts = [item.tuition ? `cuota de ${month}` : "", item.registration ? "inscripción" : ""].filter(Boolean).join(" e ");
+      return `${item.name}: ${concepts}`;
+    }).join(" · ");
+    matches.push({ id: `candidate-${matches.length + 1}`, total, difference, detail, allocations });
+  }
+  matches.sort((left, right) => left.difference - right.difference || left.allocations.length - right.allocations.length);
+  return { students: uniqueContacts(contacts || []).map((contact) => ({ id: contact.persona_id || contact.id, name: studentLabel(contact) })), candidates: matches.slice(0, 5), month };
+};
+
+const queuePaymentSuggestionNotification = async (message: Record<string, any>, analysis: Record<string, any>) => {
+  const candidate = analysis.candidates?.[0];
+  const body = candidate
+    ? `${formatCurrency(analysis.receipt.amount)} · ${candidate.detail}`
+    : `${formatCurrency(analysis.receipt.amount)} · Revisar manualmente`;
+  try {
+    await fetch(`${supabaseUrl()}/functions/v1/push-notifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-code": requiredSecret("PUSH_ADMIN_CODE") },
+      body: JSON.stringify({
+        action: "send_custom_notification",
+        title: "Posible pago recibido por WhatsApp",
+        body,
+        url: `/whatsapp-centro?phone=${encodeURIComponent(message.from_phone)}`,
+        actionTitle: "Revisar y confirmar",
+      }),
+    });
+  } catch (error) {
+    console.error("No se pudo enviar la notificación del comprobante", error);
+  }
+};
+
 const simulate = async (phone: string, input: string) => {
   const rawInput = String(input || "").trim();
   const normalizedInput = normalizeBotInput(input);
@@ -766,6 +888,100 @@ Deno.serve(async (request) => {
         }),
       });
       return jsonResponse(200, { ok: true, messageId, sentAt });
+    }
+
+    if (body.action === "analyze_payment_text") {
+      const messageId = String(body.messageId || "").trim();
+      const amount = Number(body.amount);
+      if (!messageId || !Number.isFinite(amount) || amount <= 0) {
+        return jsonResponse(400, { ok: false, error: "No se pudo detectar un importe válido." });
+      }
+      const messages = await rest(
+        `whatsapp_messages?id=eq.${encodeURIComponent(messageId)}&select=id,wa_message_id,from_phone,message_type,media_id,payload&limit=1`,
+      );
+      const message = messages?.[0];
+      if (!message || message.payload?._direction === "outbound" || !["image", "document"].includes(message.message_type)) {
+        return jsonResponse(404, { ok: false, error: "No se encontró el comprobante recibido." });
+      }
+      if (message.payload?.payment_analysis?.status === "confirmed") {
+        return jsonResponse(409, { ok: false, error: "Este comprobante ya fue confirmado." });
+      }
+      const proposal = await paymentProposal(message.from_phone, amount);
+      const analysis = {
+        status: proposal.candidates.length ? "pending_confirmation" : "no_match",
+        analyzedAt: new Date().toISOString(),
+        receipt: {
+          amount: Math.round(amount),
+          date: String(body.date || "").slice(0, 40) || null,
+          operationId: String(body.operationId || "").slice(0, 100) || null,
+        },
+        month: proposal.month,
+        students: proposal.students,
+        candidates: proposal.candidates,
+      };
+      await rest(`whatsapp_messages?id=eq.${encodeURIComponent(messageId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ payload: { ...(message.payload || {}), payment_analysis: analysis } }),
+      });
+      await queuePaymentSuggestionNotification(message, analysis);
+      return jsonResponse(200, { ok: true, analysis });
+    }
+
+    if (body.action === "confirm_payment") {
+      const messageId = String(body.messageId || "").trim();
+      const candidateId = String(body.candidateId || "").trim();
+      const messages = await rest(
+        `whatsapp_messages?id=eq.${encodeURIComponent(messageId)}&select=id,from_phone,payload&limit=1`,
+      );
+      const message = messages?.[0];
+      const analysis = message?.payload?.payment_analysis;
+      if (!message || !analysis) return jsonResponse(404, { ok: false, error: "No se encontró el análisis del comprobante." });
+      if (analysis.status === "confirmed") return jsonResponse(409, { ok: false, error: "Este comprobante ya fue confirmado." });
+      const candidate = (analysis.candidates || []).find((item: Record<string, any>) => item.id === candidateId);
+      if (!candidate) return jsonResponse(400, { ok: false, error: "Elegí una propuesta válida." });
+      const year = new Date().getFullYear();
+      const createdPayments: Array<Record<string, any>> = [];
+      for (const allocation of candidate.allocations || []) {
+        const existing = await rest(
+          `pagos?select=id,pago_mes,pago_inscripcion,mes,creado_en&alumno_id=eq.${encodeURIComponent(allocation.studentId)}&creado_en=gte.${year}-01-01T00:00:00Z&creado_en=lt.${year + 1}-01-01T00:00:00Z`,
+        );
+        if (allocation.tuition && (existing || []).some((payment: Record<string, any>) => payment.pago_mes && payment.mes === analysis.month)) {
+          return jsonResponse(409, { ok: false, error: `La cuota de ${analysis.month} de ${allocation.name} ya está registrada.` });
+        }
+        if (allocation.registration && (existing || []).some((payment: Record<string, any>) => payment.pago_inscripcion)) {
+          return jsonResponse(409, { ok: false, error: `La inscripción de ${allocation.name} ya está registrada.` });
+        }
+        createdPayments.push({
+          alumno_id: allocation.studentId,
+          mes: allocation.tuition ? analysis.month : "N/A",
+          pago_mes: !!allocation.tuition,
+          pago_inscripcion: !!allocation.registration,
+          medio_pago: "transferencia",
+          monto_total: Math.round(Number(allocation.amount || 0)),
+          descuento_pct: allocation.promoPct || null,
+          descuento_detalle: allocation.discountDetail || null,
+        });
+      }
+      if (!createdPayments.length) return jsonResponse(400, { ok: false, error: "La propuesta no contiene pagos." });
+      const inserted = await rest("pagos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify(createdPayments),
+      });
+      const confirmedAnalysis = {
+        ...analysis,
+        status: "confirmed",
+        confirmedAt: new Date().toISOString(),
+        confirmedCandidateId: candidateId,
+        paymentIds: (inserted || []).map((payment: Record<string, any>) => payment.id),
+      };
+      await rest(`whatsapp_messages?id=eq.${encodeURIComponent(messageId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ payload: { ...(message.payload || {}), payment_analysis: confirmedAnalysis } }),
+      });
+      return jsonResponse(200, { ok: true, payments: inserted || [], analysis: confirmedAnalysis });
     }
 
     if (body.action === "simulate") {

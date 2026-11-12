@@ -4,9 +4,11 @@ import {
   FaAddressBook,
   FaArrowLeft,
   FaCheckDouble,
+  FaCheckCircle,
   FaCommentDots,
   FaFilePdf,
   FaImage,
+  FaMoneyBillWave,
   FaPaperPlane,
   FaPaperclip,
   FaPhoneAlt,
@@ -19,6 +21,7 @@ import {
   FaWhatsapp,
 } from "react-icons/fa";
 import { getSupabaseAuthClient } from "../lib/supabaseAuth";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 const normalizePhone = (value) => String(value || "").replace(/\D/g, "").slice(-10);
 
@@ -124,6 +127,65 @@ const renderWhatsAppText = (value) => {
   });
 };
 
+const parseArgentineAmount = (value) => {
+  let text = String(value || "").replace(/[^0-9.,]/g, "");
+  if (!text) return null;
+  if (text.includes(",")) text = text.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(?:\.\d{3})+$/.test(text)) text = text.replace(/\./g, "");
+  const amount = Number(text);
+  return Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null;
+};
+
+const extractReceiptData = (ocrText) => {
+  const text = String(ocrText || "").replace(/\s+/g, " ").trim();
+  const lines = String(ocrText || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const amountPattern = /(?:\$|ars\s*)?\s*(\d{1,3}(?:[.\s]\d{3})+(?:,\d{2})?|\d{4,8}(?:,\d{2})?)/i;
+  const priorityLines = lines.filter((line) => /importe|monto|total|transferid|enviaste|pagaste/i.test(line));
+  const amountNearLabel = text.match(/(?:importe|monto|total|transferid[oa]?|enviaste|pagaste)[^$0-9]{0,35}(?:\$|ars\s*)?\s*(\d{1,3}(?:[.\s]\d{3})+(?:,\d{2})?|\d{4,8}(?:,\d{2})?)/i);
+  let amount = parseArgentineAmount(amountNearLabel?.[1]);
+  for (const line of amount ? [] : [...priorityLines, ...lines.filter((item) => /\$|ars/i.test(item))]) {
+    const match = line.match(amountPattern);
+    amount = parseArgentineAmount(match?.[1]);
+    if (amount) break;
+  }
+  const date = text.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/)?.[1] || "";
+  const operationId = lines.find((line) => /operaci[oó]n|comprobante|referencia|transacci[oó]n/i.test(line))
+    ?.replace(/^.*?(?:operaci[oó]n|comprobante|referencia|transacci[oó]n)\s*[:#-]?\s*/i, "")
+    .slice(0, 100) || "";
+  return { amount, date, operationId };
+};
+
+const readReceiptText = async (mediaUrl, messageType) => {
+  if (messageType === "document") {
+    const pdfjs = await import("pdfjs-dist");
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+    const pdf = await pdfjs.getDocument(mediaUrl).promise;
+    const page = await pdf.getPage(1);
+    const textContent = await page.getTextContent();
+    const embeddedText = textContent.items.map((item) => item.str || "").join(" ").trim();
+    if (embeddedText.length >= 30) return embeddedText;
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const { createWorker } = await import("tesseract.js");
+    const worker = await createWorker("spa");
+    try {
+      return (await worker.recognize(canvas)).data.text || "";
+    } finally {
+      await worker.terminate();
+    }
+  }
+  const { createWorker } = await import("tesseract.js");
+  const worker = await createWorker("spa");
+  try {
+    return (await worker.recognize(mediaUrl)).data.text || "";
+  } finally {
+    await worker.terminate();
+  }
+};
+
 export default function WhatsAppCentro() {
   const navigate = useNavigate();
   const [data, setData] = useState({
@@ -133,13 +195,14 @@ export default function WhatsAppCentro() {
     enrollments: [],
     settings: { simulation_only: true, sending_enabled: false },
   });
-  const [selectedPhone, setSelectedPhone] = useState("");
+  const [selectedPhone, setSelectedPhone] = useState(() => new URLSearchParams(window.location.search).get("phone") || "");
   const [tab, setTab] = useState("inbox");
   const [filter, setFilter] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [paymentBusyId, setPaymentBusyId] = useState("");
   const [config, setConfig] = useState(null);
   const [mediaUrls, setMediaUrls] = useState({});
   const [replyText, setReplyText] = useState("");
@@ -421,6 +484,57 @@ export default function WhatsAppCentro() {
     }
   };
 
+  const updateMessageAnalysis = (messageId, analysis) => {
+    setData((current) => ({
+      ...current,
+      messages: (current.messages || []).map((message) =>
+        String(message.id) === String(messageId)
+          ? { ...message, payload: { ...(message.payload || {}), payment_analysis: analysis } }
+          : message
+      ),
+    }));
+  };
+
+  const analyzePayment = async (message, mediaUrl) => {
+    if (!mediaUrl || paymentBusyId) return;
+    try {
+      setPaymentBusyId(String(message.id));
+      setError("");
+      const text = await readReceiptText(mediaUrl, message.message_type);
+      const receipt = extractReceiptData(text);
+      if (!receipt.amount) {
+        throw new Error("No pude detectar el importe. Probá con una imagen más nítida o revisalo manualmente.");
+      }
+      const result = await api({
+        action: "analyze_payment_text",
+        messageId: message.id,
+        amount: receipt.amount,
+        date: receipt.date,
+        operationId: receipt.operationId,
+      });
+      updateMessageAnalysis(message.id, result.analysis);
+    } catch (currentError) {
+      setError(currentError.message || String(currentError));
+    } finally {
+      setPaymentBusyId("");
+    }
+  };
+
+  const confirmPayment = async (message, candidateId) => {
+    if (paymentBusyId) return;
+    try {
+      setPaymentBusyId(String(message.id));
+      setError("");
+      const result = await api({ action: "confirm_payment", messageId: message.id, candidateId });
+      updateMessageAnalysis(message.id, result.analysis);
+      await loadInbox(true);
+    } catch (currentError) {
+      setError(currentError.message || String(currentError));
+    } finally {
+      setPaymentBusyId("");
+    }
+  };
+
   const simulate = async (input, visibleText = "", directUrl = "") => {
     const cleanInput = String(input || "").trim();
     if (!cleanInput || !simPhone.trim()) return;
@@ -692,6 +806,9 @@ export default function WhatsAppCentro() {
                     const outbound = message.payload?._direction === "outbound";
                     const mediaUrl = message.media_id ? mediaUrls[message.media_id] : null;
                     const sticker = message.message_type === "sticker";
+                    const paymentAnalysis = message.payload?.payment_analysis;
+                    const canAnalyzePayment = !outbound && ["image", "document"].includes(message.message_type);
+                    const analyzingPayment = String(paymentBusyId) === String(message.id);
                     return (
                       <div key={message.id} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[85%] rounded-lg ${sticker ? "bg-transparent p-0" : `p-2.5 shadow-sm ${outbound ? "rounded-tr-sm bg-[#d9fdd3]" : "rounded-tl-sm bg-white"}`}`}>
@@ -753,6 +870,43 @@ export default function WhatsAppCentro() {
                             <p className={`whitespace-pre-wrap px-1 text-sm ${["image", "document"].includes(message.message_type) ? "mt-2" : ""}`}>
                               {renderWhatsAppText(friendlyMessageText(message.text_body, message.message_type))}
                             </p>
+                          )}
+                          {canAnalyzePayment && !paymentAnalysis && (
+                            <button
+                              type="button"
+                              onClick={() => analyzePayment(message, mediaUrl)}
+                              disabled={!mediaUrl || !!paymentBusyId}
+                              className="mt-2 !flex !w-full items-center justify-center gap-2 rounded-md border border-emerald-200 !bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:!bg-emerald-100 disabled:opacity-50"
+                            >
+                              <FaMoneyBillWave /> {analyzingPayment ? "Analizando comprobante…" : "Analizar como pago"}
+                            </button>
+                          )}
+                          {paymentAnalysis && (
+                            <div className={`mt-2 rounded-md border p-3 text-xs ${paymentAnalysis.status === "confirmed" ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
+                              <p className="flex items-center gap-2 font-bold text-gray-800">
+                                {paymentAnalysis.status === "confirmed" ? <FaCheckCircle className="text-green-600" /> : <FaMoneyBillWave className="text-amber-700" />}
+                                {paymentAnalysis.status === "confirmed" ? "Pago registrado" : "Posible pago detectado"}
+                              </p>
+                              <p className="mt-1 font-semibold text-gray-800">
+                                ${Number(paymentAnalysis.receipt?.amount || 0).toLocaleString("es-AR")}
+                              </p>
+                              {paymentAnalysis.status === "no_match" && (
+                                <p className="mt-1 text-amber-800">El importe no coincide con una combinación pendiente. Revisalo manualmente.</p>
+                              )}
+                              {paymentAnalysis.status !== "confirmed" && (paymentAnalysis.candidates || []).map((candidate) => (
+                                <div key={candidate.id} className="mt-2 rounded-md border border-amber-200 bg-white p-2">
+                                  <p className="leading-relaxed text-gray-700">{candidate.detail}</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => confirmPayment(message, candidate.id)}
+                                    disabled={!!paymentBusyId}
+                                    className="mt-2 !flex !w-full items-center justify-center gap-2 rounded-md !bg-green-600 px-3 py-2 font-semibold text-white hover:!bg-green-700 disabled:opacity-50"
+                                  >
+                                    <FaCheckCircle /> {analyzingPayment ? "Confirmando…" : "Confirmar pago"}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           )}
                           <div className={`mt-1.5 flex items-center justify-end gap-2 px-1 text-[11px] ${sticker ? "text-gray-500" : "text-gray-400"}`}>
                             <span>{formatMessageDate(message.received_at)}</span>
