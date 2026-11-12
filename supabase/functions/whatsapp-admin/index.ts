@@ -300,12 +300,12 @@ const paymentProposal = async (phone: string, detectedAmount: number) => {
   const studentIds = [...new Set(
     (contacts || []).flatMap((contact: Record<string, any>) => [contact.persona_id, contact.id]).filter(Boolean).map(String),
   )];
-  if (!studentIds.length) return { students: [], candidates: [], month: currentMonthName() };
+  if (!studentIds.length) return { students: [], candidates: [], alreadyRegistered: [], month: currentMonthName() };
   const idFilter = encodeURIComponent(`(${studentIds.join(",")})`);
   const year = new Date().getFullYear();
   const [enrollments, payments, initialPromos] = await Promise.all([
     rest(`matriculas?select=id,alumno_id,curso_id,ciclo_codigo,curso_nombre,creado_en&alumno_id=in.${idFilter}&estado=eq.activa&limit=200`),
-    rest(`pagos?select=id,alumno_id,mes,pago_mes,pago_inscripcion,creado_en&alumno_id=in.${idFilter}&creado_en=gte.${year}-01-01T00:00:00Z&creado_en=lt.${year + 1}-01-01T00:00:00Z&limit=1000`),
+    rest(`pagos?select=id,alumno_id,mes,pago_mes,pago_inscripcion,monto_total,creado_en&alumno_id=in.${idFilter}&creado_en=gte.${year}-01-01T00:00:00Z&creado_en=lt.${year + 1}-01-01T00:00:00Z&limit=1000`),
     rest(`promos_grupo?select=grupo_id,alumno_id,descuento_pct&alumno_id=in.${idFilter}&limit=200`),
   ]);
   const courseIds = [...new Set((enrollments || []).map((item: Record<string, any>) => item.curso_id).filter(Boolean).map(String))];
@@ -353,6 +353,29 @@ const paymentProposal = async (phone: string, detectedAmount: number) => {
     return { id: studentId, name, promoPct, activeEnrollments: studentEnrollments.length };
   });
 
+  const registeredItems = (payments || []).filter((payment: Record<string, any>) => {
+    const relevant = (payment.pago_mes && payment.mes === month) || payment.pago_inscripcion;
+    return relevant && Number(payment.monto_total || 0) > 0;
+  }).slice(0, 14);
+  const alreadyRegistered: Array<Record<string, any>> = [];
+  for (let mask = 1; mask < (1 << registeredItems.length); mask += 1) {
+    const selected = registeredItems.filter((_item: Record<string, any>, index: number) => (mask & (1 << index)) !== 0);
+    const total = selected.reduce((sum: number, item: Record<string, any>) => sum + Number(item.monto_total || 0), 0);
+    const difference = Math.abs(total - detectedAmount);
+    if (difference > Math.max(1, Math.round(detectedAmount * 0.005))) continue;
+    const detail = selected.map((payment: Record<string, any>) => {
+      const contact = contactsById.get(String(payment.alumno_id)) || {};
+      const name = `${contact.nombre || ""} ${contact.apellido || ""}`.trim() || `Alumno ${payment.alumno_id}`;
+      const concepts = [
+        payment.pago_mes ? `cuota de ${payment.mes || month}` : "",
+        payment.pago_inscripcion ? "inscripción" : "",
+      ].filter(Boolean).join(" e ");
+      return `${name}: ${concepts}`;
+    }).join(" · ");
+    alreadyRegistered.push({ total, difference, detail, paymentIds: selected.map((item: Record<string, any>) => item.id) });
+  }
+  alreadyRegistered.sort((left, right) => left.difference - right.difference || left.paymentIds.length - right.paymentIds.length);
+
   const matches: Array<Record<string, any>> = [];
   const tolerance = Math.max(1, Math.round(detectedAmount * 0.005));
   const searchable = obligations.slice(0, 14);
@@ -384,7 +407,12 @@ const paymentProposal = async (phone: string, detectedAmount: number) => {
     matches.push({ id: `candidate-${matches.length + 1}`, total, difference, detail, allocations });
   }
   matches.sort((left, right) => left.difference - right.difference || left.allocations.length - right.allocations.length);
-  return { students: uniqueContacts(contacts || []).map((contact) => ({ id: contact.persona_id || contact.id, name: studentLabel(contact) })), candidates: matches.slice(0, 5), month };
+  return {
+    students: uniqueContacts(contacts || []).map((contact) => ({ id: contact.persona_id || contact.id, name: studentLabel(contact) })),
+    candidates: matches.slice(0, 5),
+    alreadyRegistered: alreadyRegistered.slice(0, 3),
+    month,
+  };
 };
 
 const simulate = async (phone: string, input: string) => {
@@ -886,7 +914,7 @@ Deno.serve(async (request) => {
       }
       const proposal = await paymentProposal(message.from_phone, amount);
       const analysis = {
-        status: proposal.candidates.length ? "pending_confirmation" : "no_match",
+        status: proposal.candidates.length ? "pending_confirmation" : proposal.alreadyRegistered.length ? "already_registered" : "no_match",
         analyzedAt: new Date().toISOString(),
         receipt: {
           amount: Math.round(amount),
@@ -896,6 +924,7 @@ Deno.serve(async (request) => {
         month: proposal.month,
         students: proposal.students,
         candidates: proposal.candidates,
+        alreadyRegistered: proposal.alreadyRegistered,
       };
       await rest(`whatsapp_messages?id=eq.${encodeURIComponent(messageId)}`, {
         method: "PATCH",

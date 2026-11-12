@@ -177,10 +177,39 @@ const readReceiptText = async (mediaUrl, messageType) => {
       await worker.terminate();
     }
   }
+  const imageResponse = await fetch(mediaUrl);
+  if (!imageResponse.ok) throw new Error("No se pudo abrir la imagen del comprobante.");
+  const bitmap = await createImageBitmap(await imageResponse.blob());
+  let scale = Math.min(3, Math.max(1, 1700 / Math.max(1, bitmap.width)));
+  if (bitmap.height * scale > 3000) scale = 3000 / bitmap.height;
+  if (bitmap.width * scale > 2400) scale = 2400 / bitmap.width;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    const gray = (pixels.data[index] * 0.299) + (pixels.data[index + 1] * 0.587) + (pixels.data[index + 2] * 0.114);
+    const contrasted = Math.max(0, Math.min(255, ((gray - 128) * 1.45) + 128));
+    pixels.data[index] = contrasted;
+    pixels.data[index + 1] = contrasted;
+    pixels.data[index + 2] = contrasted;
+  }
+  context.putImageData(pixels, 0, 0);
   const { createWorker } = await import("tesseract.js");
   const worker = await createWorker("spa");
   try {
-    return (await worker.recognize(mediaUrl)).data.text || "";
+    await worker.setParameters({
+      tessedit_pageseg_mode: "11",
+      preserve_interword_spaces: "1",
+    });
+    return (await worker.recognize(canvas)).data.text || "";
   } finally {
     await worker.terminate();
   }
@@ -899,16 +928,19 @@ export default function WhatsAppCentro() {
                             </button>
                           )}
                           {paymentAnalysis && (
-                            <div className={`mt-2 rounded-md border p-3 text-xs ${paymentAnalysis.status === "confirmed" ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
+                            <div className={`mt-2 rounded-md border p-3 text-xs ${["confirmed", "already_registered"].includes(paymentAnalysis.status) ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
                               <p className="flex items-center gap-2 font-bold text-gray-800">
-                                {paymentAnalysis.status === "confirmed" ? <FaCheckCircle className="text-green-600" /> : <FaMoneyBillWave className="text-amber-700" />}
-                                {paymentAnalysis.status === "confirmed" ? "Pago registrado" : "Posible pago detectado"}
+                                {["confirmed", "already_registered"].includes(paymentAnalysis.status) ? <FaCheckCircle className="text-green-600" /> : <FaMoneyBillWave className="text-amber-700" />}
+                                {paymentAnalysis.status === "confirmed" ? "Pago registrado" : paymentAnalysis.status === "already_registered" ? "Este pago parece ya registrado" : "Posible pago detectado"}
                               </p>
                               <p className="mt-1 font-semibold text-gray-800">
                                 ${Number(paymentAnalysis.receipt?.amount || 0).toLocaleString("es-AR")}
                               </p>
                               {paymentAnalysis.status === "no_match" && (
                                 <p className="mt-1 text-amber-800">El importe no coincide con una combinación pendiente. Revisalo manualmente.</p>
+                              )}
+                              {paymentAnalysis.status === "already_registered" && (
+                                <p className="mt-1 text-green-800">{paymentAnalysis.alreadyRegistered?.[0]?.detail || "No se generará otro pago."}</p>
                               )}
                               {paymentAnalysis.status !== "confirmed" && (paymentAnalysis.candidates || []).map((candidate) => (
                                 <div key={candidate.id} className="mt-2 rounded-md border border-amber-200 bg-white p-2">
@@ -923,6 +955,16 @@ export default function WhatsAppCentro() {
                                   </button>
                                 </div>
                               ))}
+                              {["no_match", "already_registered"].includes(paymentAnalysis.status) && (
+                                <button
+                                  type="button"
+                                  onClick={() => analyzePayment(message, mediaUrl)}
+                                  disabled={!mediaUrl || !!paymentBusyId}
+                                  className="mt-2 !w-full rounded-md border border-gray-300 !bg-white px-3 py-2 font-semibold text-gray-700 hover:!bg-gray-50 disabled:opacity-50"
+                                >
+                                  {analyzingPayment ? "Analizando nuevamente…" : "Volver a analizar"}
+                                </button>
+                              )}
                             </div>
                           )}
                           <div className={`mt-1.5 flex items-center justify-end gap-2 px-1 text-[11px] ${sticker ? "text-gray-500" : "text-gray-400"}`}>
