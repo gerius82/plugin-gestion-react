@@ -156,10 +156,15 @@ const extractReceiptData = (ocrText) => {
 };
 
 const readReceiptText = async (mediaUrl, messageType) => {
-  if (messageType === "document") {
+  const mediaResponse = await fetch(mediaUrl);
+  if (!mediaResponse.ok) throw new Error("No se pudo abrir el comprobante.");
+  const mediaBlob = await mediaResponse.blob();
+  const signature = new TextDecoder().decode(await mediaBlob.slice(0, 5).arrayBuffer());
+  const isPdf = messageType === "document" && (mediaBlob.type.toLowerCase().includes("pdf") || signature.startsWith("%PDF"));
+  if (isPdf) {
     const pdfjs = await import("pdfjs-dist");
     pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-    const pdf = await pdfjs.getDocument(mediaUrl).promise;
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(await mediaBlob.arrayBuffer()) }).promise;
     const page = await pdf.getPage(1);
     const textContent = await page.getTextContent();
     const embeddedText = textContent.items.map((item) => item.str || "").join(" ").trim();
@@ -177,9 +182,7 @@ const readReceiptText = async (mediaUrl, messageType) => {
       await worker.terminate();
     }
   }
-  const imageResponse = await fetch(mediaUrl);
-  if (!imageResponse.ok) throw new Error("No se pudo abrir la imagen del comprobante.");
-  const bitmap = await createImageBitmap(await imageResponse.blob());
+  const bitmap = await createImageBitmap(mediaBlob);
   let scale = Math.min(3, Math.max(1, 1700 / Math.max(1, bitmap.width)));
   if (bitmap.height * scale > 3000) scale = 3000 / bitmap.height;
   if (bitmap.width * scale > 2400) scale = 2400 / bitmap.width;
