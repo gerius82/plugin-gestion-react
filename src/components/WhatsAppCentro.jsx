@@ -128,7 +128,10 @@ const renderWhatsAppText = (value) => {
 };
 
 const parseArgentineAmount = (value) => {
-  let text = String(value || "").replace(/[^0-9.,]/g, "");
+  let text = String(value || "")
+    .replace(/[oO]/g, "0")
+    .replace(/[iIlL]/g, "1")
+    .replace(/[^0-9.,]/g, "");
   if (!text) return null;
   if (text.includes(",")) text = text.replace(/\./g, "").replace(",", ".");
   else if (/^\d{1,3}(?:\.\d{3})+$/.test(text)) text = text.replace(/\./g, "");
@@ -139,13 +142,16 @@ const parseArgentineAmount = (value) => {
 const extractReceiptData = (ocrText) => {
   const text = String(ocrText || "").replace(/\s+/g, " ").trim();
   const lines = String(ocrText || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const amountPattern = /(?:\$|ars\s*)?\s*(\d{1,3}(?:[.\s]\d{3})+(?:,\d{2})?|\d{4,8}(?:,\d{2})?)/i;
-  const priorityLines = lines.filter((line) => /importe|monto|total|transferid|enviaste|pagaste/i.test(line));
-  const amountNearLabel = text.match(/(?:importe|monto|total|transferid[oa]?|enviaste|pagaste)[^$0-9]{0,35}(?:\$|ars\s*)?\s*(\d{1,3}(?:[.\s]\d{3})+(?:,\d{2})?|\d{4,8}(?:,\d{2})?)/i);
-  let amount = parseArgentineAmount(amountNearLabel?.[1]);
+  const moneyDigits = "([0-9OIlL]{1,3}(?:[.\\s][0-9OIlL]{3})+(?:,[0-9OIlL]{2})?|[0-9OIlL]{4,8}(?:,[0-9OIlL]{2})?)";
+  const currencyMatch = text.match(new RegExp(`(?:\\$|ARS\\s*|S(?=\\s*[0-9O]))\\s*${moneyDigits}`, "i"));
+  const amountPattern = new RegExp(`(?:\\$|ars\\s*)?\\s*${moneyDigits}`, "i");
+  const priorityLines = lines.filter((line) => /importe|monto|total|transferencia|transferid|enviad|enviaste|pagaste/i.test(line));
+  const amountNearLabel = text.match(new RegExp(`(?:importe|monto|total|transferencia\\s+enviada|transferid[oa]?|enviad[oa]?|enviaste|pagaste)[^$0-9O]{0,35}(?:\\$|ars\\s*)?\\s*${moneyDigits}`, "i"));
+  let amount = parseArgentineAmount(currencyMatch?.[1]) || parseArgentineAmount(amountNearLabel?.[1]);
   for (const line of amount ? [] : [...priorityLines, ...lines.filter((item) => /\$|ars/i.test(item))]) {
     const match = line.match(amountPattern);
     amount = parseArgentineAmount(match?.[1]);
+    if (amount >= 1900 && amount <= 2100) amount = null;
     if (amount) break;
   }
   const date = text.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b/)?.[1] || "";
