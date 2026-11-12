@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import logo from "./assets/Logo_Plugin_2025.png";
 import { AccesoGestion, GestionAuthProvider, RequireGestionAuth, SeguridadGestion } from "./components/GestionAuth";
 import Avisos from "./components/FichaAvisosAlumnos";
@@ -49,18 +49,22 @@ import EncuestaColoniaResultados from "./components/EncuestaColoniaResultados";
 import ReservaVeranoResultado from "./components/ReservaVeranoResultado";
 import ReservasVerano from "./components/ReservasVerano";
 
-function App() {
+function AppContent() {
+  const location = useLocation();
+  const hideMainLogo = location.pathname === "/whatsapp-centro";
+
   return (
-    <Router>
-      <GestionAuthProvider>
-        <div className="min-h-screen flex flex-col items-center p-6 bg-gray-100">
+    <GestionAuthProvider>
+      <div className="min-h-screen flex flex-col items-center p-6 bg-gray-100">
+        {!hideMainLogo && (
           <img
             src={logo}
             alt="Logo Plugin"
             className="w-72 mb-8 drop-shadow-lg"
           />
+        )}
 
-          <Routes>
+        <Routes>
             <Route path="/acceso-gestion" element={<AccesoGestion />} />
 
             {/* Accesos públicos para familias y profesores */}
@@ -119,9 +123,16 @@ function App() {
               <Route path="/encuesta-colonia-resultados" element={<EncuestaColoniaResultados />} />
               <Route path="/reservas-verano" element={<ReservasVerano />} />
             </Route>
-          </Routes>
-        </div>
-      </GestionAuthProvider>
+        </Routes>
+      </div>
+    </GestionAuthProvider>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
