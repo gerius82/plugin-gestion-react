@@ -144,15 +144,20 @@ const normalizeBotInput = (value: unknown) =>
 const includesAny = (value: string, terms: string[]) =>
   terms.some((term) => value === term || value.includes(term));
 
-const botOptions = [
-  { id: "1", label: "Cursos e inscripciones" },
-  { id: "2", label: "Recuperar una clase" },
-  { id: "3", label: "Cambio de turno" },
-  { id: "4", label: "Horarios de clase" },
-  { id: "5", label: "Promos" },
-  { id: "6", label: "Festejá tu cumple" },
-  { id: "7", label: "Hablar con una persona" },
+const botOptionDefinitions = [
+  { action: "courses", label: "Cursos e inscripciones" },
+  { action: "recovery", label: "Recuperar una clase", requiresActiveEnrollment: true },
+  { action: "schedule_change", label: "Cambio de turno", requiresActiveEnrollment: true },
+  { action: "schedule", label: "Horarios de clase", requiresActiveEnrollment: true },
+  { action: "promos", label: "Promos" },
+  { action: "birthday", label: "Festejá tu cumple" },
+  { action: "human", label: "Hablar con una persona" },
 ];
+
+const buildBotOptions = (hasActiveEnrollment: boolean) =>
+  botOptionDefinitions
+    .filter((option) => hasActiveEnrollment || !option.requiresActiveEnrollment)
+    .map((option, index) => ({ ...option, id: String(index + 1) }));
 
 const publicSiteUrl = () =>
   (Deno.env.get("PUBLIC_SITE_URL")?.trim() || "https://gestion.plugin.ar").replace(/\/$/, "");
@@ -160,14 +165,17 @@ const publicSiteUrl = () =>
 const simulate = async (phone: string, input: string) => {
   const normalizedInput = normalizeBotInput(input);
   const context = await findContext(phone);
+  const hasActiveEnrollment = context.enrollments.length > 0;
+  const options = buildBotOptions(hasActiveEnrollment);
+  const selectedAction = options.find((option) => option.id === normalizedInput)?.action;
   const greeting = includesAny(normalizedInput, ["hola", "buen dia", "buenas tardes", "buenas noches", "menu", "inicio"]);
 
-  if (normalizedInput === "4" || includesAny(normalizedInput, ["horario", "cuando tiene", "cuando es", "proxima clase", "dia de clase"])) {
-    if (!context.enrollments.length) {
+  if (selectedAction === "schedule" || includesAny(normalizedInput, ["horario", "cuando tiene", "cuando es", "proxima clase", "dia de clase"])) {
+    if (!hasActiveEnrollment) {
       return {
-        message: "No encontré una matrícula activa asociada a este teléfono. Te derivo con una persona para que pueda revisarlo.",
-        options: [],
-        nextStep: "human",
+        message: "Para consultar un horario de cursado, elegí *Cursos e inscripciones* o *Hablar con una persona*.",
+        options,
+        nextStep: "menu",
         context,
       };
     }
@@ -183,58 +191,74 @@ const simulate = async (phone: string, input: string) => {
     });
     return {
       message: `Estos son los horarios activos asociados a este teléfono:\n\n${lines.join("\n")}\n\n¿Necesitás consultar algo más?`,
-      options: botOptions,
+      options,
       nextStep: "menu",
       context,
     };
   }
 
-  if (normalizedInput === "2" || includesAny(normalizedInput, ["recuper", "falto", "falta", "ausencia", "cambiar clase"])) {
+  if (selectedAction === "recovery" || includesAny(normalizedInput, ["recuper", "falto", "falta", "ausencia", "cambiar clase"])) {
+    if (!hasActiveEnrollment) {
+      return {
+        message: "La recuperación corresponde a alumnos con cursado activo. Podés elegir *Cursos e inscripciones* o *Hablar con una persona*.",
+        options,
+        nextStep: "menu",
+        context,
+      };
+    }
     return {
       message: `Podés consultar las ausencias y solicitar una recuperación desde:\n${publicSiteUrl()}/recuperar\n\nEl sistema te pedirá el teléfono registrado. Si no encontrás una opción adecuada, escribí *persona* y te derivamos.`,
-      options: botOptions,
+      options,
       nextStep: "menu",
       context,
     };
   }
 
-  if (normalizedInput === "3" || includesAny(normalizedInput, ["cambio de turno", "cambiar turno", "cambiar horario", "otro turno"])) {
+  if (selectedAction === "schedule_change" || includesAny(normalizedInput, ["cambio de turno", "cambiar turno", "cambiar horario", "otro turno"])) {
+    if (!hasActiveEnrollment) {
+      return {
+        message: "El cambio de turno corresponde a alumnos con cursado activo. Podés elegir *Cursos e inscripciones* o *Hablar con una persona*.",
+        options,
+        nextStep: "menu",
+        context,
+      };
+    }
     return {
       message: `Podés solicitar un cambio de turno desde:\n${publicSiteUrl()}/cambio-turno\n\nEl sistema te pedirá el teléfono registrado. Si necesitás ayuda, escribí *persona*.`,
-      options: botOptions,
+      options,
       nextStep: "menu",
       context,
     };
   }
 
-  if (normalizedInput === "1" || includesAny(normalizedInput, ["curso", "taller", "inscripcion", "inscribir", "vacante"])) {
+  if (selectedAction === "courses" || includesAny(normalizedInput, ["curso", "taller", "inscripcion", "inscribir", "vacante"])) {
     return {
       message: `Podés consultar los ciclos disponibles e iniciar una inscripción desde:\n${publicSiteUrl()}/menu-inscripcion-padres\n\nSi necesitás ayuda para elegir, escribí *persona*.`,
-      options: botOptions,
+      options,
       nextStep: "menu",
       context,
     };
   }
 
-  if (normalizedInput === "5" || includesAny(normalizedInput, ["promo", "promocion", "descuento", "beneficio"])) {
+  if (selectedAction === "promos" || includesAny(normalizedInput, ["promo", "promocion", "descuento", "beneficio"])) {
     return {
       message: `Podés consultar los descuentos y beneficios vigentes desde:\n${publicSiteUrl()}/promos`,
-      options: botOptions,
+      options,
       nextStep: "menu",
       context,
     };
   }
 
-  if (normalizedInput === "6" || includesAny(normalizedInput, ["cumple", "cumpleanos", "festejo", "festejar"] )) {
+  if (selectedAction === "birthday" || includesAny(normalizedInput, ["cumple", "cumpleanos", "festejo", "festejar"] )) {
     return {
       message: `Conocé nuestras propuestas de cumpleaños creativos para chicos desde:\n${publicSiteUrl()}/cumples-info?from=menu-padres`,
-      options: botOptions,
+      options,
       nextStep: "menu",
       context,
     };
   }
 
-  if (normalizedInput === "7" || includesAny(normalizedInput, ["persona", "humano", "asesor", "atencion", "hablar con alguien"])) {
+  if (selectedAction === "human" || includesAny(normalizedInput, ["persona", "humano", "asesor", "atencion", "hablar con alguien"])) {
     return {
       message: "Listo, pausé las respuestas automáticas. Una persona continuará la conversación apenas esté disponible.",
       options: [],
@@ -250,7 +274,7 @@ const simulate = async (phone: string, input: string) => {
   if (!greeting) {
     return {
       message: "No llegué a entender esa consulta. Podés elegir una opción o escribir *persona* para que te atienda alguien.",
-      options: botOptions,
+      options,
       nextStep: "menu",
       context,
     };
@@ -258,7 +282,7 @@ const simulate = async (phone: string, input: string) => {
 
   return {
     message: `¡Hola! Soy el asistente de Plugin Robótica 🤖${known ? `\n\n${known}` : ""}\n\n¿En qué podemos ayudarte?`,
-    options: botOptions,
+    options,
     nextStep: "menu",
     context,
   };
