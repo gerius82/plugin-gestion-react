@@ -145,10 +145,11 @@ const includesAny = (value: string, terms: string[]) =>
   terms.some((term) => value === term || value.includes(term));
 
 const botOptionDefinitions = [
-  { action: "courses", label: "Cursos e inscripciones" },
+  { action: "courses", label: "Talleres e inscripciones" },
   { action: "recovery", label: "Recuperar una clase", requiresActiveEnrollment: true },
   { action: "schedule_change", label: "Cambio de turno", requiresActiveEnrollment: true },
   { action: "schedule", label: "Horarios de clase", requiresActiveEnrollment: true },
+  { action: "locations", label: "Sedes y direcciones" },
   { action: "promos", label: "Promos" },
   { action: "birthday", label: "Festejá tu cumple" },
   { action: "human", label: "Hablar con una persona" },
@@ -162,18 +163,207 @@ const buildBotOptions = (hasActiveEnrollment: boolean) =>
 const publicSiteUrl = () =>
   (Deno.env.get("PUBLIC_SITE_URL")?.trim() || "https://gestion.plugin.ar").replace(/\/$/, "");
 
+const numberedOptions = (items: Array<Record<string, any>>) =>
+  items.map((item, index) => ({ ...item, id: String(index + 1) }));
+
+const fetchActiveCycles = async () =>
+  await rest("ciclos?select=codigo,nombre_publico,descripcion,fecha_inicio,fecha_fin,orden&activo=eq.true&order=orden.asc");
+
+const fetchCycleCourses = async (cycleCode: string) =>
+  await rest(
+    `cursos?select=id,nombre,descripcion,ciclo,turnos_config,precio_curso,precio_inscripcion,edad_min,edad_max&ciclo=eq.${encodeURIComponent(cycleCode)}&activo=eq.true&order=nombre.asc`,
+  );
+
+const fetchCourse = async (courseId: string) => {
+  const rows = await rest(
+    `cursos?select=id,nombre,descripcion,ciclo,turnos_config,precio_curso,precio_inscripcion,edad_min,edad_max&id=eq.${encodeURIComponent(courseId)}&activo=eq.true&limit=1`,
+  );
+  return rows?.[0] || null;
+};
+
+const formatCurrency = (value: unknown) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "A consultar";
+  if (amount === 0) return "Sin cargo";
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
+
+const parseScheduleConfig = (value: unknown) => {
+  if (!value) return {};
+  if (typeof value === "object") return value as Record<string, any>;
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const scheduleStart = (value: unknown) => {
+  const match = String(value || "").match(/(\d{1,2}:\d{2})/);
+  return match ? match[1].padStart(5, "0") : String(value || "").trim();
+};
+
+const normalizeSchedulePart = (value: unknown) =>
+  normalizeBotInput(value).replace(/\s+/g, " ");
+
+const courseScheduleKeys = (course: Record<string, any>) => {
+  const keys = new Set<string>();
+  const config = parseScheduleConfig(course.turnos_config);
+  for (const [location, days] of Object.entries(config)) {
+    if (!days || typeof days !== "object") continue;
+    for (const [day, rawTimes] of Object.entries(days as Record<string, any>)) {
+      const times = Array.isArray(rawTimes)
+        ? rawTimes
+        : rawTimes && typeof rawTimes === "object"
+          ? Object.values(rawTimes).flat()
+          : [rawTimes];
+      for (const time of times.filter(Boolean)) {
+        keys.add(`${normalizeSchedulePart(location)}|${normalizeSchedulePart(day)}|${scheduleStart(time)}`);
+      }
+    }
+  }
+  return keys;
+};
+
+const fetchAvailableSchedules = async (course: Record<string, any>) => {
+  const configuredKeys = courseScheduleKeys(course);
+  if (!configuredKeys.size) return [];
+  const [schedules, enrollments] = await Promise.all([
+    rest(
+      `turnos?select=sede,dia,hora,cupo_maximo&ciclo_codigo=eq.${encodeURIComponent(course.ciclo)}&activo=eq.true&order=sede.asc,dia.asc,hora.asc`,
+    ),
+    rest(
+      `matriculas?select=sede,dia,hora&ciclo_codigo=eq.${encodeURIComponent(course.ciclo)}&estado=eq.activa&limit=5000`,
+    ),
+  ]);
+  const counts = new Map<string, number>();
+  for (const enrollment of enrollments || []) {
+    const key = `${normalizeSchedulePart(enrollment.sede)}|${normalizeSchedulePart(enrollment.dia)}|${scheduleStart(enrollment.hora)}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return (schedules || [])
+    .map((schedule: Record<string, any>) => {
+      const key = `${normalizeSchedulePart(schedule.sede)}|${normalizeSchedulePart(schedule.dia)}|${scheduleStart(schedule.hora)}`;
+      const enrolled = counts.get(key) || 0;
+      const capacity = schedule.cupo_maximo == null ? null : Number(schedule.cupo_maximo);
+      return { ...schedule, key, enrolled, capacity, available: capacity == null || enrolled < capacity };
+    })
+    .filter((schedule: Record<string, any>) => configuredKeys.has(schedule.key));
+};
+
 const simulate = async (phone: string, input: string) => {
+  const rawInput = String(input || "").trim();
   const normalizedInput = normalizeBotInput(input);
   const context = await findContext(phone);
   const hasActiveEnrollment = context.enrollments.length > 0;
   const options = buildBotOptions(hasActiveEnrollment);
-  const selectedAction = options.find((option) => option.id === normalizedInput)?.action;
+  const selectedAction = options.find((option) => option.id === normalizedInput)?.action
+    || botOptionDefinitions.find((option) => option.action === rawInput)?.action;
   const greeting = includesAny(normalizedInput, ["hola", "buen dia", "buenas tardes", "buenas noches", "menu", "inicio"]);
+
+  if (rawInput.startsWith("cycle:")) {
+    const cycleCode = rawInput.slice("cycle:".length);
+    const [cycles, courses] = await Promise.all([fetchActiveCycles(), fetchCycleCourses(cycleCode)]);
+    const cycle = (cycles || []).find((item: Record<string, any>) => String(item.codigo) === cycleCode);
+    if (!courses?.length) {
+      return {
+        message: "Todavía no hay talleres publicados para esta propuesta.",
+        options: numberedOptions([
+          { action: "courses", label: "Ver otras propuestas" },
+          { action: "menu", label: "Volver al menú principal" },
+        ]),
+        nextStep: "catalog",
+        context,
+      };
+    }
+    return {
+      message: `Estos son los talleres disponibles en *${cycle?.nombre_publico || cycleCode}*. Elegí uno para ver la información:`,
+      options: numberedOptions([
+        ...courses.map((course: Record<string, any>) => ({ action: `course:${course.id}`, label: course.nombre })),
+        { action: "courses", label: "Volver a propuestas" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "courses",
+      context,
+    };
+  }
+
+  if (rawInput.startsWith("course:")) {
+    const course = await fetchCourse(rawInput.slice("course:".length));
+    if (!course) {
+      return {
+        message: "Ese taller ya no se encuentra disponible.",
+        options,
+        nextStep: "menu",
+        context,
+      };
+    }
+    const ageText = course.edad_min != null || course.edad_max != null
+      ? `${course.edad_min ?? "?"} a ${course.edad_max ?? "?"} años`
+      : "A consultar";
+    const description = String(course.descripcion || "Consultanos para conocer los contenidos y la modalidad del taller.").trim();
+    return {
+      message: `*${course.nombre}*\n\n${description}\n\n👦 Edades: ${ageText}\n📝 Inscripción: ${formatCurrency(course.precio_inscripcion)}\n💳 Cuota: ${formatCurrency(course.precio_curso)}`,
+      options: numberedOptions([
+        { action: `schedules:${course.id}`, label: "Ver horarios disponibles" },
+        { action: `enroll:${course.id}`, label: "Quiero inscribirme" },
+        { action: `cycle:${course.ciclo}`, label: "Volver a talleres" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "course_detail",
+      context,
+    };
+  }
+
+  if (rawInput.startsWith("schedules:")) {
+    const course = await fetchCourse(rawInput.slice("schedules:".length));
+    if (!course) {
+      return { message: "Ese taller ya no se encuentra disponible.", options, nextStep: "menu", context };
+    }
+    const schedules = await fetchAvailableSchedules(course);
+    const lines = schedules.map((schedule: Record<string, any>) =>
+      `• ${schedule.sede} — ${schedule.dia} ${schedule.hora}${schedule.available ? "" : " (lista de espera)"}`
+    );
+    return {
+      message: lines.length
+        ? `Horarios de *${course.nombre}*:\n\n${lines.join("\n")}\n\nLos cupos pueden cambiar mientras completás la inscripción.`
+        : `Todavía no hay horarios publicados para *${course.nombre}*.`,
+      options: numberedOptions([
+        { action: `enroll:${course.id}`, label: "Quiero inscribirme" },
+        { action: `course:${course.id}`, label: "Volver a la información" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "schedules",
+      context,
+    };
+  }
+
+  if (rawInput.startsWith("enroll:")) {
+    const course = await fetchCourse(rawInput.slice("enroll:".length));
+    if (!course) {
+      return { message: "Ese taller ya no se encuentra disponible.", options, nextStep: "menu", context };
+    }
+    const enrollmentUrl = `${publicSiteUrl()}/formulario?origen=padres&from=menu-inscripcion-cursos&ciclo=${encodeURIComponent(course.ciclo)}&curso_id=${encodeURIComponent(course.id)}`;
+    return {
+      message: `Podés comenzar la inscripción a *${course.nombre}* desde:\n${enrollmentUrl}`,
+      options: numberedOptions([
+        { action: `course:${course.id}`, label: "Volver a la información" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "enrollment",
+      context,
+    };
+  }
 
   if (selectedAction === "schedule" || includesAny(normalizedInput, ["horario", "cuando tiene", "cuando es", "proxima clase", "dia de clase"])) {
     if (!hasActiveEnrollment) {
       return {
-        message: "Para consultar un horario de cursado, elegí *Cursos e inscripciones* o *Hablar con una persona*.",
+        message: "Para consultar un horario de cursado, elegí *Talleres e inscripciones* o *Hablar con una persona*.",
         options,
         nextStep: "menu",
         context,
@@ -200,7 +390,7 @@ const simulate = async (phone: string, input: string) => {
   if (selectedAction === "recovery" || includesAny(normalizedInput, ["recuper", "falto", "falta", "ausencia", "cambiar clase"])) {
     if (!hasActiveEnrollment) {
       return {
-        message: "La recuperación corresponde a alumnos con cursado activo. Podés elegir *Cursos e inscripciones* o *Hablar con una persona*.",
+        message: "La recuperación corresponde a alumnos con cursado activo. Podés elegir *Talleres e inscripciones* o *Hablar con una persona*.",
         options,
         nextStep: "menu",
         context,
@@ -217,7 +407,7 @@ const simulate = async (phone: string, input: string) => {
   if (selectedAction === "schedule_change" || includesAny(normalizedInput, ["cambio de turno", "cambiar turno", "cambiar horario", "otro turno"])) {
     if (!hasActiveEnrollment) {
       return {
-        message: "El cambio de turno corresponde a alumnos con cursado activo. Podés elegir *Cursos e inscripciones* o *Hablar con una persona*.",
+        message: "El cambio de turno corresponde a alumnos con cursado activo. Podés elegir *Talleres e inscripciones* o *Hablar con una persona*.",
         options,
         nextStep: "menu",
         context,
@@ -232,10 +422,31 @@ const simulate = async (phone: string, input: string) => {
   }
 
   if (selectedAction === "courses" || includesAny(normalizedInput, ["curso", "taller", "inscripcion", "inscribir", "vacante"])) {
+    const cycles = await fetchActiveCycles();
     return {
-      message: `Podés consultar los ciclos disponibles e iniciar una inscripción desde:\n${publicSiteUrl()}/menu-inscripcion-padres\n\nSi necesitás ayuda para elegir, escribí *persona*.`,
-      options,
-      nextStep: "menu",
+      message: cycles?.length
+        ? "Elegí una propuesta para conocer sus talleres:"
+        : "Todavía no hay propuestas de talleres publicadas.",
+      options: numberedOptions([
+        ...(cycles || []).map((cycle: Record<string, any>) => ({
+          action: `cycle:${cycle.codigo}`,
+          label: cycle.nombre_publico || cycle.codigo,
+        })),
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "cycles",
+      context,
+    };
+  }
+
+  if (selectedAction === "locations" || includesAny(normalizedInput, ["sede", "direccion", "donde queda", "ubicacion"])) {
+    return {
+      message: "Nuestras sedes son:\n\n📍 *Fisherton*\nEva Perón 8128, Rosario\n\n📍 *Calle Mendoza*\nMendoza 3024, Rosario",
+      options: numberedOptions([
+        { action: "courses", label: "Ver talleres" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "locations",
       context,
     };
   }

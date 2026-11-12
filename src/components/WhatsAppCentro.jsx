@@ -421,15 +421,18 @@ export default function WhatsAppCentro() {
     }
   };
 
-  const simulate = async (input) => {
+  const simulate = async (input, visibleText = "") => {
     const cleanInput = String(input || "").trim();
     if (!cleanInput || !simPhone.trim()) return;
+    const typedOption = !visibleText ? simOptions.find((option) => option.id === cleanInput) : null;
+    const requestInput = typedOption?.action || cleanInput;
+    const displayedInput = visibleText || typedOption?.label || cleanInput;
     try {
       setBusy(true);
       setError("");
-      setSimLog((current) => [...current, { role: "user", text: cleanInput }]);
+      setSimLog((current) => [...current, { role: "user", text: displayedInput }]);
       setSimInput("");
-      const result = await api({ action: "simulate", phone: simPhone, input: cleanInput });
+      const result = await api({ action: "simulate", phone: simPhone, input: requestInput });
       setSimLog((current) => [...current, { role: "bot", text: result.message }]);
       setSimOptions(result.options || []);
       setSimContext(result.context || null);
@@ -888,7 +891,7 @@ export default function WhatsAppCentro() {
                     <button
                       type="button"
                       key={option.id}
-                      onClick={() => simulate(option.id)}
+                      onClick={() => simulate(option.action || option.id, option.label)}
                       disabled={busy}
                       className="block !w-full rounded-lg border border-green-200 !bg-white px-4 py-2 text-left text-sm font-semibold text-green-700 shadow-sm hover:!bg-green-50"
                     >
