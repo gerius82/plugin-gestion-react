@@ -339,15 +339,55 @@ const simulate = async (phone: string, input: string) => {
       return { message: "Ese taller ya no se encuentra disponible.", options, nextStep: "menu", context };
     }
     const schedules = await fetchAvailableSchedules(course);
+    const locations = [...new Set(
+      schedules
+        .map((schedule: Record<string, any>) => String(schedule.sede || "").trim())
+        .filter(Boolean),
+    )];
+    return {
+      message: locations.length
+        ? `¿Para qué sede querés consultar los horarios de *${course.nombre}*?`
+        : `Todavía no hay horarios publicados para *${course.nombre}*.`,
+      options: numberedOptions([
+        ...locations.map((location) => ({
+          action: `location-schedules:${course.id}:${encodeURIComponent(location)}`,
+          label: location,
+        })),
+        { action: `course:${course.id}`, label: "Volver a la información" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "schedule_locations",
+      context,
+    };
+  }
+
+  if (rawInput.startsWith("location-schedules:")) {
+    const selection = rawInput.slice("location-schedules:".length);
+    const separator = selection.indexOf(":");
+    const courseId = separator >= 0 ? selection.slice(0, separator) : "";
+    let selectedLocation = "";
+    try {
+      selectedLocation = separator >= 0 ? decodeURIComponent(selection.slice(separator + 1)) : "";
+    } catch {
+      selectedLocation = "";
+    }
+    const course = await fetchCourse(courseId);
+    if (!course || !selectedLocation) {
+      return { message: "No pudimos encontrar esa sede.", options, nextStep: "menu", context };
+    }
+    const schedules = (await fetchAvailableSchedules(course)).filter((schedule: Record<string, any>) =>
+      normalizeSchedulePart(schedule.sede) === normalizeSchedulePart(selectedLocation)
+    );
     const lines = schedules.map((schedule: Record<string, any>) =>
-      `• ${schedule.sede} — ${schedule.dia} ${schedule.hora}${schedule.available ? "" : " (lista de espera)"}`
+      `• ${schedule.dia} ${schedule.hora}${schedule.available ? "" : " (lista de espera)"}`
     );
     return {
       message: lines.length
-        ? `Horarios de *${course.nombre}*:\n\n${lines.join("\n")}\n\nLos cupos pueden cambiar mientras completás la inscripción.`
-        : `Todavía no hay horarios publicados para *${course.nombre}*.`,
+        ? `Horarios de *${course.nombre}* en *${selectedLocation}*:\n\n${lines.join("\n")}\n\nLos cupos pueden cambiar mientras completás la inscripción.`
+        : `Todavía no hay horarios publicados para *${course.nombre}* en *${selectedLocation}*.`,
       options: numberedOptions([
         { url: courseEnrollmentUrl(course), label: "Quiero inscribirme" },
+        { action: `schedules:${course.id}`, label: "Elegir otra sede" },
         { action: `course:${course.id}`, label: "Volver a la información" },
         { action: "menu", label: "Volver al menú principal" },
       ]),
