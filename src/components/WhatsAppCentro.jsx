@@ -535,11 +535,11 @@ export default function WhatsAppCentro() {
                   <button
                     type="button"
                     onClick={() => setUnreadOnly(true)}
-                    className={`!flex !w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${unreadOnly ? "!bg-green-600 !text-white shadow-sm hover:!bg-green-700" : "!bg-transparent !text-gray-600 hover:!bg-gray-100 hover:!text-gray-900"}`}
+                    className={`!flex !w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${unreadOnly ? "!bg-white !text-gray-900 shadow-sm hover:!bg-gray-100" : "!bg-transparent !text-gray-600 hover:!bg-gray-100 hover:!text-gray-900"}`}
                   >
                     No leídos
                     {unreadConversationsCount > 0 && (
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${unreadOnly ? "bg-white text-green-700" : "bg-green-600 text-white"}`}>
+                      <span className="rounded-full bg-green-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                         {unreadConversationsCount}
                       </span>
                     )}
