@@ -163,6 +163,9 @@ const buildBotOptions = (hasActiveEnrollment: boolean) =>
 const publicSiteUrl = () =>
   (Deno.env.get("PUBLIC_SITE_URL")?.trim() || "https://gestion.plugin.ar").replace(/\/$/, "");
 
+const courseEnrollmentUrl = (course: Record<string, any>) =>
+  `${publicSiteUrl()}/formulario?origen=padres&from=menu-inscripcion-cursos&ciclo=${encodeURIComponent(course.ciclo)}&curso_id=${encodeURIComponent(course.id)}`;
+
 const numberedOptions = (items: Array<Record<string, any>>) =>
   items.map((item, index) => ({ ...item, id: String(index + 1) }));
 
@@ -246,6 +249,7 @@ const fetchAvailableSchedules = async (course: Record<string, any>) => {
     const key = `${normalizeSchedulePart(enrollment.sede)}|${normalizeSchedulePart(enrollment.dia)}|${scheduleStart(enrollment.hora)}`;
     counts.set(key, (counts.get(key) || 0) + 1);
   }
+  const dayOrder = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
   return (schedules || [])
     .map((schedule: Record<string, any>) => {
       const key = `${normalizeSchedulePart(schedule.sede)}|${normalizeSchedulePart(schedule.dia)}|${scheduleStart(schedule.hora)}`;
@@ -253,7 +257,16 @@ const fetchAvailableSchedules = async (course: Record<string, any>) => {
       const capacity = schedule.cupo_maximo == null ? null : Number(schedule.cupo_maximo);
       return { ...schedule, key, enrolled, capacity, available: capacity == null || enrolled < capacity };
     })
-    .filter((schedule: Record<string, any>) => configuredKeys.has(schedule.key));
+    .filter((schedule: Record<string, any>) => configuredKeys.has(schedule.key))
+    .sort((left: Record<string, any>, right: Record<string, any>) => {
+      const locationComparison = String(left.sede || "").localeCompare(String(right.sede || ""), "es");
+      if (locationComparison !== 0) return locationComparison;
+      const leftDay = dayOrder.indexOf(normalizeSchedulePart(left.dia));
+      const rightDay = dayOrder.indexOf(normalizeSchedulePart(right.dia));
+      const dayComparison = (leftDay === -1 ? 99 : leftDay) - (rightDay === -1 ? 99 : rightDay);
+      if (dayComparison !== 0) return dayComparison;
+      return scheduleStart(left.hora).localeCompare(scheduleStart(right.hora));
+    });
 };
 
 const simulate = async (phone: string, input: string) => {
@@ -311,7 +324,7 @@ const simulate = async (phone: string, input: string) => {
       message: `*${course.nombre}*\n\n${description}\n\n👦 Edades: ${ageText}\n📝 Inscripción: ${formatCurrency(course.precio_inscripcion)}\n💳 Cuota: ${formatCurrency(course.precio_curso)}`,
       options: numberedOptions([
         { action: `schedules:${course.id}`, label: "Ver horarios disponibles" },
-        { action: `enroll:${course.id}`, label: "Quiero inscribirme" },
+        { url: courseEnrollmentUrl(course), label: "Quiero inscribirme" },
         { action: `cycle:${course.ciclo}`, label: "Volver a talleres" },
         { action: "menu", label: "Volver al menú principal" },
       ]),
@@ -334,7 +347,7 @@ const simulate = async (phone: string, input: string) => {
         ? `Horarios de *${course.nombre}*:\n\n${lines.join("\n")}\n\nLos cupos pueden cambiar mientras completás la inscripción.`
         : `Todavía no hay horarios publicados para *${course.nombre}*.`,
       options: numberedOptions([
-        { action: `enroll:${course.id}`, label: "Quiero inscribirme" },
+        { url: courseEnrollmentUrl(course), label: "Quiero inscribirme" },
         { action: `course:${course.id}`, label: "Volver a la información" },
         { action: "menu", label: "Volver al menú principal" },
       ]),
@@ -348,7 +361,7 @@ const simulate = async (phone: string, input: string) => {
     if (!course) {
       return { message: "Ese taller ya no se encuentra disponible.", options, nextStep: "menu", context };
     }
-    const enrollmentUrl = `${publicSiteUrl()}/formulario?origen=padres&from=menu-inscripcion-cursos&ciclo=${encodeURIComponent(course.ciclo)}&curso_id=${encodeURIComponent(course.id)}`;
+    const enrollmentUrl = courseEnrollmentUrl(course);
     return {
       message: `Podés comenzar la inscripción a *${course.nombre}* desde:\n${enrollmentUrl}`,
       options: numberedOptions([

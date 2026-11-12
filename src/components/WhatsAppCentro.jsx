@@ -421,10 +421,16 @@ export default function WhatsAppCentro() {
     }
   };
 
-  const simulate = async (input, visibleText = "") => {
+  const simulate = async (input, visibleText = "", directUrl = "") => {
     const cleanInput = String(input || "").trim();
     if (!cleanInput || !simPhone.trim()) return;
     const typedOption = !visibleText ? simOptions.find((option) => option.id === cleanInput) : null;
+    const optionUrl = directUrl || typedOption?.url;
+    if (optionUrl) {
+      window.open(optionUrl, "_blank", "noopener,noreferrer");
+      setSimInput("");
+      return;
+    }
     const requestInput = typedOption?.action || cleanInput;
     const displayedInput = visibleText || typedOption?.label || cleanInput;
     try {
@@ -891,7 +897,7 @@ export default function WhatsAppCentro() {
                     <button
                       type="button"
                       key={option.id}
-                      onClick={() => simulate(option.action || option.id, option.label)}
+                      onClick={() => simulate(option.action || option.id, option.label, option.url)}
                       disabled={busy}
                       className="block !w-full rounded-lg border border-green-200 !bg-white px-4 py-2 text-left text-sm font-semibold text-green-700 shadow-sm hover:!bg-green-50"
                     >
