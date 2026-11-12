@@ -22,15 +22,62 @@ import { getSupabaseAuthClient } from "../lib/supabaseAuth";
 
 const normalizePhone = (value) => String(value || "").replace(/\D/g, "").slice(-10);
 
-const formatDate = (value) => {
+const argentinaDateKey = (value) => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date(value));
+
+const formatTime = (value) => new Intl.DateTimeFormat("es-AR", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+}).format(new Date(value));
+
+const formatMessageDate = (value) => {
   if (!value) return "";
+  if (argentinaDateKey(value) === argentinaDateKey(new Date())) return formatTime(value);
   return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   }).format(new Date(value));
 };
+
+const formatConversationDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  const now = new Date();
+  if (argentinaDateKey(date) === argentinaDateKey(now)) return formatTime(date);
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (argentinaDateKey(date) === argentinaDateKey(yesterday)) return "ayer";
+  if (now.getTime() - date.getTime() < 7 * 24 * 60 * 60 * 1000) {
+    return new Intl.DateTimeFormat("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      weekday: "short",
+    }).format(date).replace(".", "");
+  }
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(date);
+};
+
+const contactInitials = (value) => String(value || "")
+  .replace(/\([^)]*\)/g, " ")
+  .trim()
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part.slice(0, 1).toUpperCase())
+  .join("") || "?";
 
 const botModeLabel = {
   active: "Bot activo",
@@ -515,26 +562,41 @@ export default function WhatsAppCentro() {
                 const title = matches.length
                   ? matches.map((contact) => `${contact.nombre || ""} ${contact.apellido || ""}`.trim()).join(" / ")
                   : conversation.contact_name || conversation.phone;
+                const conversationMessages = messagesByPhone.get(conversation.phone) || [];
+                const lastMessage = conversationMessages[conversationMessages.length - 1];
+                const lastOutbound = lastMessage?.payload?._direction === "outbound";
+                const unread = Number(conversation.unread_count || 0);
                 return (
                   <button
                     type="button"
                     key={conversation.phone}
                     onClick={() => setSelectedPhone(conversation.phone)}
-                    className={`w-full border-b p-4 text-left ${selectedPhone === conversation.phone ? "!bg-green-50 hover:!bg-green-100" : "!bg-white hover:!bg-gray-50"}`}
+                    className={`!w-full border-b !p-0 text-left transition ${selectedPhone === conversation.phone ? "!bg-[#f0f2f5] hover:!bg-[#e9edef]" : "!bg-white hover:!bg-[#f5f6f6]"}`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-gray-900">{title}</p>
-                        <p className="text-xs text-gray-500">+{conversation.phone}</p>
+                    <div className="flex min-h-[72px] items-center gap-3 px-3 py-2.5">
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-sky-200 bg-sky-100 text-base font-semibold text-sky-700">
+                        {contactInitials(title)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className={`truncate text-[15px] leading-5 text-gray-900 ${unread ? "font-semibold" : "font-medium"}`}>{title}</p>
+                          <span className={`shrink-0 text-[11px] ${unread ? "font-semibold text-green-600" : "text-gray-500"}`}>
+                            {formatConversationDate(conversation.last_message_at)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                          {lastOutbound && <FaCheckDouble className="shrink-0 text-[13px] text-sky-500" title="Mensaje enviado" />}
+                          <p className={`min-w-0 flex-1 truncate text-[13px] leading-5 ${unread ? "font-medium text-gray-800" : "font-normal text-gray-500"}`}>
+                            {renderWhatsAppText(friendlyPreview(conversation.last_message_preview))}
+                          </p>
+                          {unread > 0 && (
+                            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-green-500 px-1.5 text-[10px] font-bold text-white">
+                              {unread}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {conversation.unread_count > 0 && (
-                        <span className="rounded-full bg-green-600 px-2 py-0.5 text-xs font-bold text-white">
-                          {conversation.unread_count}
-                        </span>
-                      )}
                     </div>
-                    <p className="mt-2 truncate text-sm text-gray-600">{renderWhatsAppText(friendlyPreview(conversation.last_message_preview))}</p>
-                    <p className="mt-1 text-xs text-gray-400">{formatDate(conversation.last_message_at)}</p>
                   </button>
                 );
               })}
@@ -684,7 +746,7 @@ export default function WhatsAppCentro() {
                             </p>
                           )}
                           <div className={`mt-1.5 flex items-center justify-end gap-2 px-1 text-[11px] ${sticker ? "text-gray-500" : "text-gray-400"}`}>
-                            <span>{formatDate(message.received_at)}</span>
+                            <span>{formatMessageDate(message.received_at)}</span>
                             {outbound && <FaCheckDouble className="text-sky-500" title="Enviado desde WhatsApp Business" />}
                           </div>
                         </div>
