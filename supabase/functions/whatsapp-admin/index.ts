@@ -122,10 +122,28 @@ const buildMessageUpdates = async () => {
   };
 };
 
+const uniqueContacts = (contacts: Array<Record<string, any>>) => {
+  const seen = new Set<string>();
+  return contacts.filter((contact) => {
+    const name = `${contact?.nombre || ""} ${contact?.apellido || ""}`
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+    const key = name
+      ? `name:${name}`
+      : `person:${contact?.persona_id || contact?.id || "unknown"}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const findContext = async (phone: string) => {
-  const contacts = await fetchContacts([phone]);
-  const enrollments = await fetchEnrollments(contacts || []);
-  return { contacts: contacts || [], enrollments: enrollments || [] };
+  const contactRecords = await fetchContacts([phone]);
+  const enrollments = await fetchEnrollments(contactRecords || []);
+  return { contacts: uniqueContacts(contactRecords || []), enrollments: enrollments || [] };
 };
 
 const studentLabel = (contact: Record<string, any>) =>
