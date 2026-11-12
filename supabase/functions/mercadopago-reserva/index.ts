@@ -183,6 +183,9 @@ const createCheckout = async (body: Record<string, any>) => {
     payer: { email },
     items: [{ title: "Reserva Taller de Verano 2027", unit_price: "10000.00", quantity: 1 }],
     config: {
+      payment_method: {
+        max_installments: 1,
+      },
       online: {
         success_url: `${resultUrl}&resultado=aprobado`,
         failure_url: `${resultUrl}&resultado=rechazado`,
