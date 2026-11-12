@@ -373,9 +373,14 @@ export default function WhatsAppCentro() {
   const contactsByPhone = useMemo(() => {
     const map = new Map();
     for (const contact of data.contacts || []) {
-      const phone = normalizePhone(contact.telefono_busqueda || contact.telefono);
-      if (!map.has(phone)) map.set(phone, []);
-      map.get(phone).push(contact);
+      const phones = [...new Set([
+        normalizePhone(contact.telefono_busqueda || contact.telefono),
+        normalizePhone(contact.telefono_alternativo_busqueda || contact.telefono_alternativo),
+      ].filter(Boolean))];
+      for (const phone of phones) {
+        if (!map.has(phone)) map.set(phone, []);
+        map.get(phone).push(contact);
+      }
     }
     return map;
   }, [data.contacts]);
@@ -415,10 +420,14 @@ export default function WhatsAppCentro() {
   const agenda = useMemo(() => {
     const grouped = new Map();
     for (const contact of data.contacts || []) {
-      const phone = normalizePhone(contact.telefono_busqueda || contact.telefono);
-      if (!phone) continue;
-      if (!grouped.has(phone)) grouped.set(phone, { phone, contacts: [] });
-      grouped.get(phone).contacts.push(contact);
+      const phones = [...new Set([
+        normalizePhone(contact.telefono_busqueda || contact.telefono),
+        normalizePhone(contact.telefono_alternativo_busqueda || contact.telefono_alternativo),
+      ].filter(Boolean))];
+      for (const phone of phones) {
+        if (!grouped.has(phone)) grouped.set(phone, { phone, contacts: [] });
+        grouped.get(phone).contacts.push(contact);
+      }
     }
     const query = filter.trim().toLowerCase();
     return [...grouped.values()]

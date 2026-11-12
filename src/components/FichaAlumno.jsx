@@ -216,7 +216,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     if (!config) return [];
     setCargandoAlumnos(true);
     try {
-      const baseSelect = "select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,curso,sede,turno_1,tiene_promo,beneficiario_id,creado_en,actualizado_en,autoriza_imagenes,autorizacion_imagenes_en";
+      const baseSelect = "select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,telefono_alternativo,email,curso,sede,turno_1,tiene_promo,beneficiario_id,creado_en,actualizado_en,autoriza_imagenes,autorizacion_imagenes_en";
       const filtroActivo = incluirInactivos ? "" : "activo=eq.true&";
 
       const resMat = await fetch(
@@ -318,7 +318,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
     if (!config || !personaId) return [];
 
     const res = await fetch(
-      `${config.supabaseUrl}/rest/v1/inscripciones?or=(id.eq.${personaId},persona_id.eq.${personaId})&select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion,autoriza_imagenes,autorizacion_imagenes_en&order=creado_en.desc`,
+      `${config.supabaseUrl}/rest/v1/inscripciones?or=(id.eq.${personaId},persona_id.eq.${personaId})&select=id,persona_id,nombre,apellido,fecha_nacimiento,edad,escuela,responsable,telefono,telefono_alternativo,email,tiene_promo,beneficiario_id,creado_en,actualizado_en,curso,sede,turno_1,tipo_inscripcion,autoriza_imagenes,autorizacion_imagenes_en&order=creado_en.desc`,
       { headers }
     );
     const data = await res.json();
@@ -564,6 +564,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
       escuela: alumnoSeleccionado.escuela || "",
       responsable: alumnoSeleccionado.responsable || "",
       telefono: alumnoSeleccionado.telefono || "",
+      telefono_alternativo: alumnoSeleccionado.telefono_alternativo || "",
       email: alumnoSeleccionado.email || "",
       tiene_promo: !!alumnoSeleccionado.tiene_promo,
       beneficiario_id: alumnoSeleccionado.beneficiario_id || null,
@@ -611,6 +612,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
       escuela: formAlumno.escuela,
       responsable: formAlumno.responsable,
       telefono: formAlumno.telefono,
+      telefono_alternativo: formAlumno.telefono_alternativo?.trim() || null,
       email: formAlumno.email,
       tiene_promo: !!formAlumno.tiene_promo,
       beneficiario_id: formAlumno.tiene_promo ? formAlumno.beneficiario_id || null : null,
@@ -872,6 +874,7 @@ const [grupoDescuento, setGrupoDescuento] = useState(10); // porcentaje de descu
       escuela: formAlumno.escuela,
       responsable: formAlumno.responsable,
       telefono: formAlumno.telefono,
+      telefono_alternativo: formAlumno.telefono_alternativo?.trim() || null,
       email: formAlumno.email,
       tiene_promo: formAlumno.tiene_promo,
       beneficiario_id: formAlumno.beneficiario_id,
@@ -1714,6 +1717,10 @@ const renderEditorMatricula = () => (
                   <span className="font-medium">Teléfono:</span> {alumnoSeleccionado.telefono || "-"}
                 </div>
                 <div>
+                  <span className="font-medium">Teléfono alternativo:</span>{" "}
+                  {alumnoSeleccionado.telefono_alternativo || "-"}
+                </div>
+                <div>
                   <span className="font-medium">Mail:</span> {alumnoSeleccionado.email || "-"}
                 </div>
                 <div>
@@ -1757,6 +1764,7 @@ const renderEditorMatricula = () => (
                     { label: "Escuela", key: "escuela", type: "text" },
                     { label: "Responsable", key: "responsable", type: "text" },
                   { label: "Teléfono", key: "telefono", type: "text" },
+                  { label: "Teléfono alternativo (opcional)", key: "telefono_alternativo", type: "text" },
                   { label: "Mail", key: "email", type: "email" },
                 ].map((f) => (
                   <div key={f.key}>

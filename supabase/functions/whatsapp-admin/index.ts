@@ -69,15 +69,18 @@ const rest = async (path: string, init: RequestInit = {}) => {
 const fetchContacts = async (phones: string[]) => {
   const normalized = [...new Set(phones.map(normalizePhone).filter(Boolean))];
   if (!normalized.length) return [];
-  const filter = encodeURIComponent(`(${normalized.join(",")})`);
+  const phoneList = `(${normalized.join(",")})`;
+  const filter = encodeURIComponent(
+    `(telefono_busqueda.in.${phoneList},telefono_alternativo_busqueda.in.${phoneList})`,
+  );
   return await rest(
-    `inscripciones?select=id,persona_id,nombre,apellido,responsable,telefono,telefono_busqueda&telefono_busqueda=in.${filter}`,
+    `inscripciones?select=id,persona_id,nombre,apellido,responsable,telefono,telefono_busqueda,telefono_alternativo,telefono_alternativo_busqueda&or=${filter}`,
   );
 };
 
 const fetchAllContacts = async () =>
   await rest(
-    "inscripciones?select=id,persona_id,nombre,apellido,responsable,telefono,telefono_busqueda&order=responsable.asc.nullslast,nombre.asc&limit=2000",
+    "inscripciones?select=id,persona_id,nombre,apellido,responsable,telefono,telefono_busqueda,telefono_alternativo,telefono_alternativo_busqueda&order=responsable.asc.nullslast,nombre.asc&limit=2000",
   );
 
 const fetchAllActiveEnrollments = async () =>
