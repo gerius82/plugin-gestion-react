@@ -62,6 +62,31 @@ const extractMediaId = (message: Record<string, any>) => {
   return media && typeof media === "object" ? String(media.id || "") : "";
 };
 
+const notifyIncomingMedia = async (record: Record<string, any>) => {
+  if (!["image", "document"].includes(String(record.message_type || ""))) return;
+  const label = String(record.contact_name || "").trim() || `+${record.from_phone}`;
+  const fileType = record.message_type === "document" ? "PDF o documento" : "imagen";
+  try {
+    const response = await fetch(`${requiredSecret("SUPABASE_URL")}/functions/v1/push-notifications`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-code": requiredSecret("PUSH_ADMIN_CODE"),
+      },
+      body: JSON.stringify({
+        action: "send_custom_notification",
+        title: "Posible comprobante por WhatsApp",
+        body: `${label} envió una ${fileType}. Tocá para analizarla.`,
+        url: `/whatsapp-centro?phone=${encodeURIComponent(record.from_phone)}&analyze=${encodeURIComponent(record.id)}`,
+        actionTitle: "Analizar pago",
+      }),
+    });
+    if (!response.ok) console.error("No se pudo notificar el archivo recibido", await response.text());
+  } catch (error) {
+    console.error("No se pudo notificar el archivo recibido", error);
+  }
+};
+
 Deno.serve(async (request) => {
   try {
     const url = new URL(request.url);
@@ -217,6 +242,7 @@ Deno.serve(async (request) => {
         if (!conversationResponse.ok) {
           console.error("No se pudo actualizar la conversación", await conversationResponse.text());
         }
+        await notifyIncomingMedia(record);
       }
     }
 

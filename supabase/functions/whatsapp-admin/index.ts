@@ -387,28 +387,6 @@ const paymentProposal = async (phone: string, detectedAmount: number) => {
   return { students: uniqueContacts(contacts || []).map((contact) => ({ id: contact.persona_id || contact.id, name: studentLabel(contact) })), candidates: matches.slice(0, 5), month };
 };
 
-const queuePaymentSuggestionNotification = async (message: Record<string, any>, analysis: Record<string, any>) => {
-  const candidate = analysis.candidates?.[0];
-  const body = candidate
-    ? `${formatCurrency(analysis.receipt.amount)} · ${candidate.detail}`
-    : `${formatCurrency(analysis.receipt.amount)} · Revisar manualmente`;
-  try {
-    await fetch(`${supabaseUrl()}/functions/v1/push-notifications`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-admin-code": requiredSecret("PUSH_ADMIN_CODE") },
-      body: JSON.stringify({
-        action: "send_custom_notification",
-        title: "Posible pago recibido por WhatsApp",
-        body,
-        url: `/whatsapp-centro?phone=${encodeURIComponent(message.from_phone)}`,
-        actionTitle: "Revisar y confirmar",
-      }),
-    });
-  } catch (error) {
-    console.error("No se pudo enviar la notificación del comprobante", error);
-  }
-};
-
 const simulate = async (phone: string, input: string) => {
   const rawInput = String(input || "").trim();
   const normalizedInput = normalizeBotInput(input);
@@ -924,7 +902,6 @@ Deno.serve(async (request) => {
         headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
         body: JSON.stringify({ payload: { ...(message.payload || {}), payment_analysis: analysis } }),
       });
-      await queuePaymentSuggestionNotification(message, analysis);
       return jsonResponse(200, { ok: true, analysis });
     }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaAddressBook,
@@ -203,6 +203,8 @@ export default function WhatsAppCentro() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [paymentBusyId, setPaymentBusyId] = useState("");
+  const autoPaymentMessageId = useRef(new URLSearchParams(window.location.search).get("analyze") || "");
+  const autoPaymentStarted = useRef(false);
   const [config, setConfig] = useState(null);
   const [mediaUrls, setMediaUrls] = useState({});
   const [replyText, setReplyText] = useState("");
@@ -534,6 +536,21 @@ export default function WhatsAppCentro() {
       setPaymentBusyId("");
     }
   };
+
+  useEffect(() => {
+    const messageId = autoPaymentMessageId.current;
+    if (!messageId || autoPaymentStarted.current || paymentBusyId) return;
+    const message = (data.messages || []).find((item) => String(item.id) === String(messageId));
+    if (!message) return;
+    if (message.payload?.payment_analysis) {
+      autoPaymentStarted.current = true;
+      return;
+    }
+    const mediaUrl = message.media_id ? mediaUrls[message.media_id] : null;
+    if (!mediaUrl) return;
+    autoPaymentStarted.current = true;
+    analyzePayment(message, mediaUrl);
+  }, [data.messages, mediaUrls, paymentBusyId]);
 
   const simulate = async (input, visibleText = "", directUrl = "") => {
     const cleanInput = String(input || "").trim();
