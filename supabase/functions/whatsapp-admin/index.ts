@@ -418,6 +418,24 @@ const paymentProposal = async (phone: string, detectedAmount: number) => {
   };
 };
 
+const courseDetailResponse = (course: Record<string, any>, context: Record<string, any>) => {
+  const ageText = course.edad_min != null || course.edad_max != null
+    ? `${course.edad_min ?? "?"} a ${course.edad_max ?? "?"} años`
+    : "A consultar";
+  const description = String(course.descripcion || "Consultanos para conocer los contenidos y la modalidad del taller.").trim();
+  return {
+    message: `*${course.nombre}*\n\n${description}\n\n👦 Edades: ${ageText}\n📝 Inscripción: ${formatCurrency(course.precio_inscripcion)}\n💳 Cuota: ${formatCurrency(course.precio_curso)}`,
+    options: numberedOptions([
+      { action: `schedules:${course.id}`, label: "Ver horarios disponibles" },
+      { url: courseEnrollmentUrl(course), label: "Quiero inscribirme" },
+      { action: `cycle:${course.ciclo}`, label: "Volver a talleres" },
+      { action: "menu", label: "Volver al menú principal" },
+    ]),
+    nextStep: "course_detail",
+    context,
+  };
+};
+
 const simulate = async (phone: string, input: string) => {
   const rawInput = String(input || "").trim();
   const normalizedInput = normalizeBotInput(input);
@@ -443,6 +461,7 @@ const simulate = async (phone: string, input: string) => {
         context,
       };
     }
+    if (courses.length === 1) return courseDetailResponse(courses[0], context);
     return {
       message: `Estos son los talleres disponibles en *${cycle?.nombre_publico || cycleCode}*. Elegí uno para ver la información:`,
       options: numberedOptions([
@@ -465,21 +484,7 @@ const simulate = async (phone: string, input: string) => {
         context,
       };
     }
-    const ageText = course.edad_min != null || course.edad_max != null
-      ? `${course.edad_min ?? "?"} a ${course.edad_max ?? "?"} años`
-      : "A consultar";
-    const description = String(course.descripcion || "Consultanos para conocer los contenidos y la modalidad del taller.").trim();
-    return {
-      message: `*${course.nombre}*\n\n${description}\n\n👦 Edades: ${ageText}\n📝 Inscripción: ${formatCurrency(course.precio_inscripcion)}\n💳 Cuota: ${formatCurrency(course.precio_curso)}`,
-      options: numberedOptions([
-        { action: `schedules:${course.id}`, label: "Ver horarios disponibles" },
-        { url: courseEnrollmentUrl(course), label: "Quiero inscribirme" },
-        { action: `cycle:${course.ciclo}`, label: "Volver a talleres" },
-        { action: "menu", label: "Volver al menú principal" },
-      ]),
-      nextStep: "course_detail",
-      context,
-    };
+    return courseDetailResponse(course, context);
   }
 
   if (rawInput.startsWith("schedules:")) {
