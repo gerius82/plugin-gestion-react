@@ -30,6 +30,37 @@ const normalizePhone = (value: unknown) => {
   return digits.slice(-10);
 };
 
+const normalizeOutboundPhone = (value: unknown) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (/^549\d{10}$/.test(digits)) return digits;
+  if (/^54\d{10}$/.test(digits)) return `549${digits.slice(2)}`;
+  if (/^\d{10}$/.test(digits)) return `549${digits}`;
+  return "";
+};
+
+const summerTemplateName = "inscripcion_verano_2027";
+const summerTemplateLanguage = "es_AR";
+const summerTemplateText = `☀️🤖 *¡Ya está abierta la inscripción al Taller de Robótica de Verano 2027!*
+
+¡Este verano, la diversión también está en Plugin! En un ambiente climatizado, los chicos y chicas de *5 a 12 años* van a construir y programar robots, compartir con otros y descubrir la tecnología a través del juego. No necesitan conocimientos previos.
+
+🏠 Las clases son bajo techo, así que, aunque el verano venga lluvioso, los chicos pueden seguir disfrutando de sus actividades.
+
+💰 *Cuota mensual:* $65.000
+🎟️ *Inscripción sin cargo*
+
+📍 *Fisherton · Eva Perón 8128*
+• Martes y jueves de 18:30 a 20:00
+• Sábados de 09:30 a 11:00
+
+📍 *Calle Mendoza · Mendoza 3024*
+• Martes, miércoles y jueves de 18:30 a 20:00
+• Sábados de 09:30 a 11:00 o de 11:30 a 13:00
+
+👉 Tocá el botón *Inscribirme* para elegir sede y turno.
+
+Si tienen alguna duda, escríbannos por acá. ¡Los esperamos! 🤖`;
+
 const parseBody = async (request: Request) => {
   try {
     return await request.json();
@@ -814,6 +845,142 @@ Deno.serve(async (request) => {
         headers: { Prefer: "return=minimal" },
       });
       return jsonResponse(200, { ok: true });
+    }
+
+    if (body.action === "send_template_test") {
+      const phone = normalizeOutboundPhone(body.phone);
+      if (!phone) {
+        return jsonResponse(400, {
+          ok: false,
+          error: "Ingresá un teléfono argentino válido con código de área.",
+        });
+      }
+
+      const image = body.image || {};
+      const mimeType = String(image.type || "").toLowerCase();
+      const fileName = String(image.name || "verano-robotica-2027.png")
+        .replace(/[^a-zA-Z0-9._-]/g, "-")
+        .slice(0, 100);
+      const base64 = String(image.base64 || "").replace(/\s/g, "");
+      if (!["image/jpeg", "image/png"].includes(mimeType) || !base64) {
+        return jsonResponse(400, { ok: false, error: "Seleccioná una imagen PNG o JPG." });
+      }
+
+      let imageBytes: Uint8Array;
+      try {
+        const decoded = atob(base64);
+        imageBytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+      } catch {
+        return jsonResponse(400, { ok: false, error: "No se pudo leer la imagen seleccionada." });
+      }
+      if (!imageBytes.length || imageBytes.length > 5 * 1024 * 1024) {
+        return jsonResponse(400, { ok: false, error: "La imagen debe pesar menos de 5 MB." });
+      }
+
+      const accessToken = requiredSecret("WHATSAPP_ACCESS_TOKEN");
+      const phoneNumberId = requiredSecret("WHATSAPP_PHONE_NUMBER_ID");
+      const uploadForm = new FormData();
+      uploadForm.append("messaging_product", "whatsapp");
+      uploadForm.append("type", mimeType);
+      uploadForm.append("file", new Blob([imageBytes], { type: mimeType }), fileName);
+      const uploadResponse = await fetch(
+        `https://graph.facebook.com/v24.0/${encodeURIComponent(phoneNumberId)}/media`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: uploadForm,
+        },
+      );
+      const uploadResult = await uploadResponse.json().catch(() => ({}));
+      if (!uploadResponse.ok || !uploadResult?.id) {
+        console.error("No se pudo subir la imagen de la plantilla", uploadResult);
+        return jsonResponse(502, {
+          ok: false,
+          error: uploadResult?.error?.error_data?.details
+            || uploadResult?.error?.message
+            || "Meta no pudo cargar la imagen de la plantilla.",
+        });
+      }
+
+      const mediaId = String(uploadResult.id);
+      const graphResponse = await fetch(
+        `https://graph.facebook.com/v24.0/${encodeURIComponent(phoneNumberId)}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: phone,
+            type: "template",
+            template: {
+              name: summerTemplateName,
+              language: { code: summerTemplateLanguage },
+              components: [
+                {
+                  type: "header",
+                  parameters: [{ type: "image", image: { id: mediaId } }],
+                },
+              ],
+            },
+          }),
+        },
+      );
+      const graphResult = await graphResponse.json().catch(() => ({}));
+      if (!graphResponse.ok || !graphResult?.messages?.[0]?.id) {
+        console.error("No se pudo enviar la plantilla de prueba", graphResult);
+        return jsonResponse(502, {
+          ok: false,
+          error: graphResult?.error?.error_data?.details
+            || graphResult?.error?.message
+            || "Meta rechazó el envío de la plantilla.",
+        });
+      }
+
+      const sentAt = new Date().toISOString();
+      const messageId = String(graphResult.messages[0].id);
+      await rest("whatsapp_messages?on_conflict=wa_message_id", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "resolution=ignore-duplicates,return=minimal",
+        },
+        body: JSON.stringify({
+          wa_message_id: messageId,
+          from_phone: phone,
+          message_type: "template",
+          text_body: summerTemplateText,
+          media_id: mediaId,
+          payload: {
+            id: messageId,
+            to: phone,
+            type: "template",
+            template: { name: summerTemplateName, language: summerTemplateLanguage },
+            _direction: "outbound",
+            _source: "plugin_template_test",
+          },
+          received_at: sentAt,
+          status: "read",
+        }),
+      });
+      await rest("whatsapp_conversations?on_conflict=phone", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates,return=minimal",
+        },
+        body: JSON.stringify({
+          phone,
+          unread_count: 0,
+          last_message_at: sentAt,
+          last_message_preview: "Taller de Robótica de Verano 2027",
+          updated_at: sentAt,
+        }),
+      });
+      return jsonResponse(200, { ok: true, messageId, mediaId, phone, sentAt });
     }
 
     if (body.action === "send_message") {

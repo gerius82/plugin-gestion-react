@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   FaAddressBook,
   FaArrowLeft,
+  FaBullhorn,
   FaCheckDouble,
   FaCheckCircle,
   FaCommentDots,
@@ -24,6 +25,27 @@ import { getSupabaseAuthClient } from "../lib/supabaseAuth";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 const normalizePhone = (value) => String(value || "").replace(/\D/g, "").slice(-10);
+
+const summerCampaignText = `☀️🤖 *¡Ya está abierta la inscripción al Taller de Robótica de Verano 2027!*
+
+¡Este verano, la diversión también está en Plugin! En un ambiente climatizado, los chicos y chicas de *5 a 12 años* van a construir y programar robots, compartir con otros y descubrir la tecnología a través del juego. No necesitan conocimientos previos.
+
+🏠 Las clases son bajo techo, así que, aunque el verano venga lluvioso, los chicos pueden seguir disfrutando de sus actividades.
+
+💰 *Cuota mensual:* $65.000
+🎟️ *Inscripción sin cargo*
+
+📍 *Fisherton · Eva Perón 8128*
+• Martes y jueves de 18:30 a 20:00
+• Sábados de 09:30 a 11:00
+
+📍 *Calle Mendoza · Mendoza 3024*
+• Martes, miércoles y jueves de 18:30 a 20:00
+• Sábados de 09:30 a 11:00 o de 11:30 a 13:00
+
+👉 Tocá el botón *Inscribirme* para elegir sede y turno.
+
+Si tienen alguna duda, escríbannos por acá. ¡Los esperamos! 🤖`;
 
 const argentinaDateKey = (value) => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Argentina/Buenos_Aires",
@@ -246,6 +268,10 @@ export default function WhatsAppCentro() {
   const [config, setConfig] = useState(null);
   const [mediaUrls, setMediaUrls] = useState({});
   const [replyText, setReplyText] = useState("");
+  const [campaignPhone, setCampaignPhone] = useState("");
+  const [campaignImage, setCampaignImage] = useState(null);
+  const [campaignImagePreview, setCampaignImagePreview] = useState("");
+  const [campaignResult, setCampaignResult] = useState(null);
 
   const [simPhone, setSimPhone] = useState("3412153057");
   const [simInput, setSimInput] = useState("");
@@ -533,6 +559,57 @@ export default function WhatsAppCentro() {
     }
   };
 
+  const selectCampaignImage = (file) => {
+    setCampaignResult(null);
+    setCampaignImage(null);
+    setCampaignImagePreview("");
+    if (!file) return;
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      setError("Seleccioná una imagen PNG o JPG.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("La imagen debe pesar menos de 5 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCampaignImage(file);
+      setCampaignImagePreview(String(reader.result || ""));
+      setError("");
+    };
+    reader.onerror = () => setError("No se pudo leer la imagen seleccionada.");
+    reader.readAsDataURL(file);
+  };
+
+  const sendTemplateTest = async () => {
+    const digits = String(campaignPhone || "").replace(/\D/g, "");
+    if (!digits || !campaignImage || !campaignImagePreview || busy) return;
+    if (!window.confirm(`Se enviará una prueba real al ${campaignPhone}. Meta puede cobrar este mensaje de Marketing. ¿Continuar?`)) return;
+    try {
+      setBusy(true);
+      setError("");
+      setCampaignResult(null);
+      const base64 = campaignImagePreview.split(",")[1] || "";
+      const result = await api({
+        action: "send_template_test",
+        phone: campaignPhone,
+        image: {
+          name: campaignImage.name,
+          type: campaignImage.type,
+          base64,
+        },
+      });
+      setCampaignResult(result);
+      setSelectedPhone(result.phone);
+      await loadInbox(true);
+    } catch (currentError) {
+      setError(currentError.message || String(currentError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const updateMessageAnalysis = (messageId, analysis) => {
     setData((current) => ({
       ...current,
@@ -669,7 +746,7 @@ export default function WhatsAppCentro() {
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm sm:grid-cols-4">
         <button
           type="button"
           onClick={() => setTab("inbox")}
@@ -690,6 +767,13 @@ export default function WhatsAppCentro() {
           className={`!w-full rounded-lg px-4 py-2.5 font-semibold transition ${tab === "simulator" ? "!bg-green-600 !text-white shadow-sm hover:!bg-green-700" : "!bg-transparent !text-gray-700 hover:!bg-gray-100"}`}
         >
           <FaRobot className="inline mr-2" /> Simulador del bot
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("campaigns")}
+          className={`!w-full rounded-lg px-3 py-2.5 font-semibold transition ${tab === "campaigns" ? "!bg-green-600 !text-white shadow-sm hover:!bg-green-700" : "!bg-transparent !text-gray-700 hover:!bg-gray-100"}`}
+        >
+          <FaBullhorn className="inline mr-2" /> Campañas
         </button>
       </div>
 
@@ -1059,6 +1143,104 @@ export default function WhatsAppCentro() {
               </div>
             )}
           </aside>
+        </div>
+      )}
+
+      {tab === "campaigns" && (
+        <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-xl text-green-700">
+                <FaBullhorn />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Prueba de plantilla</h2>
+                <p className="mt-1 text-sm text-gray-500">Envía la plantilla aprobada a un solo teléfono antes de preparar la campaña.</p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Este es un envío real de Marketing y puede generar el cargo de un mensaje entregado.
+            </div>
+
+            <label className="mt-5 block text-sm font-semibold text-gray-800" htmlFor="campaign-phone">Teléfono destinatario</label>
+            <input
+              id="campaign-phone"
+              list="whatsapp-campaign-contacts"
+              value={campaignPhone}
+              onChange={(event) => {
+                setCampaignPhone(event.target.value);
+                setCampaignResult(null);
+              }}
+              placeholder="341 555 1234"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+            />
+            <datalist id="whatsapp-campaign-contacts">
+              {agenda.map((entry) => (
+                <option key={entry.phone} value={entry.phone}>{entry.title}</option>
+              ))}
+            </datalist>
+            <p className="mt-1 text-xs text-gray-500">Podés escribir 341…, 549341… o elegir un contacto.</p>
+
+            <label className="mt-4 block text-sm font-semibold text-gray-800" htmlFor="campaign-image">Imagen de la plantilla</label>
+            <input
+              id="campaign-image"
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={(event) => selectCampaignImage(event.target.files?.[0] || null)}
+              className="mt-1 block w-full rounded-lg border border-gray-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-green-50 file:px-3 file:py-2 file:font-semibold file:text-green-700 hover:file:bg-green-100"
+            />
+            <p className="mt-1 text-xs text-gray-500">PNG o JPG de hasta 5 MB.</p>
+
+            {campaignResult && (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                <p className="flex items-center gap-2 font-semibold"><FaCheckCircle /> Prueba enviada correctamente</p>
+                <p className="mt-1">Destino: +{campaignResult.phone}</p>
+                <button
+                  type="button"
+                  onClick={() => setTab("inbox")}
+                  className="mt-3 !w-auto rounded-md border border-green-300 !bg-white px-3 py-2 text-xs font-semibold text-green-800 hover:!bg-green-100"
+                >
+                  Ver en la bandeja
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={sendTemplateTest}
+              disabled={busy || !String(campaignPhone).replace(/\D/g, "") || !campaignImage}
+              className="mt-5 !flex !w-full items-center justify-center gap-2 rounded-lg !bg-green-600 px-4 py-3 font-semibold text-white hover:!bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FaPaperPlane /> {busy ? "Enviando prueba…" : "Enviar prueba real"}
+            </button>
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-[#efeae2] p-4 shadow-sm sm:p-6" style={{ backgroundImage: "radial-gradient(rgba(0,0,0,0.035) 1px, transparent 1px)", backgroundSize: "18px 18px" }}>
+            <div className="mx-auto max-w-md">
+              <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Vista previa</p>
+              <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+                {campaignImagePreview ? (
+                  <img src={campaignImagePreview} alt="Afiche del Taller de Verano 2027" className="max-h-[480px] w-full bg-gray-100 object-contain" />
+                ) : (
+                  <div className="flex h-60 items-center justify-center bg-gray-100 text-sm text-gray-500">
+                    <FaImage className="mr-2" /> Seleccioná el afiche
+                  </div>
+                )}
+                <div className="p-4">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">{renderWhatsAppText(summerCampaignText)}</p>
+                  <a
+                    href="https://gestion.plugin.ar/verano2027"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-4 block border-t pt-3 text-center text-sm font-semibold text-sky-600"
+                  >
+                    Inscribirme
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       )}
 
