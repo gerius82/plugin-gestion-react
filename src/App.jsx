@@ -70,6 +70,10 @@ function AppContent() {
             {/* Accesos públicos para familias y profesores */}
             <Route path="/formulario" element={<Formulario />} />
             <Route path="/formulario-verano" element={<FormularioVerano />} />
+            <Route
+              path="/verano2027"
+              element={<FormularioVerano origenPredeterminado="padres" fromPredeterminado="menu-intermedio" />}
+            />
             <Route path="/menu-padres" element={<MenuPadres />} />
             <Route path="/promos" element={<Promos />} />
             <Route path="/menu-inscripcion-padres" element={<MenuInscripcionPadres />} />

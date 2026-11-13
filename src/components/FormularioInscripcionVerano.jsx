@@ -31,7 +31,7 @@ const fechaActualArgentina = () => {
   return `${values.year}-${values.month}-${values.day}`;
 };
 
-const FormularioInscripcionVerano = () => {
+const FormularioInscripcionVerano = ({ origenPredeterminado = null, fromPredeterminado = null }) => {
   const navigate = useNavigate();
   const [mensajeExito, setMensajeExito] = useState("");
   const [inscripcionFinalizada, setInscripcionFinalizada] = useState(null);
@@ -47,8 +47,8 @@ const FormularioInscripcionVerano = () => {
   const [procesandoInscripcion, setProcesandoInscripcion] = useState(false);
   //const [turnoEnListaEspera, setTurnoEnListaEspera] = useState(false);
   const [searchParams] = useSearchParams();
-  const origen = searchParams.get("origen");
-  const from = searchParams.get("from");
+  const origen = searchParams.get("origen") || origenPredeterminado;
+  const from = searchParams.get("from") || fromPredeterminado;
   const esVistaGestion = origen === "gestion";
 
   const [ciclos, setCiclos] = useState([]);
