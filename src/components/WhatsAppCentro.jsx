@@ -1394,6 +1394,27 @@ export default function WhatsAppCentro() {
                   {busy ? "Buscando…" : "Buscar destinatarios"}
                 </button>
 
+                <div className="mt-5">
+                  <label className="block text-sm font-semibold text-gray-800" htmlFor="campaign-template">Plantilla aprobada</label>
+                  <select
+                    id="campaign-template"
+                    value="inscripcion_verano_2027"
+                    disabled
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 opacity-100"
+                  >
+                    <option value="inscripcion_verano_2027">Inscripción Taller de Verano 2027</option>
+                  </select>
+                  <label className="mt-3 block text-sm font-semibold text-gray-800" htmlFor="campaign-message-preview">Mensaje que se enviará</label>
+                  <textarea
+                    id="campaign-message-preview"
+                    value={summerCampaignText}
+                    readOnly
+                    rows={7}
+                    className="mt-1 w-full resize-none rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm leading-relaxed text-gray-700"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">El texto pertenece a la plantilla aprobada por Meta. Para modificarlo hay que aprobar una nueva versión.</p>
+                </div>
+
                 <div className="mt-5 grid grid-cols-3 gap-2">
                   <label className="col-span-3 text-sm font-semibold text-gray-800">Fecha y franja de envío</label>
                   <input
@@ -1452,6 +1473,7 @@ export default function WhatsAppCentro() {
                     <label className="flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
+                        className="!h-4 !w-4 shrink-0"
                         checked={campaignSelectedPhones.length === campaignAudienceResult.recipients.length && campaignAudienceResult.recipients.length > 0}
                         onChange={(event) => setCampaignSelectedPhones(event.target.checked ? campaignAudienceResult.recipients.map((recipient) => recipient.phone) : [])}
                       />
@@ -1475,7 +1497,7 @@ export default function WhatsAppCentro() {
                     <div className="mt-4 max-h-[520px] overflow-y-auto rounded-lg border">
                       {(campaignAudienceResult.recipients || []).map((recipient) => (
                         <label key={recipient.phone} className="flex cursor-pointer items-center gap-3 border-b px-3 py-3 last:border-b-0 hover:bg-gray-50">
-                          <input type="checkbox" checked={campaignSelectedPhones.includes(recipient.phone)} onChange={() => toggleCampaignRecipient(recipient.phone)} />
+                          <input className="!h-4 !w-4 shrink-0" type="checkbox" checked={campaignSelectedPhones.includes(recipient.phone)} onChange={() => toggleCampaignRecipient(recipient.phone)} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-semibold text-gray-900">{recipient.displayName}</span>
                             <span className="block text-xs text-gray-500">+{recipient.phone}{recipient.studentCount > 1 ? ` · ${recipient.studentCount} alumnos` : ""}</span>
