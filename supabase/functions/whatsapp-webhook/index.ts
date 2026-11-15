@@ -120,6 +120,7 @@ Deno.serve(async (request) => {
     }
 
     const records: Array<Record<string, unknown>> = [];
+    const deliveryStatuses: Array<Record<string, any>> = [];
     for (const entry of payload.entry || []) {
       for (const change of entry.changes || []) {
         const value = change.value || {};
@@ -151,6 +152,59 @@ Deno.serve(async (request) => {
 
         for (const message of value.messages || []) appendMessage(message, "inbound");
         for (const message of value.message_echoes || []) appendMessage(message, "outbound");
+        for (const status of value.statuses || []) {
+          if (status?.id && status?.status) deliveryStatuses.push(status);
+        }
+      }
+    }
+
+    if (deliveryStatuses.length) {
+      const supabaseUrl = requiredSecret("SUPABASE_URL");
+      const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      for (const item of deliveryStatuses) {
+        const messageId = String(item.id || "");
+        const state = String(item.status || "").toLowerCase();
+        if (!messageId || !["sent", "delivered", "read", "failed"].includes(state)) continue;
+        const timestamp = Number(item.timestamp || 0);
+        const occurredAt = timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString();
+        const error = (item.errors || [])
+          .map((entry: Record<string, any>) => entry?.error_data?.details || entry?.title || entry?.message)
+          .filter(Boolean)
+          .join(" · ")
+          .slice(0, 1000);
+        const messageUpdate = await fetch(
+          `${supabaseUrl}/rest/v1/whatsapp_messages?wa_message_id=eq.${encodeURIComponent(messageId)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: serviceRoleKey,
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify({ status: state }),
+          },
+        );
+        if (!messageUpdate.ok) console.error("No se pudo actualizar el estado del mensaje", await messageUpdate.text());
+
+        const recipientPatch: Record<string, any> = { status: state, updated_at: occurredAt };
+        if (state === "delivered") recipientPatch.delivered_at = occurredAt;
+        if (state === "read") recipientPatch.read_at = occurredAt;
+        if (state === "failed") recipientPatch.error = error || "Meta informó que el mensaje no pudo entregarse.";
+        const recipientUpdate = await fetch(
+          `${supabaseUrl}/rest/v1/whatsapp_campaign_recipients?wa_message_id=eq.${encodeURIComponent(messageId)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: serviceRoleKey,
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify(recipientPatch),
+          },
+        );
+        if (!recipientUpdate.ok) console.error("No se pudo actualizar el destinatario de campaña", await recipientUpdate.text());
       }
     }
 

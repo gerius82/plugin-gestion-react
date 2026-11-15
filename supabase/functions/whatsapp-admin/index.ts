@@ -111,13 +111,145 @@ const fetchContacts = async (phones: string[]) => {
 
 const fetchAllContacts = async () =>
   await rest(
-    "inscripciones?select=id,persona_id,nombre,apellido,responsable,telefono,telefono_busqueda,telefono_alternativo,telefono_alternativo_busqueda&order=responsable.asc.nullslast,nombre.asc&limit=2000",
+    "inscripciones?select=id,persona_id,nombre,apellido,responsable,telefono,telefono_busqueda,telefono_alternativo,telefono_alternativo_busqueda,activo,creado_en&order=responsable.asc.nullslast,nombre.asc&limit=5000",
   );
 
 const fetchAllActiveEnrollments = async () =>
   await rest(
     "matriculas?select=id,alumno_id,estado,curso_nombre,sede,dia,hora,ciclo_codigo&estado=eq.activa&limit=5000",
   );
+
+const fetchCampaignAudience = async (audience: string) => {
+  if (!["active", "inactive", "all"].includes(audience)) throw new Error("Filtro de destinatarios inválido.");
+  const [contacts, enrollments] = await Promise.all([
+    fetchAllContacts(),
+    rest("matriculas?select=id,alumno_id,estado&limit=10000"),
+  ]);
+
+  const groups = new Map<string, {
+    ids: Set<string>;
+    names: Set<string>;
+    phone: string;
+    hasActive: boolean;
+    hasInactive: boolean;
+  }>();
+  const idToGroup = new Map<string, string>();
+
+  for (const contact of contacts || []) {
+    const groupId = String(contact.persona_id || contact.id || "");
+    if (!groupId) continue;
+    if (!groups.has(groupId)) {
+      groups.set(groupId, {
+        ids: new Set<string>(),
+        names: new Set<string>(),
+        phone: "",
+        hasActive: false,
+        hasInactive: false,
+      });
+    }
+    const group = groups.get(groupId)!;
+    for (const id of [contact.id, contact.persona_id].filter(Boolean)) {
+      group.ids.add(String(id));
+      idToGroup.set(String(id), groupId);
+    }
+    const name = `${String(contact.nombre || "").trim()} ${String(contact.apellido || "").trim()}`.trim();
+    if (name) group.names.add(name);
+    if (!group.phone && contact.telefono) group.phone = String(contact.telefono);
+  }
+
+  for (const enrollment of enrollments || []) {
+    const groupId = idToGroup.get(String(enrollment.alumno_id || ""));
+    const group = groupId ? groups.get(groupId) : null;
+    if (!group) continue;
+    const state = String(enrollment.estado || "").toLowerCase();
+    if (state === "activa") group.hasActive = true;
+    if (["baja", "finalizada", "pausada"].includes(state)) group.hasInactive = true;
+  }
+
+  const eligibleGroups = [...groups.values()].filter((group) => {
+    if (audience === "active") return group.hasActive;
+    if (audience === "inactive") return !group.hasActive && group.hasInactive;
+    return true;
+  });
+  const recipientsByPhone = new Map<string, { phone: string; displayName: string; studentIds: string[]; names: Set<string>; ids: Set<string> }>();
+  let invalidPhones = 0;
+
+  for (const group of eligibleGroups) {
+    const phone = normalizeOutboundPhone(group.phone);
+    if (!phone) {
+      invalidPhones += 1;
+      continue;
+    }
+    if (!recipientsByPhone.has(phone)) {
+      recipientsByPhone.set(phone, { phone, displayName: "", studentIds: [], names: new Set(), ids: new Set() });
+    }
+    const recipient = recipientsByPhone.get(phone)!;
+    for (const name of group.names) recipient.names.add(name);
+    for (const id of group.ids) recipient.ids.add(id);
+  }
+
+  const recipients = [...recipientsByPhone.values()]
+    .map((recipient) => ({
+      phone: recipient.phone,
+      displayName: [...recipient.names].sort((a, b) => a.localeCompare(b, "es")).join(" / ") || recipient.phone,
+      studentIds: [...recipient.ids],
+      studentCount: recipient.names.size || 1,
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, "es"));
+
+  return {
+    audience,
+    students: eligibleGroups.length,
+    withValidPhone: eligibleGroups.length - invalidPhones,
+    invalidPhones,
+    uniqueRecipients: recipients.length,
+    sharedPhones: recipients.filter((recipient) => recipient.studentCount > 1).length,
+    recipients,
+  };
+};
+
+const uploadTemplateImage = async (image: Record<string, any>) => {
+  const mimeType = String(image?.type || "").toLowerCase();
+  const fileName = String(image?.name || "verano-robotica-2027.png")
+    .replace(/[^a-zA-Z0-9._-]/g, "-")
+    .slice(0, 100);
+  const base64 = String(image?.base64 || "").replace(/\s/g, "");
+  if (!["image/jpeg", "image/png"].includes(mimeType) || !base64) {
+    throw new Error("Seleccioná una imagen PNG o JPG.");
+  }
+  let imageBytes: Uint8Array;
+  try {
+    const decoded = atob(base64);
+    imageBytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+  } catch {
+    throw new Error("No se pudo leer la imagen seleccionada.");
+  }
+  if (!imageBytes.length || imageBytes.length > 5 * 1024 * 1024) {
+    throw new Error("La imagen debe pesar menos de 5 MB.");
+  }
+
+  const uploadForm = new FormData();
+  uploadForm.append("messaging_product", "whatsapp");
+  uploadForm.append("type", mimeType);
+  uploadForm.append("file", new Blob([imageBytes], { type: mimeType }), fileName);
+  const uploadResponse = await fetch(
+    `https://graph.facebook.com/v24.0/${encodeURIComponent(requiredSecret("WHATSAPP_PHONE_NUMBER_ID"))}/media`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${requiredSecret("WHATSAPP_ACCESS_TOKEN")}` },
+      body: uploadForm,
+    },
+  );
+  const uploadResult = await uploadResponse.json().catch(() => ({}));
+  if (!uploadResponse.ok || !uploadResult?.id) {
+    throw new Error(
+      uploadResult?.error?.error_data?.details
+        || uploadResult?.error?.message
+        || "Meta no pudo cargar la imagen de la plantilla.",
+    );
+  }
+  return { mediaId: String(uploadResult.id), fileName, mimeType };
+};
 
 const fetchEnrollments = async (contacts: Array<Record<string, any>>) => {
   const ids = [...new Set(contacts.flatMap((item) => [item.persona_id, item.id]).filter(Boolean))];
@@ -845,6 +977,140 @@ Deno.serve(async (request) => {
         headers: { Prefer: "return=minimal" },
       });
       return jsonResponse(200, { ok: true });
+    }
+
+    if (body.action === "campaign_audience") {
+      const audience = String(body.audience || "active");
+      return jsonResponse(200, { ok: true, ...(await fetchCampaignAudience(audience)) });
+    }
+
+    if (body.action === "list_campaigns") {
+      const campaigns = await rest(
+        "whatsapp_campaigns?select=id,name,audience,scheduled_date,window_start,window_end,status,total_recipients,sent_count,failed_count,created_at,started_at,completed_at&order=created_at.desc&limit=20",
+      );
+      return jsonResponse(200, { ok: true, campaigns: campaigns || [] });
+    }
+
+    if (body.action === "cancel_campaign") {
+      const campaignId = String(body.campaignId || "");
+      if (!campaignId) return jsonResponse(400, { ok: false, error: "Campaña inválida." });
+      await rest(`whatsapp_campaigns?id=eq.${encodeURIComponent(campaignId)}&status=in.(queued,running)`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "cancelled", completed_at: new Date().toISOString() }),
+      });
+      await rest(
+        `whatsapp_campaign_recipients?campaign_id=eq.${encodeURIComponent(campaignId)}&status=in.(queued,processing)`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({ status: "cancelled", updated_at: new Date().toISOString() }),
+        },
+      );
+      return jsonResponse(200, { ok: true });
+    }
+
+    if (body.action === "create_campaign") {
+      const audience = String(body.audience || "active");
+      const scheduledDate = String(body.scheduledDate || "");
+      const windowStart = String(body.windowStart || "");
+      const windowEnd = String(body.windowEnd || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
+        return jsonResponse(400, { ok: false, error: "Elegí una fecha de envío válida." });
+      }
+      if (!/^\d{2}:\d{2}$/.test(windowStart) || !/^\d{2}:\d{2}$/.test(windowEnd) || windowEnd <= windowStart) {
+        return jsonResponse(400, { ok: false, error: "La hora hasta debe ser posterior a la hora desde." });
+      }
+
+      const audienceResult = await fetchCampaignAudience(audience);
+      const allowedByPhone = new Map(
+        audienceResult.recipients.map((recipient: Record<string, any>) => [recipient.phone, recipient]),
+      );
+      const requestedPhones = [...new Set(
+        (Array.isArray(body.phones) ? body.phones : [])
+          .map(normalizeOutboundPhone)
+          .filter(Boolean),
+      )];
+      const recipients = requestedPhones
+        .map((phone) => allowedByPhone.get(phone))
+        .filter(Boolean) as Array<Record<string, any>>;
+      if (!recipients.length) {
+        return jsonResponse(400, { ok: false, error: "No seleccionaste destinatarios válidos." });
+      }
+      if (recipients.length !== requestedPhones.length) {
+        return jsonResponse(409, { ok: false, error: "La lista cambió. Actualizá los destinatarios antes de enviar." });
+      }
+
+      const startAt = new Date(`${scheduledDate}T${windowStart}:00-03:00`).getTime();
+      const endAt = new Date(`${scheduledDate}T${windowEnd}:00-03:00`).getTime();
+      if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+        return jsonResponse(400, { ok: false, error: "La fecha o la franja horaria no son válidas." });
+      }
+      const now = Date.now();
+      if (endAt <= now) {
+        return jsonResponse(400, { ok: false, error: "La franja elegida ya terminó. Elegí otra fecha u horario." });
+      }
+      const effectiveStart = Math.max(startAt, now + 60_000);
+      const duration = Math.max(60_000, endAt - effectiveStart);
+      const uploaded = await uploadTemplateImage(body.image || {});
+      const campaignName = String(body.name || "Taller de Verano 2027").trim().slice(0, 120) || "Taller de Verano 2027";
+      const created = await rest("whatsapp_campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({
+          name: campaignName,
+          template_name: summerTemplateName,
+          template_language: summerTemplateLanguage,
+          audience,
+          image_media_id: uploaded.mediaId,
+          image_file_name: uploaded.fileName,
+          scheduled_date: scheduledDate,
+          window_start: windowStart,
+          window_end: windowEnd,
+          timezone: "America/Argentina/Buenos_Aires",
+          status: "queued",
+          total_recipients: recipients.length,
+        }),
+      });
+      const campaign = created?.[0];
+      if (!campaign?.id) throw new Error("No se pudo crear la campaña.");
+
+      const recipientRows = recipients.map((recipient, index) => ({
+        campaign_id: campaign.id,
+        phone: recipient.phone,
+        display_name: recipient.displayName,
+        student_ids: recipient.studentIds,
+        status: "queued",
+        scheduled_for: new Date(
+          effectiveStart + Math.floor((duration * index) / Math.max(recipients.length, 1)),
+        ).toISOString(),
+      }));
+      for (let index = 0; index < recipientRows.length; index += 250) {
+        await rest("whatsapp_campaign_recipients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify(recipientRows.slice(index, index + 250)),
+        });
+      }
+
+      fetch(`${supabaseUrl()}/functions/v1/whatsapp-campaign-worker`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "campaign-created" }),
+      }).catch((error) => console.error("No se pudo iniciar el worker", error));
+
+      return jsonResponse(200, {
+        ok: true,
+        campaign: {
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          totalRecipients: recipients.length,
+          scheduledDate,
+          windowStart,
+          windowEnd,
+        },
+      });
     }
 
     if (body.action === "send_template_test") {

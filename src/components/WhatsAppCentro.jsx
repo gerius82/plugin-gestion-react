@@ -272,6 +272,15 @@ export default function WhatsAppCentro() {
   const [campaignImage, setCampaignImage] = useState(null);
   const [campaignImagePreview, setCampaignImagePreview] = useState("");
   const [campaignResult, setCampaignResult] = useState(null);
+  const [campaignMode, setCampaignMode] = useState("test");
+  const [campaignAudience, setCampaignAudience] = useState("active");
+  const [campaignAudienceResult, setCampaignAudienceResult] = useState(null);
+  const [campaignSelectedPhones, setCampaignSelectedPhones] = useState([]);
+  const [campaignDate, setCampaignDate] = useState(() => argentinaDateKey(new Date()));
+  const [campaignWindowStart, setCampaignWindowStart] = useState("10:00");
+  const [campaignWindowEnd, setCampaignWindowEnd] = useState("20:00");
+  const [campaigns, setCampaigns] = useState([]);
+  const [massCampaignResult, setMassCampaignResult] = useState(null);
 
   const [simPhone, setSimPhone] = useState("3412153057");
   const [simInput, setSimInput] = useState("");
@@ -609,6 +618,97 @@ export default function WhatsAppCentro() {
       setBusy(false);
     }
   };
+
+  const loadCampaignAudience = async () => {
+    if (busy) return;
+    try {
+      setBusy(true);
+      setError("");
+      setMassCampaignResult(null);
+      const result = await api({ action: "campaign_audience", audience: campaignAudience });
+      setCampaignAudienceResult(result);
+      setCampaignSelectedPhones((result.recipients || []).map((recipient) => recipient.phone));
+    } catch (currentError) {
+      setError(currentError.message || String(currentError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadCampaigns = async (silent = false) => {
+    try {
+      if (!silent) setError("");
+      const result = await api({ action: "list_campaigns" });
+      setCampaigns(result.campaigns || []);
+    } catch (currentError) {
+      if (!silent) setError(currentError.message || String(currentError));
+    }
+  };
+
+  const toggleCampaignRecipient = (phone) => {
+    setCampaignSelectedPhones((current) => current.includes(phone)
+      ? current.filter((item) => item !== phone)
+      : [...current, phone]);
+  };
+
+  const createMassCampaign = async () => {
+    if (!campaignImage || !campaignImagePreview || !campaignSelectedPhones.length || busy) return;
+    if (campaignWindowEnd <= campaignWindowStart) {
+      setError("La hora hasta debe ser posterior a la hora desde.");
+      return;
+    }
+    const audienceLabels = { active: "activos", inactive: "inactivos", all: "todos los registrados" };
+    if (!window.confirm(
+      `Se programará un mensaje real para ${campaignSelectedPhones.length} teléfono(s) de ${audienceLabels[campaignAudience]}. Meta puede cobrar cada mensaje entregado. ¿Continuar?`,
+    )) return;
+    try {
+      setBusy(true);
+      setError("");
+      setMassCampaignResult(null);
+      const base64 = campaignImagePreview.split(",")[1] || "";
+      const result = await api({
+        action: "create_campaign",
+        name: "Taller de Verano 2027",
+        audience: campaignAudience,
+        phones: campaignSelectedPhones,
+        scheduledDate: campaignDate,
+        windowStart: campaignWindowStart,
+        windowEnd: campaignWindowEnd,
+        image: {
+          name: campaignImage.name,
+          type: campaignImage.type,
+          base64,
+        },
+      });
+      setMassCampaignResult(result.campaign);
+      await loadCampaigns(true);
+    } catch (currentError) {
+      setError(currentError.message || String(currentError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelCampaign = async (campaignId) => {
+    if (!window.confirm("Se cancelarán únicamente los mensajes que todavía no fueron enviados. ¿Continuar?")) return;
+    try {
+      setBusy(true);
+      setError("");
+      await api({ action: "cancel_campaign", campaignId });
+      await loadCampaigns(true);
+    } catch (currentError) {
+      setError(currentError.message || String(currentError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab !== "campaigns") return undefined;
+    loadCampaigns(true);
+    const interval = window.setInterval(() => loadCampaigns(true), 15000);
+    return () => window.clearInterval(interval);
+  }, [tab, config]);
 
   const updateMessageAnalysis = (messageId, analysis) => {
     setData((current) => ({
@@ -1147,7 +1247,26 @@ export default function WhatsAppCentro() {
       )}
 
       {tab === "campaigns" && (
-        <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-gray-200 p-1">
+            <button
+              type="button"
+              onClick={() => setCampaignMode("test")}
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${campaignMode === "test" ? "!bg-white !text-gray-900 shadow-sm hover:!bg-white" : "!bg-transparent !text-gray-600 hover:!bg-gray-100"}`}
+            >
+              Prueba individual
+            </button>
+            <button
+              type="button"
+              onClick={() => setCampaignMode("mass")}
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${campaignMode === "mass" ? "!bg-white !text-gray-900 shadow-sm hover:!bg-white" : "!bg-transparent !text-gray-600 hover:!bg-gray-100"}`}
+            >
+              Envío masivo
+            </button>
+          </div>
+
+          {campaignMode === "test" ? (
+            <div className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-xl text-green-700">
@@ -1241,6 +1360,175 @@ export default function WhatsAppCentro() {
               </div>
             </div>
           </section>
+            </div>
+          ) : (
+            <div className="grid gap-5 lg:grid-cols-[390px_minmax(0,1fr)]">
+              <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-xl text-green-700"><FaBullhorn /></span>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Nueva campaña</h2>
+                    <p className="mt-1 text-sm text-gray-500">Filtrá, revisá y programá los destinatarios.</p>
+                  </div>
+                </div>
+
+                <label className="mt-5 block text-sm font-semibold text-gray-800">Destinatarios</label>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {[["active", "Activos"], ["inactive", "Inactivos"], ["all", "Todos"]].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => { setCampaignAudience(value); setCampaignAudienceResult(null); setCampaignSelectedPhones([]); }}
+                      className={`rounded-lg border px-2 py-2 text-sm font-semibold ${campaignAudience === value ? "!border-green-600 !bg-green-50 !text-green-800 hover:!bg-green-50" : "!border-gray-300 !bg-white !text-gray-700 hover:!bg-gray-50"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={loadCampaignAudience}
+                  disabled={busy}
+                  className="mt-3 !w-full rounded-lg border border-gray-300 !bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:!bg-gray-50 disabled:opacity-50"
+                >
+                  {busy ? "Buscando…" : "Buscar destinatarios"}
+                </button>
+
+                <div className="mt-5 grid grid-cols-3 gap-2">
+                  <label className="col-span-3 text-sm font-semibold text-gray-800">Fecha y franja de envío</label>
+                  <input
+                    type="date"
+                    min={argentinaDateKey(new Date())}
+                    value={campaignDate}
+                    onChange={(event) => setCampaignDate(event.target.value)}
+                    className="col-span-3 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <div>
+                    <span className="mb-1 block text-xs text-gray-500">Desde</span>
+                    <input type="time" value={campaignWindowStart} onChange={(event) => setCampaignWindowStart(event.target.value)} className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-xs text-gray-500">Hasta</span>
+                    <input type="time" value={campaignWindowEnd} onChange={(event) => setCampaignWindowEnd(event.target.value)} className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm" />
+                  </div>
+                  <div className="flex items-end pb-2 text-xs text-gray-500">Hora Argentina</div>
+                </div>
+
+                <label className="mt-5 block text-sm font-semibold text-gray-800" htmlFor="campaign-image-mass">Imagen de la plantilla</label>
+                <input
+                  id="campaign-image-mass"
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  onChange={(event) => selectCampaignImage(event.target.files?.[0] || null)}
+                  className="mt-1 block w-full rounded-lg border border-gray-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-green-50 file:px-3 file:py-2 file:font-semibold file:text-green-700 hover:file:bg-green-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">PNG o JPG de hasta 5 MB.</p>
+                {campaignImagePreview && <img src={campaignImagePreview} alt="Imagen seleccionada" className="mt-3 max-h-36 w-full rounded-lg border bg-gray-50 object-contain" />}
+
+                {massCampaignResult && (
+                  <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                    <p className="flex items-center gap-2 font-semibold"><FaCheckCircle /> Campaña programada</p>
+                    <p className="mt-1">{massCampaignResult.totalRecipients} destinatarios · {massCampaignResult.windowStart} a {massCampaignResult.windowEnd}</p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={createMassCampaign}
+                  disabled={busy || !campaignImage || !campaignSelectedPhones.length || !campaignAudienceResult}
+                  className="mt-5 !flex !w-full items-center justify-center gap-2 rounded-lg !bg-green-600 px-4 py-3 font-semibold text-white hover:!bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FaPaperPlane /> {busy ? "Programando…" : `Programar ${campaignSelectedPhones.length || 0} mensaje(s)`}
+                </button>
+              </section>
+
+              <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-gray-900">Revisión de destinatarios</h3>
+                    <p className="mt-1 text-sm text-gray-500">Se envía una sola vez por teléfono, aunque haya hermanos.</p>
+                  </div>
+                  {campaignAudienceResult && (
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={campaignSelectedPhones.length === campaignAudienceResult.recipients.length && campaignAudienceResult.recipients.length > 0}
+                        onChange={(event) => setCampaignSelectedPhones(event.target.checked ? campaignAudienceResult.recipients.map((recipient) => recipient.phone) : [])}
+                      />
+                      Todos
+                    </label>
+                  )}
+                </div>
+
+                {!campaignAudienceResult ? (
+                  <div className="mt-8 rounded-xl border border-dashed border-gray-300 px-4 py-12 text-center text-sm text-gray-500">
+                    Elegí Activos, Inactivos o Todos y presioná “Buscar destinatarios”.
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="rounded-lg bg-gray-50 p-3"><span className="block text-xs text-gray-500">Alumnos</span><strong>{campaignAudienceResult.students}</strong></div>
+                      <div className="rounded-lg bg-gray-50 p-3"><span className="block text-xs text-gray-500">Teléfonos únicos</span><strong>{campaignAudienceResult.uniqueRecipients}</strong></div>
+                      <div className="rounded-lg bg-gray-50 p-3"><span className="block text-xs text-gray-500">Compartidos</span><strong>{campaignAudienceResult.sharedPhones}</strong></div>
+                      <div className="rounded-lg bg-gray-50 p-3"><span className="block text-xs text-gray-500">Sin teléfono válido</span><strong>{campaignAudienceResult.invalidPhones}</strong></div>
+                    </div>
+                    <div className="mt-4 max-h-[520px] overflow-y-auto rounded-lg border">
+                      {(campaignAudienceResult.recipients || []).map((recipient) => (
+                        <label key={recipient.phone} className="flex cursor-pointer items-center gap-3 border-b px-3 py-3 last:border-b-0 hover:bg-gray-50">
+                          <input type="checkbox" checked={campaignSelectedPhones.includes(recipient.phone)} onChange={() => toggleCampaignRecipient(recipient.phone)} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-gray-900">{recipient.displayName}</span>
+                            <span className="block text-xs text-gray-500">+{recipient.phone}{recipient.studentCount > 1 ? ` · ${recipient.studentCount} alumnos` : ""}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-right text-sm font-semibold text-gray-700">Seleccionados: {campaignSelectedPhones.length}</p>
+                  </>
+                )}
+              </section>
+            </div>
+          )}
+
+          {campaigns.length > 0 && (
+            <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-gray-900">Campañas recientes</h3>
+                  <p className="mt-1 text-sm text-gray-500">El estado se actualiza automáticamente.</p>
+                </div>
+                <button type="button" onClick={() => loadCampaigns()} className="!w-auto rounded-lg border border-gray-300 !bg-white px-3 py-2 text-sm font-semibold hover:!bg-gray-50"><FaSyncAlt /></button>
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <tr><th className="px-3 py-2">Campaña</th><th className="px-3 py-2">Programación</th><th className="px-3 py-2">Progreso</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2"></th></tr>
+                  </thead>
+                  <tbody>
+                    {campaigns.map((campaign) => {
+                      const processed = Number(campaign.sent_count || 0) + Number(campaign.failed_count || 0);
+                      const progress = campaign.total_recipients ? Math.round((processed / campaign.total_recipients) * 100) : 0;
+                      const statusLabel = { queued: "Programada", running: "Enviando", completed: "Finalizada", cancelled: "Cancelada", failed: "Con errores" }[campaign.status] || campaign.status;
+                      return (
+                        <tr key={campaign.id} className="border-t">
+                          <td className="px-3 py-3 font-semibold text-gray-900">{campaign.name}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-gray-600">{campaign.scheduled_date} · {String(campaign.window_start).slice(0, 5)}–{String(campaign.window_end).slice(0, 5)}</td>
+                          <td className="min-w-44 px-3 py-3">
+                            <div className="h-2 overflow-hidden rounded-full bg-gray-200"><div className="h-full bg-green-500" style={{ width: `${progress}%` }} /></div>
+                            <span className="mt-1 block text-xs text-gray-500">{campaign.sent_count}/{campaign.total_recipients} enviados{campaign.failed_count ? ` · ${campaign.failed_count} errores` : ""}</span>
+                          </td>
+                          <td className="px-3 py-3"><span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">{statusLabel}</span></td>
+                          <td className="px-3 py-3 text-right">
+                            {["queued", "running"].includes(campaign.status) && <button type="button" onClick={() => cancelCampaign(campaign.id)} className="!w-auto rounded-md !bg-transparent px-2 py-1 text-xs font-semibold text-red-600 hover:!bg-red-50">Cancelar</button>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </div>
       )}
 
