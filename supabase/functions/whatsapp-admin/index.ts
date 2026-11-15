@@ -131,7 +131,6 @@ const fetchCampaignAudience = async (audience: string) => {
     names: Set<string>;
     phone: string;
     hasActive: boolean;
-    hasInactive: boolean;
   }>();
   const idToGroup = new Map<string, string>();
 
@@ -144,7 +143,6 @@ const fetchCampaignAudience = async (audience: string) => {
         names: new Set<string>(),
         phone: "",
         hasActive: false,
-        hasInactive: false,
       });
     }
     const group = groups.get(groupId)!;
@@ -163,12 +161,11 @@ const fetchCampaignAudience = async (audience: string) => {
     if (!group) continue;
     const state = String(enrollment.estado || "").toLowerCase();
     if (state === "activa") group.hasActive = true;
-    if (["baja", "finalizada", "pausada"].includes(state)) group.hasInactive = true;
   }
 
   const eligibleGroups = [...groups.values()].filter((group) => {
     if (audience === "active") return group.hasActive;
-    if (audience === "inactive") return !group.hasActive && group.hasInactive;
+    if (audience === "inactive") return !group.hasActive;
     return true;
   });
   const recipientsByPhone = new Map<string, { phone: string; displayName: string; studentIds: string[]; names: Set<string>; ids: Set<string> }>();
