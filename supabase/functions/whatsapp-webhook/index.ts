@@ -161,6 +161,7 @@ Deno.serve(async (request) => {
     if (deliveryStatuses.length) {
       const supabaseUrl = requiredSecret("SUPABASE_URL");
       const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+      const touchedCampaigns = new Set<string>();
       for (const item of deliveryStatuses) {
         const messageId = String(item.id || "");
         const state = String(item.status || "").toLowerCase();
@@ -199,12 +200,49 @@ Deno.serve(async (request) => {
               apikey: serviceRoleKey,
               Authorization: `Bearer ${serviceRoleKey}`,
               "Content-Type": "application/json",
-              Prefer: "return=minimal",
+              Prefer: "return=representation",
             },
             body: JSON.stringify(recipientPatch),
           },
         );
-        if (!recipientUpdate.ok) console.error("No se pudo actualizar el destinatario de campaña", await recipientUpdate.text());
+        if (!recipientUpdate.ok) {
+          console.error("No se pudo actualizar el destinatario de campaña", await recipientUpdate.text());
+        } else {
+          const updatedRecipients = await recipientUpdate.json().catch(() => []);
+          for (const recipient of updatedRecipients || []) {
+            if (recipient?.campaign_id) touchedCampaigns.add(String(recipient.campaign_id));
+          }
+        }
+      }
+
+      for (const campaignId of touchedCampaigns) {
+        const statusesResponse = await fetch(
+          `${supabaseUrl}/rest/v1/whatsapp_campaign_recipients?campaign_id=eq.${encodeURIComponent(campaignId)}&select=status`,
+          { headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` } },
+        );
+        if (!statusesResponse.ok) continue;
+        const statuses = await statusesResponse.json();
+        const sentCount = statuses.filter((entry: Record<string, any>) => ["sent", "delivered", "read"].includes(entry.status)).length;
+        const failedCount = statuses.filter((entry: Record<string, any>) => entry.status === "failed").length;
+        const pendingCount = statuses.filter((entry: Record<string, any>) => ["queued", "processing"].includes(entry.status)).length;
+        const campaignUpdate = await fetch(
+          `${supabaseUrl}/rest/v1/whatsapp_campaigns?id=eq.${encodeURIComponent(campaignId)}&status=neq.cancelled`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: serviceRoleKey,
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify({
+              sent_count: sentCount,
+              failed_count: failedCount,
+              ...(pendingCount === 0 ? { status: "completed", completed_at: new Date().toISOString() } : {}),
+            }),
+          },
+        );
+        if (!campaignUpdate.ok) console.error("No se pudo actualizar el resumen de campaña", await campaignUpdate.text());
       }
     }
 
