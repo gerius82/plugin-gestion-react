@@ -37,6 +37,7 @@ export default function FichaAvisosAlumnos() {
   const [filtroCiclo, setFiltroCiclo] = useState("");
   const [filtroEdadMin, setFiltroEdadMin] = useState("");
   const [filtroEdadMax, setFiltroEdadMax] = useState("");
+  const [aplicacionWhatsAppCap, setAplicacionWhatsAppCap] = useState("personal");
   const [ciclosDisponibles, setCiclosDisponibles] = useState([]);
   const [diasDisponibles, setDiasDisponibles] = useState([]);
   const [horasDisponibles, setHorasDisponibles] = useState([]);
@@ -505,7 +506,24 @@ export default function FichaAvisosAlumnos() {
       ? `549${limpio}`
       : `54${limpio}`;
     const personalizado = interpolarMensaje(mensajePlano, alumno);
-    return `https://wa.me/${destino}?text=${encodeURIComponent(personalizado)}`;
+    const textoCodificado = encodeURIComponent(personalizado);
+    const enlaceWeb = `https://wa.me/${destino}?text=${textoCodificado}`;
+
+    if (filtroGrupo !== "cap" || aplicacionWhatsAppCap === "automatico") {
+      return enlaceWeb;
+    }
+
+    const esAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+    if (esAndroid) {
+      const paquete = aplicacionWhatsAppCap === "business" ? "com.whatsapp.w4b" : "com.whatsapp";
+      return `intent://send?phone=${destino}&text=${textoCodificado}#Intent;scheme=whatsapp;package=${paquete};S.browser_fallback_url=${encodeURIComponent(enlaceWeb)};end`;
+    }
+
+    if (aplicacionWhatsAppCap === "personal") {
+      return `whatsapp://send?phone=${destino}&text=${textoCodificado}`;
+    }
+
+    return enlaceWeb;
   };
   const resetPlantillaForm = () => {
     setPlantillaEditId("");
@@ -703,6 +721,27 @@ export default function FichaAvisosAlumnos() {
         ) : null}
       </div>
 
+      {filtroGrupo === "cap" && (
+        <div className="mb-5 rounded-lg border border-green-200 bg-green-50 p-3">
+          <label className="block text-sm font-semibold text-green-900" htmlFor="cap-whatsapp-app">
+            Aplicación para enviar los avisos de CAP
+          </label>
+          <select
+            id="cap-whatsapp-app"
+            className="mt-2 w-full max-w-sm rounded-md border border-green-300 bg-white p-2 text-sm"
+            value={aplicacionWhatsAppCap}
+            onChange={(event) => setAplicacionWhatsAppCap(event.target.value)}
+          >
+            <option value="personal">WhatsApp personal</option>
+            <option value="business">WhatsApp Business</option>
+            <option value="automatico">Preguntar / aplicación predeterminada</option>
+          </select>
+          <p className="mt-1 text-xs text-green-800">
+            En Android se abre directamente la aplicación elegida. En computadora o iPhone depende de las aplicaciones instaladas.
+          </p>
+        </div>
+      )}
+
       {/* Editor de mensaje */}
       <div className="mb-4">
         <label className="block font-medium mb-1 text-sm">
@@ -837,7 +876,7 @@ export default function FichaAvisosAlumnos() {
                       {link ? (
                         <a
                           href={link}
-                          target="_blank"
+                          target={link.startsWith("http") ? "_blank" : undefined}
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-sm transition"
                           title="Enviar aviso por WhatsApp"
