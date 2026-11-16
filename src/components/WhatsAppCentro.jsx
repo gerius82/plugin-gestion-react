@@ -169,7 +169,10 @@ const extractReceiptData = (ocrText) => {
   const amountPattern = new RegExp(`(?:\\$|ars\\s*)?\\s*${moneyDigits}`, "i");
   const priorityLines = lines.filter((line) => /importe|monto|total|transferencia|transferid|enviad|enviaste|pagaste/i.test(line));
   const amountNearLabel = text.match(new RegExp(`(?:importe|monto|total|transferencia\\s+enviada|transferid[oa]?|enviad[oa]?|enviaste|pagaste)[^$0-9O]{0,35}(?:\\$|ars\\s*)?\\s*${moneyDigits}`, "i"));
-  let amount = parseArgentineAmount(currencyMatch?.[1]) || parseArgentineAmount(amountNearLabel?.[1]);
+  // Priorizar siempre el valor asociado a "Monto", "Importe" o "Total".
+  // Algunos comprobantes muestran antes el número de cuenta como "ARS 1989",
+  // que no debe interpretarse como el importe transferido.
+  let amount = parseArgentineAmount(amountNearLabel?.[1]) || parseArgentineAmount(currencyMatch?.[1]);
   for (const line of amount ? [] : [...priorityLines, ...lines.filter((item) => /\$|ars/i.test(item))]) {
     const match = line.match(amountPattern);
     amount = parseArgentineAmount(match?.[1]);
@@ -746,6 +749,35 @@ export default function WhatsAppCentro() {
     }
   };
 
+  const correctPaymentAmount = async (message) => {
+    if (paymentBusyId) return;
+    const currentAmount = message.payload?.payment_analysis?.receipt?.amount || "";
+    const entered = window.prompt("Ingresá el importe correcto del comprobante:", currentAmount);
+    if (entered === null) return;
+    const amount = parseArgentineAmount(entered);
+    if (!amount) {
+      window.alert("Ingresá un importe válido.");
+      return;
+    }
+
+    try {
+      setPaymentBusyId(String(message.id));
+      setError("");
+      const result = await api({
+        action: "analyze_payment_text",
+        messageId: message.id,
+        amount,
+        date: message.payload?.payment_analysis?.receipt?.date || "",
+        operationId: message.payload?.payment_analysis?.receipt?.operationId || "",
+      });
+      updateMessageAnalysis(message.id, result.analysis);
+    } catch (currentError) {
+      setError(currentError.message || String(currentError));
+    } finally {
+      setPaymentBusyId("");
+    }
+  };
+
   const confirmPayment = async (message, candidateId) => {
     if (paymentBusyId) return;
     try {
@@ -1157,6 +1189,16 @@ export default function WhatsAppCentro() {
                                   </button>
                                 </div>
                               ))}
+                              {paymentAnalysis.status === "no_match" && (
+                                <button
+                                  type="button"
+                                  onClick={() => correctPaymentAmount(message)}
+                                  disabled={!!paymentBusyId}
+                                  className="mt-2 !w-full rounded-md border border-amber-300 !bg-amber-100 px-3 py-2 font-semibold text-amber-900 hover:!bg-amber-200 disabled:opacity-50"
+                                >
+                                  {analyzingPayment ? "Corrigiendo importe…" : "Corregir importe"}
+                                </button>
+                              )}
                               {["no_match", "already_registered"].includes(paymentAnalysis.status) && (
                                 <button
                                   type="button"
