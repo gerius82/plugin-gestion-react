@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaUserSlash } from "react-icons/fa";
 
 const fechaAsistenciaMs = (registro) => {
   const fecha = new Date(registro?.fecha || 0).getTime();
@@ -36,6 +37,7 @@ export default function FichaAsistenciasEstadisticas() {
   const [incluirOtrosTurnos, setIncluirOtrosTurnos] = useState(false);
   const [orden, setOrden] = useState("faltas");
   const [ascendente, setAscendente] = useState(false);
+  const [inactivandoId, setInactivandoId] = useState("");
 
   const toIsoDate = (value) => {
     const raw = String(value || "").trim();
@@ -271,6 +273,42 @@ export default function FichaAsistenciasEstadisticas() {
     return ascendente ? "↑" : "↓";
   };
 
+  const inactivarMatricula = async (alumno) => {
+    if (!config || !alumno?.id || inactivandoId) return;
+
+    const nombreCompleto = `${alumno.nombre || ""} ${alumno.apellido || ""}`.trim() || "este alumno";
+    const detalleTurno = [alumno.sede, alumno.turno].filter(Boolean).join(" · ");
+    const confirmado = window.confirm(
+      `¿Inactivar la matrícula de ${nombreCompleto}${detalleTurno ? ` (${detalleTurno})` : ""}?\n\n` +
+      "Si tiene otra matrícula o doble turno, las demás permanecerán activas."
+    );
+    if (!confirmado) return;
+
+    setInactivandoId(alumno.id);
+    try {
+      const response = await fetch(
+        `${config.supabaseUrl}/rest/v1/matriculas?id=eq.${encodeURIComponent(alumno.id)}`,
+        {
+          method: "PATCH",
+          headers: {
+            apikey: config.supabaseKey,
+            Authorization: `Bearer ${config.supabaseKey}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ estado: "baja" }),
+        }
+      );
+      if (!response.ok) throw new Error(await response.text());
+      setAlumnos((actuales) => actuales.filter((item) => item.id !== alumno.id));
+    } catch (error) {
+      console.error("No se pudo inactivar la matrícula", error);
+      window.alert("No se pudo inactivar la matrícula. Intentá nuevamente.");
+    } finally {
+      setInactivandoId("");
+    }
+  };
+
    // arriba del componente (o dentro):
    const formatISODate = (iso) => {
     const [y, m, d] = iso.split("T")[0].split("-");
@@ -414,7 +452,7 @@ export default function FichaAsistenciasEstadisticas() {
 
 
       <div className="w-full overflow-x-auto">
-      <table className="w-full min-w-[760px] table-auto border-t border-b text-left text-sm">
+      <table className="w-full min-w-[810px] table-auto border-t border-b text-left text-sm">
         <thead className="bg-gray-100">
           <tr>
             <th
@@ -439,6 +477,7 @@ export default function FichaAsistenciasEstadisticas() {
                 ? "Últimas 4 semanas"
                 : "Últimos 10 registros"}
             </th>
+            <th className="w-12 py-2 px-2" aria-label="Acciones"></th>
           </tr>
         </thead>
         <tbody>
@@ -470,6 +509,18 @@ export default function FichaAsistenciasEstadisticas() {
                     ></span>
                   ))}
                 </div>
+              </td>
+              <td className="w-12 py-2 px-2 text-right">
+                <button
+                  type="button"
+                  onClick={() => inactivarMatricula(a)}
+                  disabled={inactivandoId === a.id}
+                  className="!inline-flex !h-8 !w-8 items-center justify-center rounded-md border border-red-200 !bg-transparent !p-0 text-red-600 transition hover:!bg-red-50 hover:text-red-700 disabled:cursor-wait disabled:opacity-50"
+                  title={`Inactivar matrícula de ${a.nombre || ""} ${a.apellido || ""}`.trim()}
+                  aria-label={`Inactivar matrícula de ${a.nombre || ""} ${a.apellido || ""}`.trim()}
+                >
+                  <FaUserSlash className="h-3.5 w-3.5" />
+                </button>
               </td>
             </tr>
           ))}
