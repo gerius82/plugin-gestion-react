@@ -1,5 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+const fechaAsistenciaMs = (registro) => {
+  const fecha = new Date(registro?.fecha || 0).getTime();
+  return Number.isFinite(fecha) ? fecha : 0;
+};
+
+const resumenAusencias = (asistencias = []) => {
+  const recientes = [...asistencias].sort((a, b) => fechaAsistenciaMs(b) - fechaAsistenciaMs(a));
+  let faltasSeguidas = 0;
+
+  for (const registro of recientes) {
+    if (registro?.tipo !== "ausente") break;
+    faltasSeguidas += 1;
+  }
+
+  const faltasTotales = recientes.filter((registro) => registro?.tipo === "ausente").length;
+  const ultimaFalta = recientes.find((registro) => registro?.tipo === "ausente")?.fecha || "";
+  return { faltasSeguidas, faltasTotales, ultimaFalta };
+};
 
 export default function FichaAsistenciasEstadisticas() {
   const navigate = useNavigate();
@@ -15,6 +34,8 @@ export default function FichaAsistenciasEstadisticas() {
   const [filtroMes, setFiltroMes] = useState("");
   const [solo4Semanas, setSolo4Semanas] = useState(false);
   const [incluirOtrosTurnos, setIncluirOtrosTurnos] = useState(false);
+  const [orden, setOrden] = useState("faltas");
+  const [ascendente, setAscendente] = useState(false);
 
   const toIsoDate = (value) => {
     const raw = String(value || "").trim();
@@ -162,7 +183,7 @@ export default function FichaAsistenciasEstadisticas() {
           String(x.turno || "") !== String(a.turno || "") || String(x.sede || "") !== String(a.sede || ""),
       }));
 
-      return { ...a, asistencias: lista };
+      return { ...a, asistencias: lista, ...resumenAusencias(lista) };
     });
 
         setAlumnos(alumnosConAsistencias);
@@ -211,6 +232,43 @@ export default function FichaAsistenciasEstadisticas() {
   const claseMarcaAsistencia = (registro) => {
     const base = colorClase(registro?.tipo);
     return registro?.fueraDeTurno ? `${base} ring-2 ring-amber-400` : base;
+  };
+
+  const alumnosOrdenados = useMemo(() => {
+    const porNombre = (a, b) => {
+      const nombreA = `${a.nombre || ""} ${a.apellido || ""}`.trim();
+      const nombreB = `${b.nombre || ""} ${b.apellido || ""}`.trim();
+      return nombreA.localeCompare(nombreB, "es", { sensitivity: "base" });
+    };
+
+    return [...alumnos].sort((a, b) => {
+      if (orden === "nombre") {
+        const comparacion = porNombre(a, b);
+        return ascendente ? comparacion : -comparacion;
+      }
+
+      const racha = Number(a.faltasSeguidas || 0) - Number(b.faltasSeguidas || 0);
+      if (racha !== 0) return ascendente ? racha : -racha;
+
+      const totales = Number(a.faltasTotales || 0) - Number(b.faltasTotales || 0);
+      if (totales !== 0) return ascendente ? totales : -totales;
+
+      return porNombre(a, b);
+    });
+  }, [alumnos, orden, ascendente]);
+
+  const cambiarOrden = (nuevoOrden) => {
+    if (orden === nuevoOrden) {
+      setAscendente((valor) => !valor);
+      return;
+    }
+    setOrden(nuevoOrden);
+    setAscendente(nuevoOrden === "nombre");
+  };
+
+  const indicadorOrden = (columna) => {
+    if (orden !== columna) return "↕";
+    return ascendente ? "↑" : "↓";
   };
 
    // arriba del componente (o dentro):
@@ -356,11 +414,24 @@ export default function FichaAsistenciasEstadisticas() {
 
 
       <div className="w-full overflow-x-auto">
-      <table className="w-full min-w-[640px] table-auto border-t border-b text-left text-sm">
+      <table className="w-full min-w-[760px] table-auto border-t border-b text-left text-sm">
         <thead className="bg-gray-100">
           <tr>
-            <th className="py-2 px-3">Alumno</th>
+            <th
+              className="cursor-pointer select-none py-2 px-3"
+              onClick={() => cambiarOrden("nombre")}
+              title="Ordenar por alumno"
+            >
+              Alumno {indicadorOrden("nombre")}
+            </th>
             <th className="py-2 px-3">Turno</th>
+            <th
+              className="cursor-pointer select-none whitespace-nowrap py-2 px-3 text-center"
+              onClick={() => cambiarOrden("faltas")}
+              title="Ordenar por faltas consecutivas recientes"
+            >
+              Faltas seguidas {indicadorOrden("faltas")}
+            </th>
             <th className="py-2 px-3 text-right">
               {filtroMes
                 ? `Asistencias de ${filtroMes}`
@@ -371,10 +442,22 @@ export default function FichaAsistenciasEstadisticas() {
           </tr>
         </thead>
         <tbody>
-          {alumnos.map((a) => (
+          {alumnosOrdenados.map((a) => (
             <tr key={a.id} className="border-t">
               <td className="py-2 px-3"><div className="min-w-[170px] break-words">{a.nombre} {a.apellido}</div></td>
               <td className="py-2 px-3"><div className="min-w-[150px] break-words">{a.turno}</div></td>
+              <td className="py-2 px-3 text-center">
+                {a.faltasSeguidas > 0 ? (
+                  <span
+                    className="inline-flex min-w-8 items-center justify-center rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700"
+                    title={`${a.faltasTotales} falta${a.faltasTotales === 1 ? "" : "s"} en el período visible`}
+                  >
+                    {a.faltasSeguidas}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
+              </td>
               <td className="py-2 px-3">
                 <div className="flex gap-1 flex-wrap justify-end">
                   {a.asistencias.slice().reverse().map((r, i) => (
