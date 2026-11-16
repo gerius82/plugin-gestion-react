@@ -268,7 +268,7 @@ export default function FichaAvisosAlumnos() {
         if (filtroDia) filtrosCap.push(`dia=eq.${encodeURIComponent(filtroDia)}`);
         if (filtroHora) filtrosCap.push(`hora=eq.${encodeURIComponent(filtroHora)}`);
 
-        let queryCap = `${config.supabaseUrl}/rest/v1/cap_inscripciones?select=id,nombre,apellido,telefono,dia,hora,activo,creado_en&order=nombre.asc,apellido.asc`;
+        let queryCap = `${config.supabaseUrl}/rest/v1/cap_inscripciones?select=id,nombre,apellido,edad,adulto_responsable,telefono,dia,hora,activo,lista_espera,creado_en&order=nombre.asc,apellido.asc`;
         if (filtrosCap.length) queryCap += `&${filtrosCap.join("&")}`;
         const responseCap = await fetch(queryCap, { headers: headers() });
         if (!responseCap.ok) throw new Error("No pude cargar los alumnos de CAP.");
@@ -281,7 +281,8 @@ export default function FichaAvisosAlumnos() {
           apellido: String(item.apellido || "").trim(),
           telefono: item.telefono || "",
           fecha_nacimiento: "",
-          edad: null,
+          edad: item.edad !== null && Number.isInteger(Number(item.edad)) ? Number(item.edad) : null,
+          adulto_responsable: item.adulto_responsable || "",
           sede: "CAP",
           dia: item.dia || "",
           hora: item.hora || "18:30",
@@ -291,7 +292,14 @@ export default function FichaAvisosAlumnos() {
           matricula_creada_en: item.creado_en || "",
         }));
 
-        setAlumnos(filtroEstado === "sin_matricula" ? [] : listaCap);
+        const edadMinCap = filtroEdadMin === "" ? null : Number(filtroEdadMin);
+        const edadMaxCap = filtroEdadMax === "" ? null : Number(filtroEdadMax);
+        const listaCapFiltrada = listaCap.filter((item) => {
+          if (edadMinCap !== null && (item.edad === null || item.edad < edadMinCap)) return false;
+          if (edadMaxCap !== null && (item.edad === null || item.edad > edadMaxCap)) return false;
+          return true;
+        });
+        setAlumnos(filtroEstado === "sin_matricula" ? [] : listaCapFiltrada);
         const ordenCap = ["Lunes", "Miércoles", "Jueves", "Viernes"];
         setDiasDisponibles([...new Set(listaCap.map((item) => item.dia).filter(Boolean))].sort(
           (a, b) => ordenCap.indexOf(a) - ordenCap.indexOf(b)
@@ -477,6 +485,7 @@ export default function FichaAvisosAlumnos() {
       "{dia}": alumno?.dia || "",
       "{hora}": alumno?.hora || "",
       "{ciclo}": alumno?.ciclo_nombre || alumno?.ciclo_codigo || "",
+      "{responsable}": alumno?.adulto_responsable || "",
     };
     return Object.keys(reemplazos).reduce(
       (acc, key) => acc.split(key).join(reemplazos[key]),
@@ -603,7 +612,6 @@ export default function FichaAvisosAlumnos() {
                 setFiltroEdadMin("5");
                 setFiltroEdadMax("10");
               }}
-              disabled={filtroGrupo === "cap"}
             >
               Colonia 5–10
             </button>
@@ -619,7 +627,6 @@ export default function FichaAvisosAlumnos() {
               placeholder="Desde"
               value={filtroEdadMin}
               onChange={(e) => setFiltroEdadMin(e.target.value)}
-              disabled={filtroGrupo === "cap"}
             />
             <span className="text-gray-400">–</span>
             <input
@@ -632,7 +639,6 @@ export default function FichaAvisosAlumnos() {
               placeholder="Hasta"
               value={filtroEdadMax}
               onChange={(e) => setFiltroEdadMax(e.target.value)}
-              disabled={filtroGrupo === "cap"}
             />
           </div>
         </div>
@@ -757,7 +763,7 @@ export default function FichaAvisosAlumnos() {
         />
         <p className="mt-1 text-xs text-gray-500">
           Podés usar {`{nombre}`}, {`{apellido}`}, {`{sede}`}, {`{dia}`}, {`{hora}`},{" "}
-          {`{ciclo}`}. Se reemplazan por alumno al abrir WhatsApp.
+          {`{ciclo}`}, {`{responsable}`}. Se reemplazan por alumno al abrir WhatsApp.
         </p>
       </div>
 

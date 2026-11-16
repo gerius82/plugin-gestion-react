@@ -9,6 +9,8 @@ const HORA_CAP = "18:30";
 const formularioInicial = {
   nombre: "",
   apellido: "",
+  edad: "",
+  adulto_responsable: "",
   telefono: "",
   dia: "Lunes",
 };
@@ -47,7 +49,7 @@ export default function CapInscripciones() {
       setCargando(true);
       setError("");
       const response = await fetch(
-        `${config.supabaseUrl}/rest/v1/cap_inscripciones?select=id,nombre,apellido,telefono,dia,hora,activo,creado_en&order=activo.desc,dia.asc,nombre.asc,apellido.asc`,
+        `${config.supabaseUrl}/rest/v1/cap_inscripciones?select=id,nombre,apellido,edad,adulto_responsable,telefono,dia,hora,activo,lista_espera,creado_en&order=activo.desc,dia.asc,nombre.asc,apellido.asc`,
         { headers: headers() }
       );
       if (!response.ok) throw new Error("No se pudieron cargar las inscripciones de CAP.");
@@ -84,13 +86,23 @@ export default function CapInscripciones() {
     const payload = {
       nombre: formulario.nombre.trim(),
       apellido: formulario.apellido.trim(),
+      edad: formulario.edad === "" ? null : Number(formulario.edad),
+      adulto_responsable: formulario.adulto_responsable.trim(),
       telefono: formulario.telefono.trim(),
       dia: formulario.dia,
       hora: HORA_CAP,
       activo: true,
     };
-    if (!payload.nombre || !payload.apellido || normalizarTelefono(payload.telefono).length < 8) {
-      setError("Completá nombre, apellido y un teléfono válido.");
+    if (
+      !payload.nombre ||
+      !payload.apellido ||
+      !Number.isInteger(payload.edad) ||
+      payload.edad < 0 ||
+      payload.edad > 120 ||
+      !payload.adulto_responsable ||
+      normalizarTelefono(payload.telefono).length < 8
+    ) {
+      setError("Completá nombre, apellido, edad, adulto responsable y un teléfono válido.");
       return;
     }
 
@@ -199,6 +211,29 @@ export default function CapInscripciones() {
             required
           />
 
+          <label className="mt-4 block text-sm font-semibold text-gray-700" htmlFor="cap-edad">Edad</label>
+          <input
+            id="cap-edad"
+            type="number"
+            min="0"
+            max="120"
+            inputMode="numeric"
+            value={formulario.edad}
+            onChange={(event) => setFormulario((current) => ({ ...current, edad: event.target.value }))}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"
+            required
+          />
+
+          <label className="mt-4 block text-sm font-semibold text-gray-700" htmlFor="cap-responsable">Adulto responsable</label>
+          <input
+            id="cap-responsable"
+            value={formulario.adulto_responsable}
+            onChange={(event) => setFormulario((current) => ({ ...current, adulto_responsable: event.target.value }))}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"
+            autoComplete="name"
+            required
+          />
+
           <label className="mt-4 block text-sm font-semibold text-gray-700" htmlFor="cap-telefono">Teléfono</label>
           <input
             id="cap-telefono"
@@ -259,6 +294,8 @@ export default function CapInscripciones() {
                 <thead className="bg-gray-50 text-left text-gray-600">
                   <tr>
                     <th className="px-3 py-2">Alumno</th>
+                    <th className="px-3 py-2">Edad</th>
+                    <th className="px-3 py-2">Adulto responsable</th>
                     <th className="px-3 py-2">Teléfono</th>
                     <th className="px-3 py-2">Turno</th>
                     <th className="px-3 py-2 text-right">Estado</th>
@@ -268,8 +305,17 @@ export default function CapInscripciones() {
                   {inscriptos.map((inscripto) => (
                     <tr key={inscripto.id} className={`border-t ${inscripto.activo === false ? "opacity-55" : ""}`}>
                       <td className="whitespace-nowrap px-3 py-3 font-medium">{inscripto.nombre} {inscripto.apellido}</td>
+                      <td className="whitespace-nowrap px-3 py-3">{inscripto.edad ?? "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-3">{inscripto.adulto_responsable || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-3">{inscripto.telefono}</td>
-                      <td className="whitespace-nowrap px-3 py-3">{inscripto.dia} · {inscripto.hora} hs</td>
+                      <td className="whitespace-nowrap px-3 py-3">
+                        {inscripto.dia} · {inscripto.hora} hs
+                        {inscripto.lista_espera && (
+                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                            Lista de espera
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-3 text-right">
                         <button
                           type="button"
