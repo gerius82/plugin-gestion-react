@@ -62,6 +62,143 @@ const extractMediaId = (message: Record<string, any>) => {
   return media && typeof media === "object" ? String(media.id || "") : "";
 };
 
+const normalizeBotText = (value: unknown) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const includesBotIntent = (text: string, terms: string[]) =>
+  terms.some((term) => text.includes(term));
+
+const summerEnrollmentUrl = "https://gestion.plugin.ar/verano2027";
+
+const sendSummerBotReply = async (
+  record: Record<string, any>,
+  text: string,
+  mode: "active" | "paused" | "human" = "active",
+) => {
+  const supabaseUrl = requiredSecret("SUPABASE_URL");
+  const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+  const phoneNumberId = requiredSecret("WHATSAPP_PHONE_NUMBER_ID");
+  const graphResponse = await fetch(`https://graph.facebook.com/v24.0/${encodeURIComponent(phoneNumberId)}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requiredSecret("WHATSAPP_ACCESS_TOKEN")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: record.from_phone,
+      context: record.wa_message_id ? { message_id: record.wa_message_id } : undefined,
+      type: "text",
+      text: { preview_url: true, body: text },
+    }),
+  });
+  const graphResult = await graphResponse.json().catch(() => ({}));
+  const messageId = String(graphResult?.messages?.[0]?.id || "");
+  if (!graphResponse.ok || !messageId) {
+    console.error("No se pudo enviar la respuesta automatica del Taller de Verano", graphResult);
+    return false;
+  }
+
+  const sentAt = new Date().toISOString();
+  const headers = {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+    "Content-Type": "application/json",
+  };
+  await fetch(`${supabaseUrl}/rest/v1/whatsapp_messages?on_conflict=wa_message_id`, {
+    method: "POST",
+    headers: { ...headers, Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify({
+      wa_message_id: messageId,
+      from_phone: record.from_phone,
+      message_type: "text",
+      text_body: text,
+      payload: {
+        id: messageId,
+        to: record.from_phone,
+        type: "text",
+        text: { body: text },
+        _direction: "outbound",
+        _source: "summer_campaign_bot",
+      },
+      received_at: sentAt,
+      status: "sent",
+    }),
+  });
+  await fetch(`${supabaseUrl}/rest/v1/whatsapp_conversations?phone=eq.${encodeURIComponent(record.from_phone)}`, {
+    method: "PATCH",
+    headers: { ...headers, Prefer: "return=minimal" },
+    body: JSON.stringify({
+      bot_mode: mode,
+      bot_step: mode === "human" ? "human" : "summer_enrollment",
+      last_message_at: sentAt,
+      last_message_preview: text,
+      updated_at: sentAt,
+    }),
+  });
+  return true;
+};
+
+const handleSummerCampaignReply = async (record: Record<string, any>) => {
+  if (!record.text_body || !["text", "button", "interactive"].includes(String(record.message_type || ""))) return;
+  const supabaseUrl = requiredSecret("SUPABASE_URL");
+  const serviceRoleKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+  const headers = { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` };
+
+  const recipientResponse = await fetch(
+    `${supabaseUrl}/rest/v1/whatsapp_campaign_recipients?phone=eq.${encodeURIComponent(record.from_phone)}&status=in.(sent,delivered,read)&select=campaign_id&order=created_at.desc&limit=10`,
+    { headers },
+  );
+  if (!recipientResponse.ok) {
+    console.error("No se pudo identificar al destinatario de la campana", await recipientResponse.text());
+    return;
+  }
+  const recipients = await recipientResponse.json();
+  const campaignIds = [...new Set((recipients || []).map((item: Record<string, any>) => String(item.campaign_id || "")).filter(Boolean))];
+  if (!campaignIds.length) return;
+  const campaignResponse = await fetch(
+    `${supabaseUrl}/rest/v1/whatsapp_campaigns?id=in.(${campaignIds.join(",")})&template_name=eq.inscripcion_verano_2027&select=id&limit=1`,
+    { headers },
+  );
+  if (!campaignResponse.ok || !(await campaignResponse.json()).length) return;
+
+  const conversationResponse = await fetch(
+    `${supabaseUrl}/rest/v1/whatsapp_conversations?phone=eq.${encodeURIComponent(record.from_phone)}&select=bot_mode&limit=1`,
+    { headers },
+  );
+  const conversation = conversationResponse.ok ? (await conversationResponse.json())?.[0] : null;
+  if (conversation && conversation.bot_mode !== "active") return;
+
+  const input = normalizeBotText(record.text_body);
+  if (includesBotIntent(input, ["persona", "humano", "asesor", "hablar con alguien", "quiero consultar"])) {
+    await sendSummerBotReply(
+      record,
+      "Perfecto. Dejé pausadas las respuestas automáticas y una persona continuará la conversación apenas esté disponible.",
+      "human",
+    );
+    return;
+  }
+  if (includesBotIntent(input, ["no me interesa", "dar de baja", "no enviar", "no quiero recibir", "stop", "baja"])) {
+    await sendSummerBotReply(record, "Entendido. No enviaremos más respuestas automáticas en esta conversación.", "paused");
+    return;
+  }
+
+  const detail = includesBotIntent(input, ["horario", "turno", "sede", "direccion", "precio", "cuota", "valor"])
+    ? "En el formulario vas a poder ver y elegir la sede y el turno disponible. La cuota mensual es de $65.000 y la inscripción no tiene cargo."
+    : "Podés completar la inscripción y elegir sede y turno desde el formulario.";
+  await sendSummerBotReply(
+    record,
+    `${detail}\n\n👉 Inscribite al Taller de Verano 2027:\n${summerEnrollmentUrl}\n\nSi necesitás ayuda, respondé *persona* y te atendemos.`,
+  );
+};
+
 const notifyIncomingMedia = async (record: Record<string, any>) => {
   if (!["image", "document"].includes(String(record.message_type || ""))) return;
   const label = String(record.contact_name || "").trim() || `+${record.from_phone}`;
@@ -335,6 +472,7 @@ Deno.serve(async (request) => {
           console.error("No se pudo actualizar la conversación", await conversationResponse.text());
         }
         await notifyIncomingMedia(record);
+        await handleSummerCampaignReply(record);
       }
     }
 
