@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useGestionAuth } from "../GestionAuth";
+import capLogo from "../../assets/cap-logo.png";
 import {
   FaUserEdit,
   FaClipboardList,
@@ -186,6 +187,17 @@ export default function MenuGestion() {
           <div>
             <span className="block font-semibold text-lg">Colonia Tecnológica</span>
             <span className="block text-sm text-gray-500">Encuesta y resultados 2027</span>
+          </div>
+        </Link>
+
+        <Link
+          to="/cap"
+          className="bg-white rounded-xl border-l-8 border-red-600 p-4 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center gap-4"
+        >
+          <img src={capLogo} alt="Logo del Club Atlético Provincial" className="h-12 w-12 rounded-full object-contain" />
+          <div>
+            <span className="block font-semibold text-lg">CAP</span>
+            <span className="block text-sm text-gray-500">Club Atlético Provincial</span>
           </div>
         </Link>
 

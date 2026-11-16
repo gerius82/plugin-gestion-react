@@ -27,6 +27,9 @@ export default function FichaAvisosAlumnos() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [alumnos, setAlumnos] = useState([]);
+  const [filtroGrupo, setFiltroGrupo] = useState(() =>
+    new URLSearchParams(window.location.search).get("grupo") === "cap" ? "cap" : "plugin"
+  );
   const [filtroEstado, setFiltroEstado] = useState("activos"); // activos | inactivos | todos | sin_matricula
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroDia, setFiltroDia] = useState("");
@@ -89,7 +92,7 @@ export default function FichaAvisosAlumnos() {
   useEffect(() => {
     if (!config) return;
     cargarAlumnos();
-  }, [config, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroEdadMin, filtroEdadMax, ciclosDisponibles]);
+  }, [config, filtroGrupo, filtroEstado, filtroSede, filtroDia, filtroHora, filtroCiclo, filtroEdadMin, filtroEdadMax, ciclosDisponibles]);
 
   useEffect(() => {
     if (!config) return;
@@ -258,6 +261,45 @@ export default function FichaAvisosAlumnos() {
     setError("");
 
     try {
+      if (filtroGrupo === "cap") {
+        const filtrosCap = [];
+        if (filtroEstado === "activos") filtrosCap.push("activo=eq.true");
+        if (filtroEstado === "inactivos") filtrosCap.push("activo=eq.false");
+        if (filtroDia) filtrosCap.push(`dia=eq.${encodeURIComponent(filtroDia)}`);
+        if (filtroHora) filtrosCap.push(`hora=eq.${encodeURIComponent(filtroHora)}`);
+
+        let queryCap = `${config.supabaseUrl}/rest/v1/cap_inscripciones?select=id,nombre,apellido,telefono,dia,hora,activo,creado_en&order=nombre.asc,apellido.asc`;
+        if (filtrosCap.length) queryCap += `&${filtrosCap.join("&")}`;
+        const responseCap = await fetch(queryCap, { headers: headers() });
+        if (!responseCap.ok) throw new Error("No pude cargar los alumnos de CAP.");
+        const dataCap = await responseCap.json();
+        const listaCap = (Array.isArray(dataCap) ? dataCap : []).map((item) => ({
+          id: `cap-${item.id}`,
+          alumno_id: item.id,
+          persona_id: item.id,
+          nombre: String(item.nombre || "").trim(),
+          apellido: String(item.apellido || "").trim(),
+          telefono: item.telefono || "",
+          fecha_nacimiento: "",
+          edad: null,
+          sede: "CAP",
+          dia: item.dia || "",
+          hora: item.hora || "18:30",
+          estado_normalizado: item.activo === false ? "baja" : "activa",
+          ciclo_codigo: "CAP",
+          ciclo_nombre: "Club Atlético Provincial",
+          matricula_creada_en: item.creado_en || "",
+        }));
+
+        setAlumnos(filtroEstado === "sin_matricula" ? [] : listaCap);
+        const ordenCap = ["Lunes", "Miércoles", "Jueves", "Viernes"];
+        setDiasDisponibles([...new Set(listaCap.map((item) => item.dia).filter(Boolean))].sort(
+          (a, b) => ordenCap.indexOf(a) - ordenCap.indexOf(b)
+        ));
+        setHorasDisponibles([...new Set(listaCap.map((item) => item.hora).filter(Boolean))].sort());
+        return;
+      }
+
       let query = `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,ciclo_codigo,sede,dia,hora,estado,creado_en,inscripciones(id,persona_id,nombre,apellido,telefono,fecha_nacimiento,edad)`;
 
       const filtros = [];
@@ -446,8 +488,15 @@ export default function FichaAvisosAlumnos() {
     if (!telefono || !mensajePlano) return null;
     const limpio = telefono.replace(/\D/g, "");
     if (!limpio) return null;
+    const destino = /^549\d{10}$/.test(limpio)
+      ? limpio
+      : /^54\d{10}$/.test(limpio)
+      ? `549${limpio.slice(2)}`
+      : /^\d{10}$/.test(limpio)
+      ? `549${limpio}`
+      : `54${limpio}`;
     const personalizado = interpolarMensaje(mensajePlano, alumno);
-    return `https://wa.me/54${limpio}?text=${encodeURIComponent(personalizado)}`;
+    return `https://wa.me/${destino}?text=${encodeURIComponent(personalizado)}`;
   };
   const resetPlantillaForm = () => {
     setPlantillaEditId("");
@@ -487,7 +536,29 @@ export default function FichaAvisosAlumnos() {
       <div className="bg-white rounded-xl shadow p-6 max-w-5xl mx-auto">
 
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-2">
+        {/* Grupo */}
+        <div>
+          <label className="block font-medium mb-1 text-sm">Grupo:</label>
+          <select
+            className="w-full border p-2 rounded text-sm"
+            value={filtroGrupo}
+            onChange={(e) => {
+              setFiltroGrupo(e.target.value);
+              setFiltroEstado("activos");
+              setFiltroSede("");
+              setFiltroDia("");
+              setFiltroHora("");
+              setFiltroCiclo("");
+              setFiltroEdadMin("");
+              setFiltroEdadMax("");
+            }}
+          >
+            <option value="plugin">Alumnos de Plugin</option>
+            <option value="cap">CAP</option>
+          </select>
+        </div>
+
         {/* Estado */}
         <div>
           <label className="block font-medium mb-1 text-sm">Estado:</label>
@@ -499,7 +570,7 @@ export default function FichaAvisosAlumnos() {
             <option value="activos">Activos</option>
             <option value="inactivos">Inactivos</option>
             <option value="todos">Todos</option>
-            <option value="sin_matricula">Solo sin matrícula</option>
+            {filtroGrupo === "plugin" && <option value="sin_matricula">Solo sin matrícula</option>}
           </select>
         </div>
 
@@ -510,6 +581,7 @@ export default function FichaAvisosAlumnos() {
             className="w-full border p-2 rounded text-sm"
             value={filtroCiclo}
             onChange={(e) => setFiltroCiclo(e.target.value)}
+            disabled={filtroGrupo === "cap"}
           >
             <option value="">Todos</option>
             {ciclosDisponibles.map((c) => (
@@ -531,6 +603,7 @@ export default function FichaAvisosAlumnos() {
                 setFiltroEdadMin("5");
                 setFiltroEdadMax("10");
               }}
+              disabled={filtroGrupo === "cap"}
             >
               Colonia 5–10
             </button>
@@ -546,6 +619,7 @@ export default function FichaAvisosAlumnos() {
               placeholder="Desde"
               value={filtroEdadMin}
               onChange={(e) => setFiltroEdadMin(e.target.value)}
+              disabled={filtroGrupo === "cap"}
             />
             <span className="text-gray-400">–</span>
             <input
@@ -558,6 +632,7 @@ export default function FichaAvisosAlumnos() {
               placeholder="Hasta"
               value={filtroEdadMax}
               onChange={(e) => setFiltroEdadMax(e.target.value)}
+              disabled={filtroGrupo === "cap"}
             />
           </div>
         </div>
@@ -573,6 +648,7 @@ export default function FichaAvisosAlumnos() {
               setFiltroDia("");
               setFiltroHora("");
             }}
+            disabled={filtroGrupo === "cap"}
           >
             <option value="">Todas</option>
             <option value="Calle Mendoza">Calle Mendoza</option>

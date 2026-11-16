@@ -3,6 +3,7 @@ import logo from "./assets/Logo_Plugin_2025.png";
 import { AccesoGestion, GestionAuthProvider, RequireGestionAuth, SeguridadGestion } from "./components/GestionAuth";
 import Avisos from "./components/FichaAvisosAlumnos";
 import CambioTurno from "./components/CambioTurno";
+import CapInscripciones from "./components/CapInscripciones";
 import ControlAsistencias from "./components/FichaControlAsistenciaMensual";
 import Cumples from "./components/FichaCumples";
 import CumplesAlumnos from "./components/FichaCumplesAlumnos";
@@ -98,6 +99,7 @@ function AppContent() {
               <Route path="/menu-gestion" element={<MenuGestion />} />
               <Route path="/formularios-inscripcion" element={<MenuFormulariosGestion />} />
               <Route path="/colonia-gestion" element={<MenuColonia />} />
+              <Route path="/cap" element={<CapInscripciones />} />
               <Route path="/alumnos-menu" element={<AlumnosMenu />} />
               <Route path="/ficha" element={<FichaAlumno />} />
               <Route path="/ficha-alumno/:id" element={<FichaAlumno />} />
