@@ -505,6 +505,9 @@ const recoveryCalendar = () => {
 const recoveryUrl = (phone: string) =>
   `${publicSiteUrl()}/recuperar?from=whatsapp&telefono=${encodeURIComponent(normalizePhone(phone))}`;
 
+const scheduleChangeUrl = (phone: string) =>
+  `${publicSiteUrl()}/cambio-turno?from=whatsapp&telefono=${encodeURIComponent(normalizePhone(phone))}`;
+
 const recoveryOptionDateLabel = (value: unknown) => {
   const iso = String(value || "").split("T")[0];
   const date = new Date(`${iso}T12:00:00-03:00`);
@@ -999,9 +1002,12 @@ const simulate = async (phone: string, input: string) => {
       };
     }
     return {
-      message: `Podés solicitar un cambio de turno desde:\n${publicSiteUrl()}/cambio-turno\n\nEl sistema te pedirá el teléfono registrado. Si necesitás ayuda, escribí *persona*.`,
-      options,
-      nextStep: "menu",
+      message: "Abrí la pantalla de cambio de turno para consultar los horarios disponibles.",
+      options: numberedOptions([
+        { url: scheduleChangeUrl(phone), label: "Gestionar cambio de turno" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "schedule_change",
       context,
     };
   }

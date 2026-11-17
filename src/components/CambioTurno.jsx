@@ -10,10 +10,11 @@ export default function CambioTurno() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const from = params.get("from");
+  const telefonoInicial = params.get("telefono") || "";
   const rutaVolver = from === "alumnos-menu" ? "/alumnos-menu" : "/menu-padres";
 
   const [config, setConfig] = useState(null);
-  const [telefono, setTelefono] = useState("");
+  const [telefono, setTelefono] = useState(telefonoInicial);
 
   const [alumnos, setAlumnos] = useState([]); // [{matricula_id,alumno_id,nombre,apellido,sede,dia,hora,turno_1,ciclo_codigo,selected}]
   const [sede, setSede] = useState("");
@@ -27,6 +28,8 @@ export default function CambioTurno() {
   const [turnoSeleccionado, setTurnoSeleccionado] = useState("");
 
   const [cicloActivo, setCicloActivo] = useState("");
+  const [ciclosCargados, setCiclosCargados] = useState(false);
+  const [busquedaAutomaticaHecha, setBusquedaAutomaticaHecha] = useState(false);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
@@ -55,6 +58,8 @@ export default function CambioTurno() {
         setCicloActivo(cicloActual?.codigo || "");
       } catch (e) {
         console.error(e);
+      } finally {
+        setCiclosCargados(true);
       }
     })();
   }, [config]);
@@ -94,14 +99,14 @@ export default function CambioTurno() {
   );
 
   // Buscar alumnos por teléfono
-  const buscar = async () => {
+  const buscar = async (telefonoForzado = telefono) => {
     setError("");
     setOkMsg("");
     setAlumnos([]);
     setTurnosDisponibles([]);
     setTurnoSeleccionado("");
 
-    const tel = normalizarTelefonoBusqueda(telefono);
+    const tel = normalizarTelefonoBusqueda(telefonoForzado).slice(-10);
     if (!tel) {
       setError("Ingresá un número de teléfono válido.");
       return;
@@ -154,6 +159,12 @@ export default function CambioTurno() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!config || !ciclosCargados || !telefonoInicial || busquedaAutomaticaHecha) return;
+    setBusquedaAutomaticaHecha(true);
+    buscar(telefonoInicial);
+  }, [config, ciclosCargados, cicloActivo, telefonoInicial, busquedaAutomaticaHecha]);
 
   // Recalcular disponibilidad si cambia selección o conteos
   useEffect(() => {
@@ -323,7 +334,7 @@ export default function CambioTurno() {
         onChange={(e) => setTelefono(e.target.value)}
       />
       <button
-        onClick={buscar}
+        onClick={() => buscar()}
         disabled={loading || !config}
         className="px-4 py-2 rounded-md bg-green-500 text-white font-semibold hover:bg-green-600 disabled:opacity-50"
       >
