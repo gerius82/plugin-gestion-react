@@ -505,6 +505,59 @@ const recoveryCalendar = () => {
 const recoveryUrl = (phone: string) =>
   `${publicSiteUrl()}/recuperar?from=whatsapp&telefono=${encodeURIComponent(normalizePhone(phone))}`;
 
+const recoveryOptionDateLabel = (value: unknown) => {
+  const iso = String(value || "").split("T")[0];
+  const date = new Date(`${iso}T12:00:00-03:00`);
+  if (!iso || Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "numeric",
+    month: "long",
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(date);
+};
+
+const fetchRecoveryOptions = async (context: Record<string, any>) => {
+  const enrollments = Array.isArray(context.enrollments) ? context.enrollments : [];
+  if (!enrollments.length) return [];
+  const studentIds = [...new Set(enrollments.map((item: Record<string, any>) => String(item.alumno_id || "")).filter(Boolean))];
+  const [recentByStudent, holidays] = await Promise.all([
+    Promise.all(studentIds.map((studentId) => rest(
+      `asistencias?select=fecha,tipo,recuperada&alumno_id=eq.${encodeURIComponent(studentId)}&tipo=in.(regular,ausente)&order=fecha.desc&limit=6`,
+    ))),
+    rest("feriados?select=fecha"),
+  ]);
+  const optionLabels: string[] = [];
+  const included = new Set<string>();
+  for (const attendance of recentByStudent.flat()) {
+    if (attendance.tipo !== "ausente" || attendance.recuperada !== false) continue;
+    const label = recoveryOptionDateLabel(attendance.fecha);
+    if (label && !included.has(label)) {
+      optionLabels.push(label);
+      included.add(label);
+    }
+  }
+
+  const holidaySet = new Set(
+    (holidays || []).map((item: Record<string, any>) => String(item.fecha || "").split("T")[0]).filter(Boolean),
+  );
+  const regularDay = normalizeSchedulePart(enrollments[0]?.dia);
+  const todayIso = argentinaDateIso(new Date());
+  for (let offset = 0; regularDay && offset < 60; offset += 1) {
+    const date = new Date(`${todayIso}T12:00:00-03:00`);
+    date.setUTCDate(date.getUTCDate() + offset);
+    const iso = argentinaDateIso(date);
+    const weekday = normalizeSchedulePart(new Intl.DateTimeFormat("es-AR", {
+      weekday: "long",
+      timeZone: "America/Argentina/Buenos_Aires",
+    }).format(date));
+    if (weekday !== regularDay || holidaySet.has(iso)) continue;
+    const label = recoveryOptionDateLabel(iso);
+    if (!included.has(label)) optionLabels.push(`${label} (próxima clase)`);
+    break;
+  }
+  return optionLabels;
+};
+
 const fetchRecoveryAvailability = async (context: Record<string, any>) => {
   const enrollments = Array.isArray(context.enrollments) ? context.enrollments : [];
   if (!enrollments.length) return [];
@@ -921,23 +974,14 @@ const simulate = async (phone: string, input: string) => {
         context,
       };
     }
-    const availability = await fetchRecoveryAvailability(context);
-    const sections = availability.map((item: Record<string, any>) => {
-      const heading = `*${item.student}${item.course ? ` — ${item.course}` : ""}*`;
-      const lines = (item.options || []).map((option: Record<string, any>) => {
-        const places = option.availablePlaces == null
-          ? ""
-          : ` · ${option.availablePlaces} lugar${option.availablePlaces === 1 ? "" : "es"}`;
-        return `• ${option.dateLabel} · ${option.time} hs · ${option.location}${places}`;
-      });
-      return `${heading}\n${lines.length ? lines.join("\n") : "No encontramos turnos con lugar en las próximas dos semanas."}`;
-    });
-    if (!sections.length) sections.push("No encontramos turnos con lugar en las próximas dos semanas.");
+    const recoveryOptions = await fetchRecoveryOptions(context);
+    const recoveryLines = recoveryOptions.length
+      ? recoveryOptions.map((option: string) => `• ${option}`).join("\n")
+      : "No hay fechas para recuperar";
     return {
-      message: `*Recuperación de clases*\n\n*Recordamos:*\n✅ Las ausencias justificadas podrán recuperarse en otros turnos según disponibilidad.\n🚫 Los feriados NO podrán recuperarse.\n\n*Clases disponibles en las próximas dos semanas:*\n\n${sections.join("\n\n")}\n\nLos cupos pueden cambiar hasta que confirmes la solicitud. Tocá el botón para elegir la ausencia y generar el recupero.`,
+      message: `*Recordamos:*\n\n- ✅ Las ausencias justificadas podrán recuperarse en otros turnos según disponibilidad.\n- 🚫 Los feriados NO podrán recuperarse.\n\n*Clases para recuperar:*\n${recoveryLines}`,
       options: numberedOptions([
-        { url: recoveryUrl(phone), label: "Generar recupero" },
-        { action: "human", label: "Hablar con una persona" },
+        { url: recoveryUrl(phone), label: "Gestionar recupero" },
         { action: "menu", label: "Volver al menú principal" },
       ]),
       nextStep: "recovery",
