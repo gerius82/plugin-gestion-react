@@ -50,7 +50,6 @@ export default function FichaRecuperar() {
 
   const [ausencias, setAusencias] = useState([]); // ["12 de agosto", "19 de agosto"]
   const [faltaSeleccionada, setFaltaSeleccionada] = useState("");
-  const [proximasRecuperaciones, setProximasRecuperaciones] = useState([]);
 
   const [turnos, setTurnos] = useState([]); // [{turno: "lunes 18:00", disponible: true}]
   const [turnoSeleccionado, setTurnoSeleccionado] = useState("");
@@ -142,7 +141,6 @@ export default function FichaRecuperar() {
     setOkMsg("");
     setAlumnos([]);
     setAusencias([]);
-    setProximasRecuperaciones([]);
     setTurnos([]);
     setTurnoSeleccionado("");
     setFaltaSeleccionada("");
@@ -267,28 +265,6 @@ export default function FichaRecuperar() {
 
       setAusencias(opciones);
       setFaltaSeleccionada(opciones[0] || "");
-
-      const hoy = toISO(new Date());
-      const recuperaciones = (await Promise.all(
-        ids.map((id) =>
-          fetch(
-            `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${id}&tipo=eq.recuperacion&fecha=gte.${hoy}&order=fecha.asc&select=id,alumno_id,fecha,turno,sede`,
-            { headers: headers() }
-          ).then((response) => {
-            if (!response.ok) throw new Error("No se pudieron cargar las recuperaciones programadas.");
-            return response.json();
-          })
-        )
-      )).flat();
-      const alumnosPorId = new Map(alumnosList.map((alumno) => [String(alumno.alumno_id), alumno]));
-      setProximasRecuperaciones(
-        recuperaciones
-          .map((recuperacion) => ({
-            ...recuperacion,
-            alumno: alumnosPorId.get(String(recuperacion.alumno_id)),
-          }))
-          .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
-      );
     } catch (e) {
       console.error(e);
       setError("No pude cargar las ausencias.");
@@ -393,10 +369,6 @@ export default function FichaRecuperar() {
     const seleccionados = alumnos.filter((a) => a.selected);
     if (seleccionados.length === 0) {
       setError("Seleccioná al menos un alumno para recuperar.");
-      return;
-    }
-    if (!faltaSeleccionada || faltaSeleccionada === "No hay fechas para recuperar") {
-      setError("No hay clases pendientes habilitadas para recuperar.");
       return;
     }
     if (!diaSeleccionado) {
@@ -538,25 +510,6 @@ export default function FichaRecuperar() {
               ))}
             </ul>
           </div>
-
-          {proximasRecuperaciones.length > 0 && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-              <h3 className="font-semibold mb-2">Próxima clase de recuperación</h3>
-              <ul className="space-y-1">
-                {proximasRecuperaciones.map((recuperacion) => {
-                  const fecha = new Date(`${String(recuperacion.fecha).split("T")[0]}T12:00:00`);
-                  const nombre = `${recuperacion.alumno?.nombre || ""} ${recuperacion.alumno?.apellido || ""}`.trim();
-                  return (
-                    <li key={recuperacion.id}>
-                      {nombre ? `${nombre}: ` : ""}{formatearFechaLarga(fecha)}
-                      {recuperacion.turno ? ` · ${recuperacion.turno}` : ""}
-                      {recuperacion.sede ? ` · ${recuperacion.sede}` : ""}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
 
           <div>
             <label className="block font-medium mb-1">Seleccioná una ausencia</label>

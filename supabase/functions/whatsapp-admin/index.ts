@@ -476,38 +476,6 @@ const fetchPendingRecoveries = async (context: Record<string, any>) => {
   }));
 };
 
-const argentinaTodayIso = () => {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: string) => parts.find((part) => part.type === type)?.value || "";
-  return `${value("year")}-${value("month")}-${value("day")}`;
-};
-
-const fetchUpcomingRecoveries = async (context: Record<string, any>) => {
-  const enrollments = Array.isArray(context.enrollments) ? context.enrollments : [];
-  const studentIds = [...new Set(enrollments.map((item: Record<string, any>) => String(item.alumno_id || "")).filter(Boolean))];
-  if (!studentIds.length) return [];
-  const upcoming = (await Promise.all(
-    studentIds.map((studentId) => rest(
-      `asistencias?select=id,alumno_id,fecha,turno,sede&alumno_id=eq.${encodeURIComponent(studentId)}&tipo=eq.recuperacion&fecha=gte.${argentinaTodayIso()}&order=fecha.asc&limit=10`,
-    )),
-  )).flat();
-  const contactsById = new Map<string, Record<string, any>>();
-  for (const contact of context.contacts || []) {
-    for (const id of [contact.id, contact.persona_id].filter(Boolean)) contactsById.set(String(id), contact);
-  }
-  return upcoming
-    .map((item: Record<string, any>) => ({
-      ...item,
-      student: studentLabel(contactsById.get(String(item.alumno_id)) || {}),
-    }))
-    .sort((left: Record<string, any>, right: Record<string, any>) => String(left.fecha).localeCompare(String(right.fecha)));
-};
-
 const recoveryDateLabel = (value: unknown) => {
   const isoDate = String(value || "").split("T")[0];
   if (!isoDate) return "Fecha no disponible";
@@ -835,20 +803,11 @@ const simulate = async (phone: string, input: string) => {
         context,
       };
     }
-    const [pendingRecoveries, upcomingRecoveries] = await Promise.all([
-      fetchPendingRecoveries(context),
-      fetchUpcomingRecoveries(context),
-    ]);
+    const pendingRecoveries = await fetchPendingRecoveries(context);
     const recoveryReminder = "*Recordamos:*\n\n✅ Las ausencias justificadas podrán recuperarse en otros turnos según disponibilidad.\n🚫 Los feriados NO podrán recuperarse.";
-    const upcomingSection = upcomingRecoveries.length
-      ? `\n\n*Próxima clase de recuperación:*\n${upcomingRecoveries.map((recovery: Record<string, any>) => {
-        const details = [recovery.turno, recovery.sede].filter(Boolean).join(" · ");
-        return `• ${recovery.student}: ${recoveryDateLabel(recovery.fecha)}${details ? ` · ${details}` : ""}`;
-      }).join("\n")}`
-      : "";
     if (!pendingRecoveries.length) {
       return {
-        message: `${recoveryReminder}${upcomingSection}\n\nNo encontramos clases pendientes de recuperar dentro de las últimas 6 clases.`,
+        message: `${recoveryReminder}\n\nNo encontramos clases pendientes de recuperar dentro de las últimas 6 clases.`,
         options: numberedOptions([
           { action: "menu", label: "Volver al menú principal" },
         ]),
@@ -871,7 +830,7 @@ const simulate = async (phone: string, input: string) => {
       return `*${student}*\n${lines.join("\n")}`;
     });
     return {
-      message: `${recoveryReminder}${upcomingSection}\n\n*Clases pendientes de recuperar:*\n\n${sections.join("\n\n")}`,
+      message: `${recoveryReminder}\n\n*Clases pendientes de recuperar:*\n\n${sections.join("\n\n")}`,
       options: numberedOptions([
         { url: recoveryUrl(phone), label: "Gestionar recupero" },
       ]),
