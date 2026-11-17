@@ -231,14 +231,23 @@ export default function FichaRecuperar() {
     if (!config) return;
     let cuposLocal = {};
 
-    // 1) Ausencias sin recuperar + fecha futura (próxima clase)
+    // 1) Ausencias sin recuperar dentro de las últimas 6 clases + próxima clase
     try {
       const ids = alumnosList.map((a) => a.alumno_id);
-      const resFaltas = await fetch(
-        `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=in.(${ids.join(",")})&tipo=eq.ausente&recuperada=is.false&order=fecha.desc&limit=4&select=fecha`,
-        { headers: headers() }
+      const asistenciasRecientes = (await Promise.all(
+        ids.map((id) =>
+          fetch(
+            `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${id}&tipo=in.(regular,ausente)&order=fecha.desc&limit=6&select=fecha,tipo,recuperada`,
+            { headers: headers() }
+          ).then((response) => {
+            if (!response.ok) throw new Error("No se pudieron cargar las asistencias recientes.");
+            return response.json();
+          })
+        )
+      )).flat();
+      const faltas = asistenciasRecientes.filter(
+        (asistencia) => asistencia.tipo === "ausente" && asistencia.recuperada === false
       );
-      const faltas = await resFaltas.json();
 
       const yaIncluidas = new Set();
       const opciones = [];
