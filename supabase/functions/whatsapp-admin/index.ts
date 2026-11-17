@@ -522,10 +522,6 @@ const recoveryDateLabel = (value: unknown) => {
   return `${label.slice(0, 1).toUpperCase()}${label.slice(1)}`;
 };
 
-const recoveryTimeLabel = (value: unknown) => String(value || "")
-  .replace(/^(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s+/i, "")
-  .trim();
-
 const currentMonthName = () => {
   const value = new Intl.DateTimeFormat("es-AR", {
     month: "long",
@@ -846,7 +842,7 @@ const simulate = async (phone: string, input: string) => {
     const recoveryReminder = "*Recordamos:*\n\n✅ Las ausencias justificadas podrán recuperarse en otros turnos según disponibilidad.\n🚫 Los feriados NO podrán recuperarse.";
     const upcomingSection = upcomingRecoveries.length
       ? `\n\n*Próxima clase de recuperación:*\n${upcomingRecoveries.map((recovery: Record<string, any>) => {
-        const details = [recoveryTimeLabel(recovery.turno), recovery.sede].filter(Boolean).join(" · ");
+        const details = [recovery.turno, recovery.sede].filter(Boolean).join(" · ");
         return `• ${recovery.student}: ${recoveryDateLabel(recovery.fecha)}${details ? ` · ${details}` : ""}`;
       }).join("\n")}`
       : "";
