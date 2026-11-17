@@ -450,6 +450,164 @@ const fetchAvailableSchedules = async (course: Record<string, any>) => {
     });
 };
 
+const argentinaDateIso = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+};
+
+const argentinaTimeMinutes = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
+  return hour * 60 + minute;
+};
+
+const scheduleMinutes = (value: unknown) => {
+  const [hour, minute] = scheduleStart(value).split(":").map(Number);
+  return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
+};
+
+const recoveryCalendar = () => {
+  const dates: Array<Record<string, string>> = [];
+  const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const now = new Date();
+  for (let offset = 0; offset < 14; offset += 1) {
+    const date = new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
+    const iso = argentinaDateIso(date);
+    const midday = new Date(`${iso}T12:00:00-03:00`);
+    const day = dayNames[midday.getDay()];
+    if (day === "Domingo") continue;
+    dates.push({
+      iso,
+      day,
+      label: new Intl.DateTimeFormat("es-AR", {
+        timeZone: "America/Argentina/Buenos_Aires",
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+      }).format(midday),
+    });
+  }
+  return dates;
+};
+
+const recoveryUrl = (phone: string) =>
+  `${publicSiteUrl()}/recuperar?from=whatsapp&telefono=${encodeURIComponent(normalizePhone(phone))}`;
+
+const fetchRecoveryAvailability = async (context: Record<string, any>) => {
+  const enrollments = Array.isArray(context.enrollments) ? context.enrollments : [];
+  if (!enrollments.length) return [];
+
+  const calendar = recoveryCalendar();
+  if (!calendar.length) return [];
+  const start = calendar[0].iso;
+  const end = calendar[calendar.length - 1].iso;
+  const today = argentinaDateIso(new Date());
+  const currentMinutes = argentinaTimeMinutes();
+  const holidays = await rest(`feriados?select=fecha&fecha=gte.${start}&fecha=lte.${end}`);
+  const holidaySet = new Set(
+    (holidays || []).map((item: Record<string, any>) => String(item.fecha || "").split("T")[0]).filter(Boolean),
+  );
+  const usableDates = calendar.filter((item) => !holidaySet.has(item.iso));
+
+  const groups = new Map<string, Array<Record<string, any>>>();
+  for (const enrollment of enrollments) {
+    const key = `${String(enrollment.ciclo_codigo || "")}|${normalizeSchedulePart(enrollment.sede)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(enrollment);
+  }
+
+  const results: Array<Record<string, any>> = [];
+  for (const groupEnrollments of groups.values()) {
+    const sample = groupEnrollments[0];
+    const cycle = String(sample.ciclo_codigo || "");
+    const location = String(sample.sede || "");
+    if (!cycle || !location) continue;
+    const [schedules, regularEnrollments, recoveries] = await Promise.all([
+      rest(
+        `turnos?select=sede,dia,hora,cupo_maximo&ciclo_codigo=eq.${encodeURIComponent(cycle)}&sede=eq.${encodeURIComponent(location)}&activo=eq.true&order=dia.asc,hora.asc`,
+      ),
+      rest(
+        `matriculas?select=sede,dia,hora&ciclo_codigo=eq.${encodeURIComponent(cycle)}&sede=eq.${encodeURIComponent(location)}&estado=eq.activa&limit=5000`,
+      ),
+      rest(
+        `asistencias?select=fecha,turno,sede&tipo=eq.recuperacion&fecha=gte.${start}&fecha=lte.${end}&sede=eq.${encodeURIComponent(location)}&limit=5000`,
+      ),
+    ]);
+
+    const regularCounts = new Map<string, number>();
+    for (const item of regularEnrollments || []) {
+      const key = `${normalizeSchedulePart(item.dia)}|${scheduleStart(item.hora)}`;
+      regularCounts.set(key, (regularCounts.get(key) || 0) + 1);
+    }
+    const recoveryCounts = new Map<string, number>();
+    for (const item of recoveries || []) {
+      const date = String(item.fecha || "").split("T")[0];
+      const key = `${date}|${normalizeSchedulePart(item.turno)}`;
+      recoveryCounts.set(key, (recoveryCounts.get(key) || 0) + 1);
+    }
+
+    for (const enrollment of groupEnrollments) {
+      const contact = (context.contacts || []).find((item: Record<string, any>) =>
+        [item.id, item.persona_id].filter(Boolean).map(String).includes(String(enrollment.alumno_id))
+      );
+      const options: Array<Record<string, any>> = [];
+      for (const date of usableDates) {
+        for (const schedule of schedules || []) {
+          if (normalizeSchedulePart(schedule.dia) !== normalizeSchedulePart(date.day)) continue;
+          const startsAt = scheduleMinutes(schedule.hora);
+          if (date.iso === today && startsAt !== null && startsAt <= currentMinutes) continue;
+          const isUsualSchedule = groupEnrollments.some((current: Record<string, any>) =>
+            String(current.alumno_id) === String(enrollment.alumno_id)
+            && normalizeSchedulePart(current.dia) === normalizeSchedulePart(schedule.dia)
+            && scheduleStart(current.hora) === scheduleStart(schedule.hora)
+          );
+          if (isUsualSchedule) continue;
+          const scheduleKey = `${normalizeSchedulePart(schedule.dia)}|${scheduleStart(schedule.hora)}`;
+          const recoveryKey = `${date.iso}|${normalizeSchedulePart(`${schedule.dia} ${schedule.hora}`)}`;
+          const occupied = (regularCounts.get(scheduleKey) || 0) + (recoveryCounts.get(recoveryKey) || 0);
+          const parsedCapacity = Number(schedule.cupo_maximo);
+          const capacity = schedule.cupo_maximo == null || !Number.isFinite(parsedCapacity) ? null : parsedCapacity;
+          const availablePlaces = capacity == null ? null : Math.max(0, capacity - occupied);
+          if (availablePlaces === 0) continue;
+          options.push({
+            date: date.iso,
+            dateLabel: `${date.label.slice(0, 1).toUpperCase()}${date.label.slice(1)}`,
+            day: schedule.dia,
+            time: scheduleStart(schedule.hora),
+            location,
+            availablePlaces,
+          });
+        }
+      }
+      results.push({
+        studentId: enrollment.alumno_id,
+        student: studentLabel(contact || {}),
+        course: enrollment.curso_nombre || "",
+        options: options.slice(0, 12),
+      });
+    }
+  }
+
+  const unique = new Map<string, Record<string, any>>();
+  for (const result of results) {
+    const key = `${result.studentId}|${result.course}`;
+    if (!unique.has(key)) unique.set(key, result);
+  }
+  return [...unique.values()];
+};
+
 const currentMonthName = () => {
   const value = new Intl.DateTimeFormat("es-AR", {
     month: "long",
@@ -763,10 +921,26 @@ const simulate = async (phone: string, input: string) => {
         context,
       };
     }
+    const availability = await fetchRecoveryAvailability(context);
+    const sections = availability.map((item: Record<string, any>) => {
+      const heading = `*${item.student}${item.course ? ` — ${item.course}` : ""}*`;
+      const lines = (item.options || []).map((option: Record<string, any>) => {
+        const places = option.availablePlaces == null
+          ? ""
+          : ` · ${option.availablePlaces} lugar${option.availablePlaces === 1 ? "" : "es"}`;
+        return `• ${option.dateLabel} · ${option.time} hs · ${option.location}${places}`;
+      });
+      return `${heading}\n${lines.length ? lines.join("\n") : "No encontramos turnos con lugar en las próximas dos semanas."}`;
+    });
+    if (!sections.length) sections.push("No encontramos turnos con lugar en las próximas dos semanas.");
     return {
-      message: `Podés consultar las ausencias y solicitar una recuperación desde:\n${publicSiteUrl()}/recuperar\n\nEl sistema te pedirá el teléfono registrado. Si no encontrás una opción adecuada, escribí *persona* y te derivamos.`,
-      options,
-      nextStep: "menu",
+      message: `*Recuperación de clases*\n\n*Recordamos:*\n✅ Las ausencias justificadas podrán recuperarse en otros turnos según disponibilidad.\n🚫 Los feriados NO podrán recuperarse.\n\n*Clases disponibles en las próximas dos semanas:*\n\n${sections.join("\n\n")}\n\nLos cupos pueden cambiar hasta que confirmes la solicitud. Tocá el botón para elegir la ausencia y generar el recupero.`,
+      options: numberedOptions([
+        { url: recoveryUrl(phone), label: "Generar recupero" },
+        { action: "human", label: "Hablar con una persona" },
+        { action: "menu", label: "Volver al menú principal" },
+      ]),
+      nextStep: "recovery",
       context,
     };
   }

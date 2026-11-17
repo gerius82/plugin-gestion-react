@@ -39,10 +39,11 @@ export default function FichaRecuperar() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const from = params.get("from");
+  const telefonoInicial = params.get("telefono") || "";
   const rutaVolver = from === "alumnos-menu" ? "/alumnos-menu" : "/menu-padres";
 
   const [config, setConfig] = useState(null);
-  const [telefono, setTelefono] = useState("");
+  const [telefono, setTelefono] = useState(telefonoInicial);
   const [alumnos, setAlumnos] = useState([]); // [{matricula_id, alumno_id, nombre, apellido, sede, dia, hora, turno_1, ciclo_codigo, selected}]
   const [sede, setSede] = useState("");
 
@@ -64,6 +65,8 @@ export default function FichaRecuperar() {
   const [okMsg, setOkMsg] = useState("");
   const [feriadosSet, setFeriadosSet] = useState(new Set());
   const [cicloActivo, setCicloActivo] = useState("");
+  const [ciclosCargados, setCiclosCargados] = useState(false);
+  const [busquedaAutomaticaHecha, setBusquedaAutomaticaHecha] = useState(false);
 
   // Cargar config
   useEffect(() => {
@@ -98,6 +101,8 @@ export default function FichaRecuperar() {
         setFeriadosSet(s);
       } catch {
         setFeriadosSet(new Set());
+      } finally {
+        setCiclosCargados(true);
       }
     })();
   }, [config]);
@@ -131,7 +136,7 @@ export default function FichaRecuperar() {
   }, [feriadosSet]);
 
   // Buscar por teléfono
-  const buscar = async () => {
+  const buscar = async (telefonoForzado = telefono) => {
     setError("");
     setOkMsg("");
     setAlumnos([]);
@@ -141,7 +146,7 @@ export default function FichaRecuperar() {
     setFaltaSeleccionada("");
     setDiaSeleccionado(null);
 
-    const tel = normalizarTelefonoBusqueda(telefono);
+    const tel = normalizarTelefonoBusqueda(telefonoForzado).slice(-10);
     if (!tel) {
       setError("Ingresá un número de teléfono válido.");
       return;
@@ -150,34 +155,57 @@ export default function FichaRecuperar() {
 
     setLoading(true);
     try {
-      const res = await fetch(
-        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,sede,dia,hora,ciclo_codigo,inscripciones!inner(nombre,apellido,telefono)` +
-          `&estado=eq.activa` +
-          (cicloActivo ? `&ciclo_codigo=eq.${encodeURIComponent(cicloActivo)}` : "") +
-          `&inscripciones.telefono=ilike.*${tel}*`,
+      const resContactos = await fetch(
+        `${config.supabaseUrl}/rest/v1/inscripciones?select=id,persona_id,nombre,apellido,telefono,telefono_alternativo,telefono_busqueda,telefono_alternativo_busqueda` +
+          `&or=(telefono_busqueda.eq.${encodeURIComponent(tel)},telefono_alternativo_busqueda.eq.${encodeURIComponent(tel)})`,
         { headers: headers() }
       );
-      const data = (await res.json()).filter(
-        (a) => normalizarTelefonoBusqueda(a.inscripciones?.telefono) === tel
+      if (!resContactos.ok) throw new Error("No se pudieron consultar los alumnos.");
+      const contactos = await resContactos.json();
+      const ids = [...new Set(
+        (Array.isArray(contactos) ? contactos : [])
+          .flatMap((contacto) => [contacto.id, contacto.persona_id])
+          .filter(Boolean)
+      )];
+      if (!ids.length) {
+        setError("No se encontraron alumnos con ese teléfono.");
+        return;
+      }
+      const contactosPorId = new Map();
+      contactos.forEach((contacto) => {
+        [contacto.id, contacto.persona_id]
+          .filter(Boolean)
+          .forEach((id) => contactosPorId.set(String(id), contacto));
+      });
+      const res = await fetch(
+        `${config.supabaseUrl}/rest/v1/matriculas?select=id,alumno_id,sede,dia,hora,ciclo_codigo` +
+          `&alumno_id=in.(${ids.join(",")})` +
+          `&estado=eq.activa` +
+          (cicloActivo ? `&ciclo_codigo=eq.${encodeURIComponent(cicloActivo)}` : ""),
+        { headers: headers() }
       );
+      if (!res.ok) throw new Error("No se pudieron consultar las matrículas.");
+      const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         setError("No se encontraron alumnos con ese teléfono.");
-        setLoading(false);
         return;
       }
 
-      const conCheck = data.map((a) => ({
-        matricula_id: a.id,
-        alumno_id: a.alumno_id,
-        nombre: a.inscripciones?.nombre || "",
-        apellido: a.inscripciones?.apellido || "",
-        sede: a.sede,
-        dia: a.dia,
-        hora: a.hora,
-        turno_1: `${a.dia} ${a.hora}`,
-        ciclo_codigo: a.ciclo_codigo,
-        selected: true,
-      }));
+      const conCheck = data.map((matricula) => {
+        const contacto = contactosPorId.get(String(matricula.alumno_id)) || {};
+        return {
+          matricula_id: matricula.id,
+          alumno_id: matricula.alumno_id,
+          nombre: contacto.nombre || "",
+          apellido: contacto.apellido || "",
+          sede: matricula.sede,
+          dia: matricula.dia,
+          hora: matricula.hora,
+          turno_1: `${matricula.dia} ${matricula.hora}`,
+          ciclo_codigo: matricula.ciclo_codigo,
+          selected: true,
+        };
+      });
       setAlumnos(conCheck);
       setSede(conCheck[0].sede);
 
@@ -191,6 +219,12 @@ export default function FichaRecuperar() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!config || !ciclosCargados || !telefonoInicial || busquedaAutomaticaHecha) return;
+    setBusquedaAutomaticaHecha(true);
+    buscar(telefonoInicial);
+  }, [config, ciclosCargados, cicloActivo, telefonoInicial, busquedaAutomaticaHecha]);
 
   // Carga ausencias, calcula próxima clase y capacidad por turno
   const cargarAusenciasYCapacidad = async (alumnosList, sedeSel, ciclo) => {
@@ -469,7 +503,7 @@ export default function FichaRecuperar() {
         onChange={(e) => setTelefono(e.target.value)}
       />
       <button
-        onClick={buscar}
+        onClick={() => buscar()}
         disabled={loading || !config}
         className="px-4 py-2 rounded-md bg-green-500 text-white font-semibold hover:bg-green-600 disabled:opacity-50"
       >
