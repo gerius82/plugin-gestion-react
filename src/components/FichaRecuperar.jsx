@@ -549,7 +549,7 @@ export default function FichaRecuperar() {
                   return (
                     <li key={recuperacion.id}>
                       {nombre ? `${nombre}: ` : ""}{formatearFechaLarga(fecha)}
-                      {recuperacion.turno ? ` · ${recuperacion.turno}` : ""}
+                      {recuperacion.turno ? ` · ${quitarDiaDelTurno(recuperacion.turno)}` : ""}
                       {recuperacion.sede ? ` · ${recuperacion.sede}` : ""}
                     </li>
                   );
@@ -692,6 +692,12 @@ function normalizarDia(valor) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function quitarDiaDelTurno(valor) {
+  return String(valor || "")
+    .replace(/^(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s+/i, "")
+    .trim();
 }
 
 function toISO(d) {
