@@ -48,7 +48,7 @@ export default function FichaRecuperar() {
   const [sede, setSede] = useState("");
 
 
-  const [ausencias, setAusencias] = useState([]); // ["12 de agosto", "19 de agosto (próxima clase)"]
+  const [ausencias, setAusencias] = useState([]); // ["12 de agosto", "19 de agosto"]
   const [faltaSeleccionada, setFaltaSeleccionada] = useState("");
 
   const [turnos, setTurnos] = useState([]); // [{turno: "lunes 18:00", disponible: true}]
@@ -226,24 +226,32 @@ export default function FichaRecuperar() {
     buscar(telefonoInicial);
   }, [config, ciclosCargados, cicloActivo, telefonoInicial, busquedaAutomaticaHecha]);
 
-  // Carga ausencias, calcula próxima clase y capacidad por turno
+  // Carga ausencias recuperables y capacidad por turno
   const cargarAusenciasYCapacidad = async (alumnosList, sedeSel, ciclo) => {
     if (!config) return;
     let cuposLocal = {};
 
-    // 1) Ausencias sin recuperar + fecha futura (próxima clase)
+    // 1) Ausencias sin recuperar que todavía están dentro de las últimas 6 clases
     try {
       const ids = alumnosList.map((a) => a.alumno_id);
-      const resFaltas = await fetch(
-        `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=in.(${ids.join(",")})&tipo=eq.ausente&recuperada=is.false&order=fecha.desc&limit=4&select=fecha`,
-        { headers: headers() }
+      const respuestas = await Promise.all(
+        ids.map((id) =>
+          fetch(
+            `${config.supabaseUrl}/rest/v1/asistencias?alumno_id=eq.${id}&tipo=in.(regular,ausente)&order=fecha.desc&limit=6&select=fecha,tipo,recuperada`,
+            { headers: headers() }
+          ).then((response) => {
+            if (!response.ok) throw new Error("No se pudieron cargar las asistencias recientes.");
+            return response.json();
+          })
+        )
       );
-      const faltas = await resFaltas.json();
+      const faltas = respuestas
+        .flat()
+        .filter((asistencia) => asistencia.tipo === "ausente" && asistencia.recuperada === false);
 
       const yaIncluidas = new Set();
       const opciones = [];
 
-      // pasadas
       faltas.forEach((a) => {
         const [y, m, d] = a.fecha.split("T")[0].split("-");
         const f = `${parseInt(d)} de ${obtenerNombreMes(parseInt(m))}`;
@@ -252,14 +260,6 @@ export default function FichaRecuperar() {
           yaIncluidas.add(f);
         }
       });
-
-      // próxima futura según turno_1 del primer alumno
-      const turnoOriginal = alumnosList[0].turno_1?.toLowerCase();
-      const proxima = calcularProximaClase(turnoOriginal, feriadosSet);
-      if (proxima && !yaIncluidas.has(proxima)) {
-        opciones.push(`${proxima} (próxima clase)`);
-        yaIncluidas.add(proxima);
-      }
 
       if (opciones.length === 0) opciones.push("No hay fechas para recuperar");
 
@@ -408,30 +408,6 @@ export default function FichaRecuperar() {
       for (const a of seleccionados) {
         const fechaHoy = new Date().toISOString().split("T")[0];
         const fechaRecuperaISO = diaSeleccionado?.iso || fechaHoy;
-        const faltaEsProxima = falta.toLowerCase().includes("próxima");
-
-        if (falta !== "No hay fechas para recuperar" && faltaEsProxima) {
-          const fechaProximaISO = convertirFechaTextoAISO(falta);
-          const resAusenciaFutura = await fetch(
-            `${config.supabaseUrl}/rest/v1/asistencias?select=id&alumno_id=eq.${a.alumno_id}&fecha=eq.${fechaProximaISO}&tipo=eq.ausente`,
-            { headers: headers() }
-          );
-          const ausenciaFutura = await resAusenciaFutura.json();
-          if (!Array.isArray(ausenciaFutura) || ausenciaFutura.length === 0) {
-            await fetch(`${config.supabaseUrl}/rest/v1/asistencias`, {
-              method: "POST",
-              headers: { ...headers(), "Content-Type": "application/json" },
-              body: JSON.stringify({
-                alumno_id: a.alumno_id,
-                fecha: fechaProximaISO,
-                tipo: "ausente",
-                recuperada: false,
-                turno: alumnos[0]?.turno_1,
-                sede: alumnos[0]?.sede,
-              }),
-            });
-          }
-        }
 
         const resRecuperacion = await fetch(
           `${config.supabaseUrl}/rest/v1/asistencias?select=id&alumno_id=eq.${a.alumno_id}&fecha=eq.${fechaRecuperaISO}&tipo=eq.recuperacion&turno=eq.${encodeURIComponent(turnoSeleccionado)}&sede=eq.${encodeURIComponent(alumnos[0]?.sede || "")}`,
@@ -669,63 +645,6 @@ function normalizarDia(valor) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-}
-
-function calcularProximaClase(turno, feriadosSet = new Set()) {
-  if (!turno) return "";
-  const dias = [
-    "domingo",
-    "lunes",
-    "martes",
-    "miércoles",
-    "jueves",
-    "viernes",
-    "sábado",
-  ];
-  const hoy = new Date();
-  const [diaNombre] = turno.split(" ");
-  const diaDeseado = dias.findIndex((d) => normalizarDia(d) === normalizarDia(diaNombre));
-  if (diaDeseado === -1) return "";
-
-  let delta = (diaDeseado - hoy.getDay() + 7) % 7;
-  let intentos = 0;
-  while (intentos < 60) {
-    const proxima = new Date(hoy);
-    proxima.setDate(hoy.getDate() + delta);
-    const iso = toISO(proxima);
-    if (!feriadosSet.has(iso)) {
-      return `${proxima.getDate()} de ${obtenerNombreMes(proxima.getMonth() + 1)}`;
-    }
-    delta += 7;
-    intentos += 1;
-  }
-  return "";
-}
-
-function convertirFechaTextoAISO(texto) {
-  // "12 de agosto" o "12 de agosto (próxima clase)"
-  const limpio = texto.replace(/\s*\(próxima clase\)\s*/i, "");
-  const partes = limpio.split(" ");
-  const dia = partes[0].padStart(2, "0");
-  const mesTexto = partes[2];
-  const meses = [
-    "enero",
-    "febrero",
-    "marzo",
-    "abril",
-    "mayo",
-    "junio",
-    "julio",
-    "agosto",
-    "septiembre",
-    "octubre",
-    "noviembre",
-    "diciembre",
-  ];
-  const mes = (meses.indexOf(mesTexto?.toLowerCase()) + 1).toString().padStart(2, "0");
-  const hoy = new Date();
-  const anio = hoy.getFullYear();
-  return `${anio}-${mes}-${dia}`;
 }
 
 function toISO(d) {
