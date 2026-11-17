@@ -458,13 +458,8 @@ const fetchPendingRecoveries = async (context: Record<string, any>) => {
   if (!enrollments.length) return [];
   const studentIds = [...new Set(enrollments.map((item: Record<string, any>) => String(item.alumno_id || "")).filter(Boolean))];
   if (!studentIds.length) return [];
-  const recentClasses = (await Promise.all(
-    studentIds.map((studentId) => rest(
-      `asistencias?select=id,alumno_id,fecha,turno,sede,tipo,recuperada&alumno_id=eq.${encodeURIComponent(studentId)}&tipo=in.(regular,ausente)&order=fecha.desc&limit=6`,
-    )),
-  )).flat();
-  const pending = recentClasses.filter((item: Record<string, any>) =>
-    item.tipo === "ausente" && item.recuperada === false
+  const pending = await rest(
+    `asistencias?select=id,alumno_id,fecha,turno,sede&alumno_id=in.${encodeURIComponent(`(${studentIds.join(",")})`)}&tipo=eq.ausente&recuperada=is.false&order=fecha.desc&limit=100`,
   );
   const contactsById = new Map<string, Record<string, any>>();
   for (const contact of context.contacts || []) {
@@ -804,10 +799,9 @@ const simulate = async (phone: string, input: string) => {
       };
     }
     const pendingRecoveries = await fetchPendingRecoveries(context);
-    const recoveryReminder = "*Recordamos:*\n\n✅ Las ausencias justificadas podrán recuperarse en otros turnos según disponibilidad.\n🚫 Los feriados NO podrán recuperarse.";
     if (!pendingRecoveries.length) {
       return {
-        message: `${recoveryReminder}\n\nNo encontramos clases pendientes de recuperar dentro de las últimas 6 clases.`,
+        message: "No encontramos clases pendientes de recuperar.",
         options: numberedOptions([
           { action: "menu", label: "Volver al menú principal" },
         ]),
@@ -830,7 +824,7 @@ const simulate = async (phone: string, input: string) => {
       return `*${student}*\n${lines.join("\n")}`;
     });
     return {
-      message: `${recoveryReminder}\n\n*Clases pendientes de recuperar:*\n\n${sections.join("\n\n")}`,
+      message: `*Clases pendientes de recuperar:*\n\n${sections.join("\n\n")}`,
       options: numberedOptions([
         { url: recoveryUrl(phone), label: "Gestionar recupero" },
       ]),
