@@ -4,6 +4,23 @@ import { useLocation, useNavigate } from "react-router-dom";
 const normalizarTelefonoBusqueda = (valor = "") =>
   String(valor || "").replace(/\D/g, "").replace(/^0+/, "");
 
+const ORDEN_DIAS = {
+  lunes: 1,
+  martes: 2,
+  miercoles: 3,
+  jueves: 4,
+  viernes: 5,
+  sabado: 6,
+  domingo: 7,
+};
+
+const normalizarDia = (dia = "") =>
+  String(dia)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
 const fechaArgentinaISO = (fecha = new Date()) => {
   const partes = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -245,17 +262,24 @@ export default function CambioTurno() {
       (key) => !turnosActuales.has(key)
     );
 
-    const lista = base.map((key) => {
-      const max = cuposMaximos[key];
-      const actuales = conteo[key] || 0;
-      const [dia, hora] = key.split("||");
-      return {
-        dia,
-        hora,
-        turno: `${dia} ${hora}`,
-        disponible: Number.isFinite(max) ? actuales + selectedCount <= max : true,
-      };
-    });
+    const lista = base
+      .map((key) => {
+        const max = cuposMaximos[key];
+        const actuales = conteo[key] || 0;
+        const [dia, hora] = key.split("||");
+        return {
+          dia,
+          hora,
+          turno: `${dia} ${hora}`,
+          disponible: Number.isFinite(max) ? actuales + selectedCount <= max : true,
+        };
+      })
+      .sort((a, b) => {
+        const ordenA = ORDEN_DIAS[normalizarDia(a.dia)] ?? 99;
+        const ordenB = ORDEN_DIAS[normalizarDia(b.dia)] ?? 99;
+        if (ordenA !== ordenB) return ordenA - ordenB;
+        return String(a.hora).localeCompare(String(b.hora), "es", { numeric: true });
+      });
 
     // Si el seleccionado se quedó sin lugar, deseleccionar
     if (!lista.find((x) => x.turno === turnoSeleccionado && x.disponible)) {
